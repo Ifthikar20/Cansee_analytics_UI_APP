@@ -12,6 +12,7 @@ import {
   MessageSquareWarning,
   ScanFace,
   Scale,
+  ShieldAlert,
   ShieldQuestion,
   Swords,
 } from '@lucide/vue'
@@ -61,6 +62,18 @@ export const CATEGORY_PRESENTATION = {
     icon: ShieldQuestion,
     badgeClass: 'bg-severity-medium/10 text-severity-medium',
   },
+  privacy: {
+    label: 'Privacy',
+    blurb: 'Private or non-public data about your brand surfacing in an answer',
+    icon: ShieldAlert,
+    badgeClass: 'bg-severity-high/10 text-severity-high',
+  },
+  security: {
+    label: 'Security',
+    blurb: 'Unsupported compliance claims, unconfirmed incidents, or advice against your brand on security grounds',
+    icon: ShieldAlert,
+    badgeClass: 'bg-severity-high/10 text-severity-high',
+  },
 }
 
 export const FALLBACK_CATEGORY = {
@@ -90,6 +103,10 @@ export const LEGACY_ISSUE_CATEGORY = {
   emerging_narrative: 'trust',
   negative_outranking: 'association',
   ranking_for_bad_query: 'association',
+  private_data: 'privacy',
+  hallucinated_compliance: 'security',
+  false_incident: 'security',
+  security_advisory: 'security',
 }
 
 export function categoryPresentation(key) {

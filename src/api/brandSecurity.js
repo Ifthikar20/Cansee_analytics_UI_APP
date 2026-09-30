@@ -47,4 +47,13 @@ export default {
     api.get(`/brand-security/websites/${websiteId}/pulse/`),
   savePulse: (websiteId, payload) =>
     api.put(`/brand-security/websites/${websiteId}/pulse/`, payload),
+
+  // Security perception ---------------------------------------------------
+  // What AI assistants say about the brand's security posture, measured by
+  // cold probes over the security prompt pack. params: { days } (0 = all).
+  perception: (websiteId, params = {}) =>
+    api.get(`/brand-security/websites/${websiteId}/perception/`, { params }),
+  // Start a probe. payload: { providers: [], custom_prompts: [] } (both optional).
+  runProbe: (websiteId, payload = {}) =>
+    api.post(`/brand-security/websites/${websiteId}/perception/probe/`, payload),
 }

@@ -34,7 +34,9 @@ import { compareSeverity } from '@/constants/severity'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import AlertsTable from '@/components/brand_security/AlertsTable.vue'
+import SecurityPerceptionPanel from '@/components/brand_security/SecurityPerceptionPanel.vue'
 import AlertDetailSheet from '@/components/brand_security/AlertDetailSheet.vue'
 import CategoryChips from '@/components/brand_security/CategoryChips.vue'
 import ProtectionSummary from '@/components/brand_security/ProtectionSummary.vue'
@@ -47,6 +49,26 @@ const route = useRoute()
 const router = useRouter()
 
 const websiteId = computed(() => appStore.activeWebsite?.id || null)
+
+// ── Views ───────────────────────────────────────────────────────────────
+// "findings" is the alert queue; "perception" is the security-perception
+// dashboard. URL-synced (?view=perception) so the tab is shareable.
+const VIEWS = ['findings', 'perception']
+const view = ref(VIEWS.includes(route.query.view) ? route.query.view : 'findings')
+
+watch(view, (v) => {
+  router.replace({ query: { ...route.query, view: v === 'findings' ? undefined : v } })
+})
+
+// A detector chip on the perception panel jumps to the queue, scoped to
+// the security category so the reader lands on the relevant findings.
+function showSecurityFindings() {
+  filter.category = 'security'
+  filter.status = 'open'
+  view.value = 'findings'
+  syncQuery()
+  loadAlerts()
+}
 
 const alerts = ref([])
 const config = ref({ brand_terms: [], negative_keywords: [] })
@@ -404,12 +426,26 @@ function dismissAlert(alert) {
         <span class="font-semibold text-foreground">Brand Security</span>
       </div>
       <div class="flex items-center gap-3">
-        <span class="text-xs text-muted-foreground">
+        <span v-if="view === 'findings'" class="text-xs text-muted-foreground">
           Findings appear automatically as prompt runs complete
         </span>
+        <Tabs v-model="view">
+          <TabsList>
+            <TabsTrigger value="findings">Findings</TabsTrigger>
+            <TabsTrigger value="perception">Security perception</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
     </div>
 
+    <!-- ── Security perception dashboard ── -->
+    <SecurityPerceptionPanel
+      v-if="view === 'perception'"
+      :website-id="websiteId || ''"
+      @show-findings="showSecurityFindings"
+    />
+
+    <template v-else>
     <!-- ── First-visit guide: no reference content yet ── -->
     <Card v-if="isFirstVisit" class="border-dashed">
       <CardContent class="pt-6">
@@ -659,6 +695,7 @@ function dismissAlert(alert) {
           </CardContent>
         </Card>
     </div>
+    </template>
 
     <!-- ── Finding detail drawer ── -->
     <AlertDetailSheet

@@ -1129,7 +1129,9 @@ const addTopic = ref('')
 const addLocation = ref('US')
 const addTags = ref([])
 const addPending = ref(false)
-const TAG_PRESETS = ['branded', 'non-branded', 'informational', 'transactional']
+// 'security' routes the prompt through the cold security-perception path:
+// no crawled context is sent to the models and security claims are extracted.
+const TAG_PRESETS = ['branded', 'non-branded', 'informational', 'transactional', 'security']
 const LOCATIONS = ref([{ code: 'US', name: 'United States' }])
 
 async function loadRegions() {
