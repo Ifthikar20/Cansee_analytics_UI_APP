@@ -10,11 +10,7 @@
       <span class="status-pill">Operational</span>
     </div>
     <div class="status-row">
-      <span><strong>LLM probing</strong> &middot; Claude / GPT-4 / Gemini / Perplexity</span>
-      <span class="status-pill">Operational</span>
-    </div>
-    <div class="status-row">
-      <span><strong>Content Studio publishing</strong> &middot; WordPress / Webflow / Shopify / HubSpot</span>
+      <span><strong>LLM probing</strong> &middot; ChatGPT / Claude / Gemini / Perplexity</span>
       <span class="status-pill">Operational</span>
     </div>
     <div class="status-row">

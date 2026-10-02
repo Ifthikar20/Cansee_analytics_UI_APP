@@ -39,13 +39,14 @@
                 </a>
               </div>
               <a href="#how" class="nav-uc-foot">
-                <span>Every use case runs on the same five-engine scan.</span>
+                <span>Every use case runs on the same multi-engine scan.</span>
                 <span class="nav-uc-foot-link">See how it works
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
                 </span>
               </a>
             </div>
           </div>
+          <a href="#tour">Product Tour</a>
           <a href="#features">Features</a>
           <a href="#how">How It Works</a>
         </nav>
@@ -89,6 +90,7 @@
           @click="closeNav"
         >{{ uc.label }}</a>
         <span class="nav-sheet-eyebrow">More</span>
+        <a href="#tour" @click="closeNav">Product Tour</a>
         <a href="#features" @click="closeNav">Features</a>
         <a href="#how" @click="closeNav">How It Works</a>
         <router-link to="/login" class="nav-sheet-login" @click="closeNav">Log In</router-link>
@@ -106,17 +108,23 @@
             OPTIMIZED.<br/>
             <em>FOR THE AGENTIC ERA.</em>
           </h1>
-          <p class="hero-p anim" data-anim="fade-up" data-delay="60">
-            See how often
-            <span class="hero-word-cycler" aria-live="off">
-              <TransitionGroup name="word-cycle">
-                <span class="hero-word" :key="categories[activeCat]">{{ categories[activeCat] }}</span>
-              </TransitionGroup>
-            </span>
-            mentions your brand. Find the prompts you're missing from. Generate the
-            content to close the gap — and get the answers where you already work,
-            in Slack or Discord.
-          </p>
+          <div class="hero-sub anim" data-anim="fade-up" data-delay="60">
+            <p class="hero-p">
+              See how often
+              <span class="hero-word-cycler" aria-live="off">
+                <TransitionGroup name="word-cycle">
+                  <span class="hero-word" :key="categories[activeCat]">{{ categories[activeCat] }}</span>
+                </TransitionGroup>
+              </span>
+              mentions your brand. Find the prompts you're missing from, the sources
+              shaping the answers, and what they get wrong — and get the findings where
+              you already work, in Slack or Discord.
+            </p>
+            <a href="#tour" class="hero-tour-link">
+              Take the product tour
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </a>
+          </div>
         </div>
 
         <!-- Hero media. This is the page's LCP element, so it is eager and
@@ -140,7 +148,7 @@
       <div class="trust-row">
         <span class="trust-label">Probes across</span>
         <span class="trust-item">Anthropic Claude</span>
-        <span class="trust-item">OpenAI GPT-4</span>
+        <span class="trust-item">OpenAI ChatGPT</span>
         <span class="trust-item">Google Gemini</span>
         <span class="trust-item">Perplexity</span>
       </div>
@@ -353,6 +361,9 @@
         </div>
       </div>
     </section>
+
+    <!-- ═══ Product tour — one question, end to end, on sample data ═══ -->
+    <ProductTour class="anim" data-anim="fade-up" />
 
     <!-- ═══ Feature showcase — alternating rows ═══ -->
     <section class="feature-showcase" id="features">
@@ -789,6 +800,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { assetUrl } from '@/utils/assetUrl'
+import ProductTour from '@/components/landing/ProductTour.vue'
 
 const scrolled = ref(false)
 const activeCat = ref(0)
@@ -966,7 +978,7 @@ const heroProviders = [
     topCompetitor: { name: 'Asana', share: 18 },
   },
   {
-    key: 'openai', name: 'GPT-4',
+    key: 'openai', name: 'ChatGPT',
     pct: 38, delta: -3, rank: 4.6, citations: 8, hallucinations: 1,
     sentiment: { pos: 0.55, neu: 0.35, neg: 0.10 },
     topCompetitor: { name: 'Linear', share: 22 },
@@ -996,7 +1008,7 @@ const steps = [
   { title: 'Add Your Brand', desc: 'Drop in your domain and the competitors you want to track. We map your category instantly.' },
   { title: 'Pick Your Prompts', desc: 'We mine real buyer questions from Reddit, Quora, and search trends — you approve the set you want to rank for.' },
   { title: 'Watch LLM Visibility', desc: 'We run those prompts across every major LLM and stream back where you show up, where competitors win, and which sources shape the answers.' },
-  { title: 'Export & Share', desc: 'Push clean .csv exports, refresh-on-demand Looker Studio dashboards, or pipe everything through the API into your stack.' },
+  { title: 'Get It Where You Work', desc: 'Daily or weekly digests in Slack, Discord, or Microsoft Teams, and CSV exports of your prompts and analytics events.' },
 ]
 
 /* ── Showcase features (alternating rows) ── */
@@ -1025,14 +1037,14 @@ const useCases = [
     label: 'Measure if AI gets you right',
     feature: 'Brand Ingestion',
     blurb: 'Feed AI your brand facts and see which ones the answers reflect, and which they miss.',
-    anchor: '#features',
+    anchor: '#tour-risks',
     icon: ['M4 19.5A2.5 2.5 0 0 1 6.5 17H20', 'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z'],
   },
   {
     key: 'markets',
     label: 'Track every market & model',
     feature: 'Multi-LLM probing',
-    blurb: 'Dozens of markets across five engines, sliced by topic — in a single run.',
+    blurb: 'Dozens of markets across every engine you track, sliced by topic — in a single run.',
     anchor: '#uc-probe',
     icon: ['M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z', 'M2 12h20', 'M12 2a15 15 0 0 1 0 20', 'M12 2a15 15 0 0 0 0 20'],
   },
@@ -1049,7 +1061,7 @@ const useCases = [
     label: 'Keep a record of what AI said',
     feature: 'Answer history',
     blurb: 'Every answer, verbatim, with its citations and timestamp — never pruned.',
-    anchor: '#features',
+    anchor: '#tour-answers',
     icon: ['M21 8v13H3V8', 'M1 3h22v5H1z', 'M10 12h4'],
   },
   {
@@ -1057,31 +1069,20 @@ const useCases = [
     label: 'Find the conversation forming',
     feature: 'Brand Research',
     blurb: 'The live threads shaping the answer, and where you can join in.',
-    anchor: '#features',
+    anchor: '#tour-sources',
     icon: ['M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z'],
   },
 ]
 
+// Ordered by what sells the product first: the multi-engine scan, then the
+// sources behind it, then brand safety, then the prompt set that feeds them.
 const showcaseFeatures = [
-  {
-    key: 'prompt',
-    video: 'feature-1.mp4',
-    fallbackVideo: 'market-back-ground.mp4',
-    eyebrow: 'PROMPT LIBRARY',
-    headline: 'Decide which questions you get measured on.',
-    desc: "Large language models don't rank pages — they rank mentions. The Prompt Library is where you curate the questions that matter to your category, tag and group them, and set how often each one gets asked. Every prompt then carries its own result.",
-    bullets: [
-      'Add prompts one by one or import them in bulk, then group and tag',
-      'Per prompt: which models answer it, which market, how often it reruns',
-      'Visibility, average position, mentions and sentiment tracked per prompt',
-    ],
-  },
   {
     key: 'probe',
     video: 'feature-2.mp4',
     fallbackVideo: 'watercolor-main.mp4',
     eyebrow: 'MULTI-LLM PROBING',
-    headline: 'Run the same prompts across Claude, GPT-4, Gemini, and Perplexity in one run.',
+    headline: 'Run the same prompts across ChatGPT, Claude, Gemini, and Perplexity in one run.',
     desc: "We query every model in parallel, capture the raw responses, and extract every brand mention, citation, and claim. One score, four perspectives.",
     bullets: [
       'Parallel runs across all four target LLMs',
@@ -1113,6 +1114,19 @@ const showcaseFeatures = [
       'Nine checks run over every answer, each with a stable code you can track',
       'The flagged phrase is highlighted in place, in the answer it came from',
       'A queue you can filter by category and severity, and share by link',
+    ],
+  },
+  {
+    key: 'prompt',
+    video: 'feature-1.mp4',
+    fallbackVideo: 'market-back-ground.mp4',
+    eyebrow: 'PROMPT LIBRARY',
+    headline: 'Decide which questions you get measured on.',
+    desc: "Large language models don't rank pages — they rank mentions. The Prompt Library is where you curate the questions that matter to your category, tag and group them, and set how often each one gets asked. Every prompt then carries its own result.",
+    bullets: [
+      'Add prompts one by one or import them in bulk, then group and tag',
+      'Per prompt: which models answer it, which market, how often it reruns',
+      'Visibility, average position, mentions and sentiment tracked per prompt',
     ],
   },
 ]
@@ -1170,7 +1184,7 @@ const PROMPT_EXAMPLES = [
 const MODEL_KEYS = ['anthropic', 'openai', 'google', 'perplexity']
 const MODEL_LABEL = {
   anthropic: 'Claude',
-  openai: 'GPT-4',
+  openai: 'ChatGPT',
   google: 'Gemini',
   perplexity: 'Perplexity',
 }
@@ -1248,22 +1262,22 @@ function startPromptCycle() {
 const topDomains = [
   {
     domain: 'reddit.com', type: 'Community', share: 28, yourRank: null,
-    citedBy: ['Perplexity', 'Claude', 'GPT-4'],
+    citedBy: ['Perplexity', 'Claude', 'ChatGPT'],
     takeaway: 'Most-cited source in your category, and you are absent from it.',
   },
   {
     domain: 'wikipedia.org', type: 'Reference', share: 22, yourRank: null,
-    citedBy: ['Claude', 'GPT-4', 'Gemini'],
+    citedBy: ['Claude', 'ChatGPT', 'Gemini'],
     takeaway: 'Claude leans on Wikipedia. No entry cites your brand.',
   },
   {
     domain: 'g2.com', type: 'Review', share: 14, yourRank: 4,
-    citedBy: ['GPT-4', 'Perplexity'],
+    citedBy: ['ChatGPT', 'Perplexity'],
     takeaway: 'You place 4th here — the cheapest position to improve.',
   },
   {
     domain: 'nytimes.com', type: 'News', share: 11, yourRank: null,
-    citedBy: ['Gemini', 'GPT-4'],
+    citedBy: ['Gemini', 'ChatGPT'],
     takeaway: 'Gemini is news-first. Nothing here mentions you.',
   },
 ]
@@ -1280,7 +1294,7 @@ const securityFindings = [
     after: '.',
   },
   {
-    code: 'BS-FACT-001', category: 'Factual misrepresentation', model: 'GPT-4',
+    code: 'BS-FACT-001', category: 'Factual misrepresentation', model: 'ChatGPT',
     severity: 'high', severityLabel: 'High',
     before: 'Worth noting that ',
     flagged: 'Meterlane was acquired in 2024 and is no longer actively maintained',
@@ -1326,7 +1340,7 @@ const faqItems = [
   { q: 'How accurate are the citations?',
     a: "Every cited source is captured directly from the model's response and scored by influence, so you see not just what's cited but how much weight it carries." },
   { q: 'Can I share the data with my team or clients?',
-    a: 'Yes — export to .csv, plug into Looker Studio, or pull through the API into whatever stack you already report in.' },
+    a: 'Yes. Send daily or weekly digests to Slack, Discord, or Microsoft Teams, and export your prompts and analytics events to CSV.' },
 ]
 
 /* ── Animated count-up stats ── */
@@ -1851,6 +1865,17 @@ strong { font-weight: 600; }
    as the display size steps down at the breakpoints. */
 .hero-h { max-width: 21ch; }
 .hero-p { max-width: 500px; color: var(--muted); }
+.hero-sub { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; }
+.hero-tour-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+.hero-tour-link:hover { text-decoration-thickness: 2px; }
 
 .hero-word-cycler {
   display: inline-grid;

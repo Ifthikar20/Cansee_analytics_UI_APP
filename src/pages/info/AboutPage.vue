@@ -23,7 +23,7 @@
       </div>
       <div>
         <h4>Brand truth beats hallucination.</h4>
-        <p>Every claim we publish is grounded in your verified Brand Vault.</p>
+        <p>Every AI answer is checked against the brand facts you verify.</p>
       </div>
       <div>
         <h4>Measurement should be weekly, not quarterly.</h4>

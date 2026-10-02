@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint src",
+    "test": "node --test \"src/**/*.test.js\"",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write src/"
   },

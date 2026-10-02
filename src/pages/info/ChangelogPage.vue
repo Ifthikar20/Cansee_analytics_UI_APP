@@ -3,14 +3,13 @@
     <h2>v2.1 · May 2026</h2>
     <ul>
       <li><strong>Source Influence</strong> — per-provider source-mix breakdown with citation confidence scoring.</li>
-      <li><strong>Content Studio</strong> — gap-aware brief drafting grounded in Brand Vault facts; one-click publish to WordPress, Webflow, Shopify, and HubSpot.</li>
       <li><strong>Auth screens</strong> — refreshed sidebar, light-only theme for sign-in flows.</li>
       <li><strong>Performance</strong> — landing page no longer scrolls horizontally on wide displays.</li>
     </ul>
 
     <h2>v2.0 · March 2026</h2>
     <ul>
-      <li><strong>Brand Vault</strong> — verified-fact knowledge base used as grounding context for every generated draft.</li>
+      <li><strong>Brand Vault</strong> (now Brand Ingestion) — a verified-fact knowledge base that every AI answer is checked against.</li>
       <li><strong>Multi-LLM Probing</strong> — added Perplexity and Gemini providers alongside Claude and GPT-4.</li>
       <li><strong>Prompt Library</strong> — typewriter previews, intent buckets, and saved-prompt re-runs.</li>
     </ul>
