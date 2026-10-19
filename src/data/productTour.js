@@ -157,7 +157,7 @@ export const TOUR_PROMPTS = [
         capturedAt: '1 hour ago',
         cited: ['reddit.com', 'g2.com', 'meterlane.com'],
         text:
-          '[[Meterlane]] is the tracker most often recommended for teams under fifteen in recent startup threads, mainly for its free plan and simple sprint setup. {{Linear}} is the usual alternative for engineering-led teams, and {{Asana}} for teams that need timelines and approvals.',
+          '[[Meterlane]] is a strong pick for teams under fifteen, mainly for its free plan and simple sprint setup. {{Linear}} is the usual alternative for engineering-led teams, and {{Asana}} for teams that need timelines and approvals.',
       },
     },
     shareOfVoice: [
@@ -174,7 +174,7 @@ export const TOUR_PROMPTS = [
         share: 26,
         citedBy: ['perplexity', 'openai'],
         presence: 'mentioned',
-        note: 'The main source for this question on Perplexity. The threads it cites recommend Linear nine times and Meterlane twice.',
+        note: 'The main source for this question on Perplexity. The threads it cites recommend Linear nine times and Meterlane twice, so your #1 spot there rests on thin evidence.',
       },
       {
         domain: 'zapier.com',
@@ -222,7 +222,7 @@ export const TOUR_PROMPTS = [
         { brand: 'Asana', mentions: 5 },
         { brand: 'Meterlane', mentions: 2, you: true },
       ],
-      note: 'Perplexity cited this thread in 4 of its 6 answers. A useful reply from your team here is the quickest way into that answer.',
+      note: 'Perplexity cited this thread in 4 of its 6 answers, and it favours Linear 9 to 2. A useful reply from your team here is the quickest way to hold your #1 spot.',
     },
     risks: [
       {
@@ -592,7 +592,12 @@ export const TOUR_PROMPTS = [
         },
         { fact: 'A new release ships every two weeks', status: 'reflected', engines: ['anthropic', 'perplexity'] },
         { fact: 'Public changelog and status page', status: 'reflected', engines: ['anthropic', 'perplexity', 'google'] },
-        { fact: 'Support replies within one business day', status: 'missed', engines: [] },
+        {
+          fact: 'Support replies within one business day',
+          status: 'contradicted',
+          engines: ['google'],
+          note: 'Gemini repeats 2024 reviews that describe slow support.',
+        },
       ],
     },
     actions: [

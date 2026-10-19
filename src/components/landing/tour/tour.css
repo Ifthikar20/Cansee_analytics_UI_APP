@@ -28,12 +28,11 @@
   padding: var(--sec-pad) 0;
 }
 
-.tour p,
-.tour blockquote,
-.tour dl,
-.tour dd { margin: 0; }
-.tour ul { margin: 0; padding: 0; list-style: none; }
-.tour button { font: inherit; color: inherit; }
+/* Resets sit inside :where() so they carry no specificity and every
+   component rule below (.tour-btn, .tour-tab ...) still wins. */
+:where(.tour) :where(p, blockquote, dl, dd) { margin: 0; }
+:where(.tour) :where(ul) { margin: 0; padding: 0; list-style: none; }
+:where(.tour) :where(button) { font: inherit; color: inherit; }
 
 /* Hash targets for #tour and #tour-<step>: all pinned to the section
    top, clearing the floating nav. */
@@ -144,7 +143,8 @@
 .tour-tab.is-done { color: var(--on-ink-mut); }
 .tour-tab-num { font-family: var(--font-display); font-weight: 400; font-size: 24px; line-height: 1; }
 .tour-tab-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.tour-tab-feature { color: var(--on-ink-dim); }
+.tour-tab-feature { display: flex; flex-wrap: wrap; column-gap: .3em; color: var(--on-ink-dim); }
+.tour-tab-part { white-space: nowrap; }
 .tour-tab.is-active .tour-tab-feature { color: var(--on-ink-mut); }
 
 .tour-stage { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
@@ -158,14 +158,15 @@
   line-height: 1.1;
   color: var(--on-ink);
 }
-.tour-stage-cap { color: var(--on-ink-mut); max-width: 680px; }
+/* Room for three caption lines, so the card below never shifts between steps. */
+.tour-stage-cap { min-height: 4.2em; color: var(--on-ink-mut); max-width: 680px; }
 
 /* The light product card the panels render into. */
 .tour-card {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  min-height: 520px;
+  min-height: 600px;
   padding: 20px;
   border-radius: 12px;
   background: #fffcf7;
@@ -267,12 +268,18 @@
 .tour .tp-quote { padding-left: 12px; border-left: 2px solid var(--t-fg); color: var(--t-mut); }
 
 /* Bars: label · track · value. */
-.tour .tp-bars { display: flex; flex-direction: column; gap: 10px; }
+/* Rows are subgrids of the list, so every track in a list starts and
+   ends at the same x and the bars can be compared. */
+.tour .tp-bars {
+  display: grid;
+  grid-template-columns: 128px minmax(40px, 1fr) auto;
+  gap: 10px 12px;
+}
 .tour .tp-bar-row {
   display: grid;
-  grid-template-columns: 128px minmax(0, 1fr) auto;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   align-items: center;
-  gap: 12px;
 }
 .tour .tp-bar-label { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .tour .tp-bar {
@@ -293,6 +300,7 @@
 }
 @keyframes tp-grow { from { transform: scaleX(0); } to { transform: none; } }
 .tour .tp-bar-val { color: var(--t-dim); white-space: nowrap; text-align: right; }
+.tour .tp-note { margin-top: 4px; }
 
 /* — Ask — */
 .tour .tp-search {
@@ -408,7 +416,7 @@
 .tour .tp-domain-row {
   appearance: none;
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto 112px 44px;
+  grid-template-columns: 20px minmax(0, 1fr) 112px 44px;
   align-items: center;
   gap: 10px;
   width: 100%;
@@ -426,7 +434,7 @@
 .tour .tp-domain-share .tp-bar { min-width: 0; }
 .tour .tp-domain-engines { display: inline-flex; gap: 4px; }
 .tour .tp-domain-detail { display: flex; flex-direction: column; gap: 4px; padding: 6px 4px 12px 34px; color: var(--t-mut); }
-.tour .tp-domain-presence { color: var(--t-fg); }
+.tour .tp-domain-presence { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--t-fg); }
 .tour .tp-convo {
   display: flex;
   flex-direction: column;
@@ -528,14 +536,8 @@
   .tour-frame { grid-template-columns: 1fr; }
   .tour-rail { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
   .tour-tab { grid-template-columns: 1fr; justify-items: center; gap: 4px; padding: 10px 4px; text-align: center; }
-  .tour-tab-feature {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-  }
+  /* The stage header already names the active step's features. */
+  .tour-tab-feature { display: none; }
 }
 
 @media (max-width: 767px) {
@@ -558,11 +560,12 @@
   .tour .tp-risks,
   .tour .tp-act { grid-template-columns: 1fr; }
   .tour .tp-facts { grid-template-columns: 1fr; }
-  .tour .tp-engines { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tour .tp-engines { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .tour .tp-engine { gap: 6px; padding: 8px 10px; }
   .tour .tp-big { font-size: 56px; }
-  .tour .tp-bar-row { grid-template-columns: 104px minmax(0, 1fr) auto; }
+  .tour .tp-bars { grid-template-columns: 104px minmax(40px, 1fr) auto; }
+  .tour .tp-convo .tp-bars { grid-template-columns: 88px minmax(40px, 1fr) auto; }
   .tour .tp-domain-row { grid-template-columns: 20px minmax(0, 1fr) 40px 44px; }
-  .tour .tp-domain-row .tp-pill,
   .tour .tp-domain-share .tp-bar { display: none; }
   .tour .tp-domain-share { grid-template-columns: 1fr; text-align: right; }
   .tour .tp-domain-detail { padding-left: 4px; }

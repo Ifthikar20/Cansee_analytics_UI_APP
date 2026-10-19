@@ -24,7 +24,7 @@
 
     <div class="tp-col">
       <div class="tp-col-head">
-        <span class="tp-label">Your brand facts vs. the answers</span>
+        <span class="tp-label">Your brand facts</span>
         <span class="tp-muted">Alignment {{ prompt.alignment.score }}/100</span>
       </div>
       <ul class="tp-facts-list">

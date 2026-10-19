@@ -12,7 +12,6 @@
           >
             <span class="tp-domain-rank">{{ i + 1 }}</span>
             <span class="tp-domain-name">{{ s.domain }}</span>
-            <span class="tp-pill">{{ s.type }}</span>
             <span class="tp-domain-share">
               <span class="tp-bar"><span :style="{ width: (s.share / maxShare) * 100 + '%' }"></span></span>
               <span class="tp-bar-val">{{ s.share }}%</span>
@@ -28,7 +27,9 @@
             </span>
           </button>
           <div v-if="open === s.domain" class="tp-domain-detail">
-            <span class="tp-domain-presence">{{ presence(s) }}</span>
+            <span class="tp-domain-presence">
+              <span class="tp-pill">{{ s.type }}</span>{{ presence(s) }}
+            </span>
             <span class="tp-muted">Cited by {{ citedBy(s) }}.</span>
             <p>{{ s.note }}</p>
           </div>

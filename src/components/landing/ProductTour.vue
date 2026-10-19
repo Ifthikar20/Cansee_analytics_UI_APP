@@ -59,7 +59,13 @@
             <span class="tour-tab-num" aria-hidden="true">{{ i + 1 }}</span>
             <span class="tour-tab-txt">
               <span class="tour-tab-label">{{ s.label }}</span>
-              <span class="tour-tab-feature">{{ s.feature }}</span>
+              <span class="tour-tab-feature">
+                <span
+                  v-for="(part, j) in s.feature.split(' · ')"
+                  :key="part"
+                  class="tour-tab-part"
+                >{{ j ? '· ' + part : part }}</span>
+              </span>
             </span>
           </button>
         </div>

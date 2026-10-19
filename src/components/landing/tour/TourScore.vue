@@ -42,6 +42,10 @@
             <span class="tp-bar-val">{{ fmt(p.value) }} / {{ p.max }}</span>
           </li>
         </ul>
+        <p class="tp-note tp-muted">
+          Mentions uses a smoothed rate ({{ pct(summary.score.parts.mention / 40) }} here, not the raw
+          {{ pct(summary.rate) }}), so a small sample can't max it out. The total is rounded down.
+        </p>
       </div>
     </div>
 

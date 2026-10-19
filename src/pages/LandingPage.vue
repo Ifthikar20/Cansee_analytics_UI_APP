@@ -46,7 +46,7 @@
               </a>
             </div>
           </div>
-          <a href="#tour">Product Tour</a>
+          <a href="#tour">Tour</a>
           <a href="#features">Features</a>
           <a href="#how">How It Works</a>
         </nav>
@@ -199,13 +199,13 @@
                       ChatGPT
                     </div>
                     <div class="why-demo-body">
-                      Top vendors for enterprise <em>observability</em>:
+                      Top project trackers for a <em>growing team</em>:
                       <ol class="why-demo-list">
-                        <li>Datadog</li>
-                        <li>New Relic</li>
-                        <li>Grafana</li>
+                        <li>Linear</li>
+                        <li>Asana</li>
+                        <li>Notion</li>
                         <li class="why-demo-you">
-                          Meterlane LLC
+                          Meterlane
                           <span class="why-demo-you-tag" aria-hidden="true">
                             <svg width="14" height="10" viewBox="0 0 14 10" fill="none" aria-hidden="true">
                               <path d="M13 5H1M1 5l4-4M1 5l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
@@ -1593,7 +1593,7 @@ strong { font-weight: 600; }
 .brand-beta { font-size: 16px; color: var(--muted-2); }
 
 .nav-links { display: flex; align-items: center; gap: 28px; margin-left: auto; }
-.nav-links a { color: var(--ink); text-decoration: none; transition: opacity .2s ease; }
+.nav-links a { color: var(--ink); text-decoration: none; white-space: nowrap; transition: opacity .2s ease; }
 .nav-links a:hover { opacity: .55; }
 
 /* ── Use Cases mega-menu ── */
@@ -1728,7 +1728,7 @@ strong { font-weight: 600; }
 .nav-sheet { max-height: calc(100vh - 100px); overflow-y: auto; }
 
 .nav-right { display: flex; align-items: center; gap: 16px; margin-left: auto; }
-.nav-link-text { color: var(--ink); text-decoration: none; transition: opacity .2s ease; }
+.nav-link-text { color: var(--ink); text-decoration: none; white-space: nowrap; transition: opacity .2s ease; }
 .nav-link-text:hover { opacity: .55; }
 
 /* Resting: a quiet light pill with an outlined arrow, as in the
