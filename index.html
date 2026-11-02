@@ -14,12 +14,15 @@
   <title>Cansee — Brand Intelligence</title>
 
   <!-- Theme bootstrap: runs before any CSS paints so a reload in dark
-       mode never flashes white. Mirrors stores/app.js (same key/values). -->
+       mode never flashes white. Mirrors stores/app.js (same key/values).
+       FORCED_DARK mirrors composables/useForcedTheme.js: the landing page
+       and the auth screens are always dark, whatever the preference. -->
   <script>
     (function () {
       try {
+        var FORCED_DARK = /^\/(welcome|login|register|sso|forgot-password|reset-password|verify-email|invite|auth)?(\/|$)/;
         var pref = localStorage.getItem('cs-theme');
-        var dark = pref === 'dark' || (pref === 'system' &&
+        var dark = FORCED_DARK.test(window.location.pathname) || pref === 'dark' || (pref === 'system' &&
           window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
         var mode = dark ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', mode);
