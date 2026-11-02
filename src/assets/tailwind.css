@@ -59,6 +59,12 @@
   --severity-high: #c2483d;
   --severity-medium: #b07d28;
   --severity-low: #6b6b66;
+  /* Search vs AI gap classes (lib/gap.js): AI ahead, Google ahead,
+     strong in both, invisible in both. */
+  --gap-ai: #6d28d9;
+  --gap-google: #1d4ed8;
+  --gap-strong: #2f7d4f;
+  --gap-invisible: #a1a19c;
 }
 
 [data-theme="dark"] {
@@ -101,6 +107,10 @@
   --severity-high: #ff6b6b;
   --severity-medium: #fbbf24;
   --severity-low: #b3b3b3;
+  --gap-ai: #a78bfa;
+  --gap-google: #60a5fa;
+  --gap-strong: #4ade80;
+  --gap-invisible: #6f6f6f;
 }
 
 @theme inline {
@@ -139,6 +149,10 @@
   --color-severity-high: var(--severity-high);
   --color-severity-medium: var(--severity-medium);
   --color-severity-low: var(--severity-low);
+  --color-gap-ai: var(--gap-ai);
+  --color-gap-google: var(--gap-google);
+  --color-gap-strong: var(--gap-strong);
+  --color-gap-invisible: var(--gap-invisible);
 }
 
 /*

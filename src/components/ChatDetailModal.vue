@@ -1,4 +1,5 @@
 <script setup>
+import { ENGINES } from '@/lib/engines'
 import { ref, computed, watch } from 'vue'
 import { X, ExternalLink, ArrowLeft, ArrowRight, Loader2 } from '@lucide/vue'
 import citationsApi from '@/api/citations'
@@ -28,6 +29,9 @@ const MODELS = {
   llama: { label: 'Llama', abbr: 'La', color: '#0ea5e9' },
   nova: { label: 'Nova', abbr: 'No', color: '#64748b' },
 }
+// The five tracked engines take their label and colour from lib/engines,
+// so every screen agrees; the other models keep their own.
+for (const e of ENGINES) MODELS[e.key] = { ...MODELS[e.key], label: e.label, color: e.color }
 // Alignment score band -> token-based pill styling (same bands as the
 // dashboard breakdown: aligned >= 70, partial 40-69, unaligned < 40).
 function alignmentBandClass(score) {

@@ -78,7 +78,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
-  /** Key of the active nav item: account | subscription | notifications | usage | appearance | contact | team | domains */
+  /** Key of the active nav item: account | subscription | notifications | project | connections | brand-facts | usage | appearance | contact | team | domains */
   active: { type: String, required: true },
 })
 
@@ -124,6 +124,35 @@ const NAV_BASE = [
         icon: [
           'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9',
           'M13.7 21a2 2 0 0 1-3.4 0',
+        ],
+      },
+    ],
+  },
+  {
+    // The active project's own settings. These pages read the project
+    // from the header switcher (appStore.activeWebsite).
+    label: 'Project',
+    items: [
+      {
+        key: 'project', label: 'Project',
+        to: { path: '/settings/project' },
+        icon: [
+          'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z',
+          'M2 12h20',
+          'M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z',
+        ],
+      },
+      {
+        key: 'connections', label: 'Connections',
+        to: { path: '/settings/connections' },
+        icon: ['M9 2v6', 'M15 2v6', 'M6 8h12v4a6 6 0 0 1-12 0z', 'M12 18v4'],
+      },
+      {
+        key: 'brand-facts', label: 'Brand facts',
+        to: { path: '/settings/brand-facts' },
+        icon: [
+          'M4 19.5A2.5 2.5 0 0 1 6.5 17H20',
+          'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',
         ],
       },
     ],

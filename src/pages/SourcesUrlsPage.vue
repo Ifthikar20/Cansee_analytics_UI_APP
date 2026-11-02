@@ -10,6 +10,7 @@
  * pages). Every metric has a tooltip definition; there are no dead
  * controls.
  */
+import { ENGINES } from '@/lib/engines'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Line } from 'vue-chartjs'
@@ -163,6 +164,9 @@ const MODELS = {
   llama: { label: 'Llama', color: '#0ea5e9', initial: 'L' },
   nova: { label: 'Nova', color: '#64748b', initial: 'N' },
 }
+// The five tracked engines take their label and colour from lib/engines,
+// so every screen agrees; the other models keep their own.
+for (const e of ENGINES) MODELS[e.key] = { ...MODELS[e.key], label: e.label, color: e.color }
 function modelStyle(key) {
   return MODELS[key] || { label: key, color: '#94a3b8', initial: (key || '?')[0].toUpperCase() }
 }
@@ -443,13 +447,8 @@ const headerFacts = computed(() => {
             ({{ trafficSummary.ai_percentage }}% of all traffic)
           </span>
           <router-link
-            v-else
-            to="/app/integrations"
-            class="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          >Install the tracking pixel to see AI-referred visits</router-link>
-          <router-link
             v-if="!trafficSummary.gsc_connected"
-            to="/app/integrations"
+            to="/settings/connections"
             class="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
           >Connect Search Console to see Google performance</router-link>
         </template>

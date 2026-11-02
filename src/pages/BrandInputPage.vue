@@ -11,7 +11,7 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import {
-  Bot, ChevronRight, Link2, FileText, Loader2, RefreshCw, StickyNote,
+  Bot, Link2, FileText, Loader2, RefreshCw, StickyNote,
   Globe, BookOpen, Package, FileCode, ShieldCheck,
 } from '@lucide/vue'
 
@@ -372,11 +372,9 @@ watch(websiteId, async (v) => {
   <div class="flex flex-col gap-6">
     <!-- ── Header / breadcrumb ── -->
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <div class="flex items-center gap-2 text-sm text-muted-foreground">
-        <span class="font-medium text-foreground">AI Visibility</span>
-        <ChevronRight class="size-3.5" />
-        <span class="font-semibold text-foreground">Brand Ingestion</span>
-      </div>
+      <p class="max-w-xl text-sm text-muted-foreground">
+        What's true about your brand. Cansee checks every AI answer against these facts.
+      </p>
       <Button variant="ghost" @click="loadSources">
         <RefreshCw class="size-3.5" :class="{ 'animate-spin': listLoading }" />
         Refresh

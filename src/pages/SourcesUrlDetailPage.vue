@@ -1,4 +1,5 @@
 <script setup>
+import { ENGINES } from '@/lib/engines'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Bar } from 'vue-chartjs'
@@ -43,6 +44,9 @@ const MODELS = {
   llama: { label: 'Llama', color: '#0ea5e9', initial: 'L' },
   nova: { label: 'Nova', color: '#64748b', initial: 'N' },
 }
+// The five tracked engines take their label and colour from lib/engines,
+// so every screen agrees; the other models keep their own.
+for (const e of ENGINES) MODELS[e.key] = { ...MODELS[e.key], label: e.label, color: e.color }
 function modelStyle(key) {
   return MODELS[key] || { label: key, color: '#94a3b8', initial: (key || '?')[0].toUpperCase() }
 }
@@ -297,7 +301,7 @@ function fmtTime(iso) {
           </template>
           <Card v-else-if="!realTraffic.gsc_connected" class="lg:col-span-3"><CardContent class="pt-5 text-sm text-muted-foreground">
             Connect Search Console to see this page's Google clicks, impressions and position.
-            <router-link to="/app/integrations" class="font-medium text-foreground hover:underline">Open integrations</router-link>
+            <router-link to="/settings/connections" class="font-medium text-foreground hover:underline">Open Connections</router-link>
           </CardContent></Card>
           <Card v-else class="lg:col-span-3"><CardContent class="pt-5 text-sm text-muted-foreground">
             No Google Search data recorded for this page in this period.
@@ -314,7 +318,7 @@ function fmtTime(iso) {
             <template v-if="realTraffic.pixel_active">No AI-referred visits to this page in this period.</template>
             <template v-else>
               Install the tracking pixel to count visits arriving from AI assistants.
-              <router-link to="/app/integrations" class="font-medium text-foreground hover:underline">Open integrations</router-link>
+              <router-link to="/settings/connections" class="font-medium text-foreground hover:underline">Open Connections</router-link>
             </template>
           </CardContent></Card>
         </div>
