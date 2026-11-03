@@ -51,11 +51,19 @@ import {
 // to show, so requests are _silentError (no second, generic toast from the
 // API client). A failed message POST does not throw: the optimistic message
 // gets status `send_failed` and `send.error`, and retrySend() re-posts it
-// with the same Idempotency-Key.
+// with the same Idempotency-Key (editing its text takes a new key).
+//
+// The server decides when a run is over. A run this tab had to end on its
+// own (its transport failed for good) is `settledLocally`; when the server
+// still lists it as active, the next chat detail attaches it again.
 
 const SILENT = Object.freeze({ _silentError: true })
 
+// Stop waits this long for the terminal event, then asks the server.
 const STOP_FALLBACK_MS = 8000
+// After a new chat's first reply, when its generated title has not arrived,
+// the server is asked again after each of these delays.
+const TITLE_CHECKS_MS = [2000, 6000, 15000]
 const SERVER_RUNS_TO_FOLLOW = 3
 const RUN_KEYS = ['phase', 'lastSeq', 'startedAt', 'durationMs', 'usage', 'error', 'retrying', 'model', 'stopReason', 'outcome']
 
@@ -111,6 +119,10 @@ export const useAgentStore = defineStore('agent', () => {
 
     const inflightChats = new Map()
     const stopTimers = new Map()
+    // Chats this tab created whose generated title has not arrived yet, and
+    // the pending checks for one (see followTitle).
+    const titleWanted = new Set()
+    const titleTimers = new Map()
     let chatsRequest = 0
     let initPromise = null
 
@@ -208,15 +220,26 @@ export const useAgentStore = defineStore('agent', () => {
         return chatState.value[key]
     }
 
-    /** The project id, initialising from the active website when needed. */
-    function ensureProject() {
-        if (websiteId.value) return websiteId.value
-        const active = idOf(app.activeWebsite?.id)
-        if (active) {
-            init(active)
-            return websiteId.value
+    /**
+     * The project id, initialising from `expected` (the project the calling
+     * page shows) or the active website when needed. When the store is
+     * scoped to a project other than `expected` this throws rather than act
+     * on the wrong project.
+     */
+    function ensureProject(expected = null) {
+        const want = idOf(expected)
+        if (!websiteId.value) {
+            const id = want || idOf(app.activeWebsite?.id)
+            if (id) init(id)
         }
-        throw new AgentError({ code: 'no_project', message: 'Choose a project first.' })
+        if (!websiteId.value) throw new AgentError({ code: 'no_project', message: 'Choose a project first.' })
+        if (want && want !== websiteId.value) {
+            throw new AgentError({
+                code: 'project_changed',
+                message: 'The workspace is on another project now. Reload this page, then try again.',
+            })
+        }
+        return websiteId.value
     }
 
     function withPane(chatId, fn) {
@@ -298,6 +321,7 @@ export const useAgentStore = defineStore('agent', () => {
             durationMs: null,
             usage: null,
             cancelRequested: false,
+            settledLocally: false,
             error: null,
             retrying: null,
             model: '',
@@ -305,6 +329,14 @@ export const useAgentStore = defineStore('agent', () => {
             outcome: '',
         }
         return runs.value[r.id]
+    }
+
+    /** The server still runs a run this tab ended on its own: follow it again. */
+    function reviveRun(run, serverPhase) {
+        run.settledLocally = false
+        run.error = null
+        run.phase = run.cancelRequested ? RUN_PHASE.CANCELLING : serverPhase
+        if (run.cancelRequested) armStopCheck(run.id)
     }
 
     function attachRun(run) {
@@ -340,11 +372,13 @@ export const useAgentStore = defineStore('agent', () => {
 
         const serverPhase = activeRunRaw ? phaseFromRunStatus(activeRunRaw.status) : null
         if (activeRunRaw && !isTerminalPhase(serverPhase)) {
-            const isNew = !runs.value[activeRunRaw.id]
+            const known = runs.value[activeRunRaw.id]
+            const revive = Boolean(known && known.settledLocally)
             const run = upsertRun(activeRunRaw, { chatId, messageId: activeRunRaw.message_id })
+            if (revive) reviveRun(run, serverPhase)
             const message = messages.value[run.messageId]
             // Resume from the snapshot the parts reflect, not the run's newest seq.
-            if (isNew || resync) run.lastSeq = message ? Number(message.parts_seq) || 0 : 0
+            if (!known || resync || revive) run.lastSeq = message ? Number(message.parts_seq) || 0 : 0
             st.activeRunId = run.id
             attachRun(run)
         } else if (st.activeRunId) {
@@ -354,9 +388,7 @@ export const useAgentStore = defineStore('agent', () => {
             } else if (resync || !manager.isAttached(local.id)) {
                 // The server has no active run and no stream will report the
                 // end (a resyncing transport is paused until this returns).
-                const message = messages.value[local.messageId]
-                local.phase = phaseFromMessageStatus(message?.status) || RUN_PHASE.DONE
-                onRunTerminal(local)
+                finishFromSavedMessage(local)
             }
         }
         return detail
@@ -392,15 +424,15 @@ export const useAgentStore = defineStore('agent', () => {
     }
 
     // Chats the server lists with an active run this tab is not following
-    // (another tab started it): load them so the recents spinner and the
-    // unseen dot follow the run to its end.
+    // (another tab started it, or this tab lost its stream): load them so the
+    // recents spinner and the unseen dot follow the run to its end.
     function followServerRuns(summaries) {
         let followed = 0
         for (const s of summaries) {
             if (followed >= SERVER_RUNS_TO_FOLLOW) break
             if (!s.active_run_id || manager.isAttached(s.active_run_id)) continue
             const local = runs.value[s.active_run_id]
-            if (local && isTerminalPhase(local.phase)) continue
+            if (local && isTerminalPhase(local.phase) && !local.settledLocally) continue
             followed += 1
             loadChatDetail(s.id, { force: true }).catch(() => {})
         }
@@ -410,6 +442,72 @@ export const useAgentStore = defineStore('agent', () => {
         const timer = stopTimers.get(runId)
         if (timer) clearTimeout(timer)
         stopTimers.delete(runId)
+    }
+
+    function clearTitleTimer(chatId) {
+        const timer = titleTimers.get(chatId)
+        if (timer) clearTimeout(timer)
+        titleTimers.delete(chatId)
+    }
+
+    /**
+     * A new chat's generated title is saved after its first reply ended when
+     * the title takes longer than the reply, and then no chat.updated event
+     * carries it. Ask the server after each TITLE_CHECKS_MS delay until a
+     * generated or user title is there.
+     */
+    function followTitle(chatId, attempt = 0) {
+        if (attempt >= TITLE_CHECKS_MS.length) return
+        clearTitleTimer(chatId)
+        const ep = epoch.value
+        const wanted = (chat) => Boolean(chat) && chat.title_source !== 'user' && chat.title_source !== 'model'
+        const check = async () => {
+            titleTimers.delete(chatId)
+            const wid = websiteId.value
+            if (ep !== epoch.value || !wid || !wanted(chats.value.byId[chatId])) return
+            let detail = null
+            try {
+                const response = await agentApi.getChat(wid, chatId, { _silentError: true })
+                detail = normalizeChatDetail(response?.data)
+            } catch (err) {
+                if (normalizeError(err).status === 404) return
+            }
+            const chat = chats.value.byId[chatId]
+            if (ep !== epoch.value || !wanted(chat)) return
+            if (detail && detail.title) {
+                chat.title = detail.title
+                chat.title_source = detail.title_source
+            }
+            if (wanted(chat)) followTitle(chatId, attempt + 1)
+        }
+        titleTimers.set(chatId, setTimeout(check, TITLE_CHECKS_MS[attempt]))
+    }
+
+    /**
+     * Drafts the run was still writing when it ended: nothing writes them
+     * anymore. When the draft's agent call reports it saved, only its end
+     * event missed this tab, so the draft goes and the saved copy loads.
+     * Any other one failed.
+     */
+    function settleDrafts(run) {
+        const message = messages.value[run.messageId]
+        const calls = (Array.isArray(message?.parts) ? message.parts : []).filter((p) => p && p.type === 'agent_call')
+        const stopped = run.phase === RUN_PHASE.CANCELLED
+        for (const [aid, entry] of Object.entries(artifacts.value)) {
+            const draft = entry?.draft
+            if (!draft || draft.runId !== run.id || draft.status !== 'drafting') continue
+            const call = calls.filter((p) => idOf(p.artifact_id) === aid).pop()
+            if (call && call.status === 'done') {
+                entry.draft = null
+                refreshArtifact(aid)
+                continue
+            }
+            entry.draft = {
+                ...draft,
+                status: 'failed',
+                error: stopped ? { code: 'stopped', message: 'Stopped' } : { code: 'not_finished', message: 'Not finished' },
+            }
+        }
     }
 
     function onRunTerminal(run) {
@@ -422,12 +520,28 @@ export const useAgentStore = defineStore('agent', () => {
             if (chat.active_run_id === run.id) chat.active_run_id = null
             chat.last_message_at = new Date().toISOString()
         }
+        settleDrafts(run)
+        if (titleWanted.delete(run.chatId) && chat && chat.title_source !== 'user' && chat.title_source !== 'model') {
+            followTitle(run.chatId)
+        }
         if (viewingChatId.value !== run.chatId) markUnseen(run.chatId)
         // Spend changed: refresh the allowance shown next to the composer.
         loadStatus()
     }
 
-    /** End a run on this side when no terminal event will arrive. */
+    /** The server has finished `run` but no terminal event reached this tab: its saved message says how. */
+    function finishFromSavedMessage(run) {
+        const message = messages.value[run.messageId]
+        run.phase = phaseFromMessageStatus(message?.status) || RUN_PHASE.DONE
+        onRunTerminal(run)
+    }
+
+    /**
+     * End a run on this side when no terminal event will arrive and the
+     * server cannot be asked (its transport failed for good, or the server
+     * no longer knows the run). The server stays authoritative: a chat
+     * detail that still lists the run as active revives it.
+     */
     function settleRunLocally(runId, phase, error = null) {
         const run = runs.value[runId]
         if (!run) return
@@ -435,6 +549,7 @@ export const useAgentStore = defineStore('agent', () => {
         clearStopTimer(runId)
         if (isTerminalPhase(run.phase)) return
         run.phase = phase
+        run.settledLocally = true
         if (error) run.error = error
         const message = messages.value[run.messageId]
         if (message && message.status === MESSAGE_STATUS.STREAMING) {
@@ -473,14 +588,58 @@ export const useAgentStore = defineStore('agent', () => {
         const message = messages.value[fresh.messageId]
         const active = Boolean(st && st.activeRunId === runId && !isTerminalPhase(fresh.phase))
         if (!active) {
-            if (!isTerminalPhase(fresh.phase)) {
-                fresh.phase = phaseFromMessageStatus(message?.status) || RUN_PHASE.DONE
-                onRunTerminal(fresh)
-            }
+            if (!isTerminalPhase(fresh.phase)) finishFromSavedMessage(fresh)
             return { active: false, lastSeq: fresh.lastSeq }
         }
         fresh.lastSeq = message ? Number(message.parts_seq) || 0 : 0
         return { active: true, lastSeq: fresh.lastSeq }
+    }
+
+    function armStopCheck(runId) {
+        clearStopTimer(runId)
+        stopTimers.set(
+            runId,
+            setTimeout(() => {
+                stopTimers.delete(runId)
+                checkStoppingRun(runId)
+            }, STOP_FALLBACK_MS)
+        )
+    }
+
+    /**
+     * Stop's fallback: no terminal event yet, so ask the server. A run it
+     * still lists as active is still stopping (a tool in flight can take a
+     * while to return); the chat stays busy, the transport keeps reading and
+     * the check repeats. A run it has finished is settled from the saved
+     * message instead of being assumed cancelled.
+     */
+    async function checkStoppingRun(runId) {
+        const run = runs.value[runId]
+        if (!run || isTerminalPhase(run.phase) || !websiteId.value) return
+        const ep = epoch.value
+        let response
+        try {
+            response = await agentApi.getChat(websiteId.value, run.chatId, { _silentError: true })
+        } catch (err) {
+            if (ep !== epoch.value) return
+            // The chat is gone, so the run is too; anything else: ask again later.
+            if (normalizeError(err).status === 404) settleRunLocally(runId, RUN_PHASE.CANCELLED)
+            else armStopCheck(runId)
+            return
+        }
+        const current = runs.value[runId]
+        if (ep !== epoch.value || !current || isTerminalPhase(current.phase)) return
+        const data = response?.data
+        const live = normalizeChatDetail(data)?.active_run
+        if (live && String(live.id) === runId && !isTerminalPhase(phaseFromRunStatus(live.status))) {
+            armStopCheck(runId)
+            return
+        }
+        // Finished on the server without its terminal event reaching this tab:
+        // stop reading and take the saved message, which is final.
+        manager.detach(runId)
+        ingestChatDetail(data, { resync: true })
+        if (!isTerminalPhase(current.phase)) finishFromSavedMessage(current)
     }
 
     function commitDrafts(runId, before, after) {
@@ -529,8 +688,15 @@ export const useAgentStore = defineStore('agent', () => {
                     withPane(run.chatId, (pane) => pane.updateTab(fx.tabId, fx.patch))
                     break
                 case 'chat.updated': {
-                    const chat = chats.value.byId[fx.chatId || run.chatId]
-                    if (chat && fx.title) chat.title = fx.title
+                    // Only the generated title comes as an event; a name the
+                    // user set meanwhile stays.
+                    const chatId = fx.chatId || run.chatId
+                    const chat = chats.value.byId[chatId]
+                    if (chat && fx.title && chat.title_source !== 'user') {
+                        chat.title = fx.title
+                        chat.title_source = 'model'
+                    }
+                    if (fx.title) titleWanted.delete(chatId)
                     break
                 }
                 case 'artifact.completed':
@@ -634,13 +800,8 @@ export const useAgentStore = defineStore('agent', () => {
                 const assistant = upsertMessage(data?.assistant_message, { chatId })
                 const run = startRun(chatId, data?.run, assistant)
                 const s = chatState.value[chatId]
-                if (s) {
-                    s.pending = false
-                    if (s.cancelOnStart) {
-                        s.cancelOnStart = false
-                        stop(chatId)
-                    }
-                }
+                if (s) s.pending = false
+                applyEarlyStop(chatId)
                 return run
             })
             .catch((err) => {
@@ -660,8 +821,23 @@ export const useAgentStore = defineStore('agent', () => {
                 }
                 // Disabled, unconfigured or over allowance: refresh the banner.
                 if (error.status === 503 || error.code === ERROR_CODE.ALLOWANCE_EXCEEDED) loadStatus()
+                followBusyChat(chatId, error)
                 return null
             })
+    }
+
+    /** A Stop pressed while the run-start POST was pending applies to the run it started. */
+    function applyEarlyStop(chatId) {
+        const st = chatState.value[chatId]
+        if (!st || !st.cancelOnStart) return
+        st.cancelOnStart = false
+        stop(chatId)
+    }
+
+    /** 409 run_in_progress: the server is running a turn this tab does not follow; load it. */
+    function followBusyChat(chatId, error) {
+        if (error.status !== 409 || error.code !== ERROR_CODE.RUN_IN_PROGRESS) return
+        loadChatDetail(chatId, { force: true }).catch(() => {})
     }
 
     function forgetChat(chatId) {
@@ -679,6 +855,8 @@ export const useAgentStore = defineStore('agent', () => {
         delete childrenOf.value[rootKey(chatId)]
         delete chatState.value[chatId]
         inflightChats.delete(chatId)
+        titleWanted.delete(chatId)
+        clearTitleTimer(chatId)
         delete chats.value.byId[chatId]
         chats.value.order = chats.value.order.filter((id) => id !== chatId)
         // Reset the pane before dropping its stored tabs, or it writes them back.
@@ -901,6 +1079,8 @@ export const useAgentStore = defineStore('agent', () => {
             } catch {}
             if (viewingChatId.value === NEW_CHAT_KEY) viewingChatId.value = cid
             setLastChat(userId(), wid, cid)
+            // Its first reply also gets it a generated title.
+            titleWanted.add(cid)
 
             const temp = messages.value[tempId]
             removeChild(childrenOf.value, rootKey(NEW_CHAT_KEY), tempId)
@@ -923,6 +1103,7 @@ export const useAgentStore = defineStore('agent', () => {
         const tempId = addOptimistic(cid, lastPersistedLeaf(cid), body, agent)
         st.leafId = tempId
         st.pending = true
+        st.cancelOnStart = false
         moveToTop(cid, body)
         postSend(tempId)
         return cid
@@ -975,9 +1156,11 @@ export const useAgentStore = defineStore('agent', () => {
     }
 
     /**
-     * Stop the chat's run: POST cancel, keep reading until run.cancelled or
-     * run.completed arrives, and settle locally after 8 s without one. A
-     * send still waiting for its 202 is cancelled as soon as the run exists.
+     * Stop the chat's run: POST cancel and keep reading until run.cancelled
+     * or run.completed arrives. Without one after 8 s, the server is asked
+     * (see checkStoppingRun); the chat stays busy while the server still
+     * runs the turn, since a new message would be refused until it ends. A
+     * turn still waiting for its 202 is cancelled as soon as the run exists.
      */
     async function stop(chatId) {
         const key = idOf(chatId) || NEW_CHAT_KEY
@@ -991,19 +1174,21 @@ export const useAgentStore = defineStore('agent', () => {
         if (run.cancelRequested) return
         run.cancelRequested = true
         run.phase = RUN_PHASE.CANCELLING
-        clearStopTimer(run.id)
-        stopTimers.set(
-            run.id,
-            setTimeout(() => {
-                stopTimers.delete(run.id)
-                settleRunLocally(run.id, RUN_PHASE.CANCELLED)
-            }, STOP_FALLBACK_MS)
-        )
+        armStopCheck(run.id)
+        let response
         try {
-            await agentApi.cancelRun(run.id)
+            response = await agentApi.cancelRun(run.id)
         } catch (err) {
             const error = normalizeError(err)
+            // The server does not know the run: nothing will report its end.
             if (error.status === 404) settleRunLocally(run.id, RUN_PHASE.CANCELLED)
+            return
+        }
+        // Already finished on the server: confirm it now rather than in 8 s.
+        const status = response?.data?.status
+        if (status && isTerminalPhase(phaseFromRunStatus(status))) {
+            clearStopTimer(run.id)
+            checkStoppingRun(run.id)
         }
     }
 
@@ -1015,16 +1200,25 @@ export const useAgentStore = defineStore('agent', () => {
         assertIdle(chatId)
         const st = ensureChatState(chatId)
         st.pending = true
+        st.cancelOnStart = false
         try {
             const { data } = await agentApi.regenerate(wid, message.id, { ...SILENT })
             if (ep !== epoch.value) return null
             const assistant = upsertMessage(data?.assistant_message, { chatId })
             if (assistant && message.parent_id) addChild(childrenOf.value, String(message.parent_id), assistant.id)
-            return startRun(chatId, data?.run, assistant)
+            const run = startRun(chatId, data?.run, assistant)
+            applyEarlyStop(chatId)
+            return run
         } catch (err) {
-            throw normalizeError(err)
+            const error = normalizeError(err)
+            if (ep === epoch.value) followBusyChat(chatId, error)
+            throw error
         } finally {
-            if (ep === epoch.value && chatState.value[chatId]) chatState.value[chatId].pending = false
+            const s = ep === epoch.value ? chatState.value[chatId] : null
+            if (s) {
+                s.pending = false
+                s.cancelOnStart = false
+            }
         }
     }
 
@@ -1034,6 +1228,7 @@ export const useAgentStore = defineStore('agent', () => {
         assertIdle(chatId)
         const st = ensureChatState(chatId)
         st.pending = true
+        st.cancelOnStart = false
         try {
             const { data } = await request()
             if (ep !== epoch.value) return null
@@ -1041,11 +1236,19 @@ export const useAgentStore = defineStore('agent', () => {
             if (user) addChild(childrenOf.value, parentKeyOf(user), user.id)
             const assistant = upsertMessage(data?.assistant_message, { chatId })
             if (assistant && user) addChild(childrenOf.value, user.id, assistant.id)
-            return startRun(chatId, data?.run, assistant)
+            const run = startRun(chatId, data?.run, assistant)
+            applyEarlyStop(chatId)
+            return run
         } catch (err) {
-            throw normalizeError(err)
+            const error = normalizeError(err)
+            if (ep === epoch.value) followBusyChat(chatId, error)
+            throw error
         } finally {
-            if (ep === epoch.value && chatState.value[chatId]) chatState.value[chatId].pending = false
+            const s = ep === epoch.value ? chatState.value[chatId] : null
+            if (s) {
+                s.pending = false
+                s.cancelOnStart = false
+            }
         }
     }
 
@@ -1055,8 +1258,12 @@ export const useAgentStore = defineStore('agent', () => {
         const body = typeof text === 'string' ? text.trim() : ''
         if (!body) throw new AgentError({ status: 400, code: ERROR_CODE.INVALID, message: 'Write a message first.' })
         if (message.local && message.send) {
-            // Not on the server yet: change the text and post it again.
+            // Not on the server yet: change the text and post it again. Other
+            // text is another request, so it takes a new Idempotency-Key; the
+            // old key would replay a turn the server may have started with
+            // the old text.
             message.parts = [{ id: `${message.id}:text`, type: 'text', text: body }]
+            if (message.send.text !== body) message.send.idempotencyKey = newId()
             message.send.text = body
             return retrySend(message.id)
         }
@@ -1249,8 +1456,9 @@ export const useAgentStore = defineStore('agent', () => {
         }
     }
 
-    async function loadContext() {
-        const wid = ensureProject()
+    /** The brand context. Pass the page's `websiteId`; another project in scope throws project_changed. */
+    async function loadContext({ websiteId: expected = null } = {}) {
+        const wid = ensureProject(expected)
         const ep = epoch.value
         try {
             const { data } = await agentApi.getContext(wid, { _silentError: true })
@@ -1262,9 +1470,13 @@ export const useAgentStore = defineStore('agent', () => {
         }
     }
 
-    /** PUT the brand context with its revision; a stale one throws code revision_conflict. */
-    async function saveContext(payload = {}) {
-        const wid = ensureProject()
+    /**
+     * PUT the brand context with its revision; a stale one throws code
+     * revision_conflict. Pass the page's `websiteId`: a form shown for one
+     * project is never written to another (that throws project_changed).
+     */
+    async function saveContext(payload = {}, { websiteId: expected = null } = {}) {
+        const wid = ensureProject(expected)
         const ep = epoch.value
         const body = {
             audience: payload.audience ?? '',
@@ -1302,6 +1514,9 @@ export const useAgentStore = defineStore('agent', () => {
         manager.detachAll()
         for (const timer of stopTimers.values()) clearTimeout(timer)
         stopTimers.clear()
+        for (const timer of titleTimers.values()) clearTimeout(timer)
+        titleTimers.clear()
+        titleWanted.clear()
         inflightChats.clear()
         epoch.value += 1
         chatsRequest += 1
@@ -1331,6 +1546,9 @@ export const useAgentStore = defineStore('agent', () => {
 
     /* ── Watchers ── */
 
+    // Sign-out drops every user's data right away (clearAuth runs this
+    // before it returns); the token watcher covers a token cleared otherwise.
+    auth.onClearAuth(() => resetAll())
     watch(
         () => auth.accessToken,
         (token, before) => {
@@ -1344,14 +1562,10 @@ export const useAgentStore = defineStore('agent', () => {
             else if (now && websiteId.value) setLastProject(now, websiteId.value)
         }
     )
-    // Follow a project switch made elsewhere (the app shell) once the
-    // workspace has been opened in this session.
-    watch(
-        () => idOf(app.activeWebsite?.id),
-        (id) => {
-            if (id && websiteId.value && id !== websiteId.value) init(id)
-        }
-    )
+    // The project follows the workspace URL, never app.activeWebsite on its
+    // own: AgentShell calls init() for the project in view. The active
+    // website can change while a page that blocked the switch (unsaved
+    // context edits) still shows the old project.
 
     return {
         // state

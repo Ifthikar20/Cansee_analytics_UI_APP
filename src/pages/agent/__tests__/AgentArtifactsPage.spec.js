@@ -63,6 +63,14 @@ describe('AgentArtifactsPage', () => {
     expect(wrapper.find('ul.ag-arts').exists()).toBe(false)
   })
 
+  it('describes what a saved report keeps: engine checks, not answer text', async () => {
+    const { wrapper } = await setup('agent-reports', ['report'])
+    const intro = wrapper.find('.ag-page-intro').text()
+    // The research snapshot stores each engine's named / rank / sentiment only.
+    expect(intro).toContain('AI engine checks (named or not, rank, sentiment)')
+    expect(intro).not.toMatch(/engine answers/i)
+  })
+
   it('derives kinds from the route when the prop is missing', async () => {
     await setup('agent-sheets', null)
     expect(fakeAgent.loadArtifacts).toHaveBeenCalledWith(['sheet'], '')

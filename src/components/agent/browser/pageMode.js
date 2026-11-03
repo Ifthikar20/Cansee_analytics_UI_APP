@@ -49,6 +49,8 @@ const ERROR_TITLES = {
   timeout: 'The page took too long to respond.',
   too_large: 'The page is larger than 2 MB, so it was not loaded.',
   not_html: "This address isn't a web page.",
+  too_complex: 'The page has too much markup to read here.',
+  busy: 'Too many pages are being read right now. Try again in a moment.',
 }
 
 export function pageErrorInfo(error) {

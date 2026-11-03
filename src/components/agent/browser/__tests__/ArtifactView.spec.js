@@ -11,24 +11,43 @@ vi.mock('@/stores/auth', async () => {
   const m = await import('./__fixtures__/stores.js')
   return { useAuthStore: m.useAuthStore }
 })
+vi.mock('@/composables/agent/useBrowse', () => ({ useBrowse: () => ({ load: () => {} }) }))
 
 import ArtifactView from '../views/ArtifactView.vue'
+import PaneHeader from '../PaneHeader.vue'
 import { useArtifactSource } from '../useArtifactSource'
 import { useAgentStore } from '@/stores/agent'
 import { PREVIEW_CSP } from '@/lib/agent/srcdoc'
 import { serpCapture } from './__fixtures__/stores.js'
 
+// The artifact view, with the pane header when `header` is set. `call` is
+// what the chat knows about the agent call writing the artifact.
 const Harness = defineComponent({
-  props: { artifactId: { type: String, required: true }, version: { type: Number, default: null } },
+  props: {
+    artifactId: { type: String, required: true },
+    version: { type: Number, default: null },
+    call: { type: Object, default: null },
+    header: { type: Boolean, default: false },
+  },
   emits: ['version'],
   setup(props, { emit }) {
     const source = useArtifactSource(
       () => props.artifactId,
-      () => props.version
+      () => props.version,
+      { call: () => props.call }
     )
-    return () => h(ArtifactView, { source, onVersion: (v) => emit('version', v) })
+    const tab = { id: `artifact:${props.artifactId}`, kind: 'artifact', artifactId: props.artifactId, title: '', status: 'ready' }
+    return () =>
+      h('div', [
+        props.header ? h(PaneHeader, { tab, source }) : null,
+        h(ArtifactView, { source, onVersion: (v) => emit('version', v) }),
+      ])
   },
 })
+
+function failWith(status) {
+  return Object.assign(new Error(`HTTP ${status}`), { status })
+}
 
 function campaign(overrides = {}) {
   return {
@@ -186,5 +205,138 @@ describe('ArtifactView', () => {
     expect(wrapper.find('.ag-artv-notice').text()).toContain('Viewing version 1 of 2.')
     await wrapper.find('.ag-artv-notice-btn').trigger('click')
     expect(wrapper.emitted('version')[0]).toEqual([null])
+  })
+
+  it('keeps a finished draft out of exports and retries its saved copy until it loads', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      agent.artifacts.p1 = {
+        id: 'p1',
+        kind: 'page',
+        title: 'Battery page',
+        draft: {
+          status: 'done',
+          kind: 'page',
+          title: 'Battery page',
+          version: 1,
+          content: '<h1>Raw draft</h1><form action="https://collector.test/lead"></form>',
+          warnings: [{ path: 'form', message: 'Removed a form action.' }],
+        },
+      }
+      let calls = 0
+      agent.loadArtifact = vi.fn(async () => {
+        calls += 1
+        if (calls < 3) throw failWith(502)
+        Object.assign(agent.artifacts.p1, { version: 1, content: '<h1>Checked page</h1>', draft: null })
+        return agent.artifacts.p1
+      })
+      const wrapper = mount(Harness, { props: { artifactId: 'p1', header: true } })
+      await flushPromises()
+      expect(calls).toBe(1)
+      expect(wrapper.find('.ag-export').attributes('aria-disabled')).toBe('true')
+      expect(wrapper.find('.ag-artv-notice').text()).toBe('Draft finished. Loading the saved version…')
+
+      await vi.advanceTimersByTimeAsync(1000)
+      expect(calls).toBe(2)
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(calls).toBe(3)
+      await flushPromises()
+      expect(wrapper.find('.ag-export').attributes('aria-disabled')).toBeUndefined()
+      expect(wrapper.findAll('iframe').some((f) => f.attributes('srcdoc').includes('Checked page'))).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('says when the saved copy behind a finished draft will not load', async () => {
+    agent.artifacts.p2 = {
+      id: 'p2',
+      kind: 'page',
+      draft: { status: 'done', kind: 'page', version: 2, content: '<h1>Raw draft</h1>', warnings: [{ path: 'img', message: 'x' }] },
+    }
+    agent.loadArtifact = vi.fn(async () => {
+      throw failWith(403)
+    })
+    const wrapper = mount(Harness, { props: { artifactId: 'p2', header: true } })
+    await flushPromises()
+    expect(agent.loadArtifact).toHaveBeenCalledTimes(1)
+    const notice = wrapper.find('.ag-artv-notice')
+    expect(notice.text()).toContain('This is the unchecked draft, and export is off until the saved version loads.')
+    expect(wrapper.text()).not.toContain('checked for safety')
+    expect(wrapper.find('.ag-export').attributes('aria-disabled')).toBe('true')
+    await notice.find('.ag-artv-notice-btn').trigger('click')
+    expect(agent.loadArtifact).toHaveBeenCalledTimes(2)
+  })
+
+  it('tells a draft the agent never saved from an item that was deleted', async () => {
+    agent.loadArtifact = vi.fn(async () => {
+      throw failWith(404)
+    })
+    const unsaved = { status: 'error', active: false, saved: false, error: 'The page is incomplete.', kind: 'page', title: 'Acme' }
+    const never = mount(Harness, { props: { artifactId: 'gone1', call: unsaved } })
+    await flushPromises()
+    expect(never.find('[role="alert"]').text()).toContain("This draft wasn't saved.")
+    expect(never.find('[role="alert"]').text()).toContain('The page is incomplete.')
+    expect(never.text()).not.toContain('deleted')
+    expect(never.find('.ag-perr-btn').exists()).toBe(false)
+
+    const deleted = mount(Harness, { props: { artifactId: 'gone2', call: { ...unsaved, status: 'done', saved: true } } })
+    await flushPromises()
+    expect(deleted.find('[role="alert"]').text()).toContain('It was deleted, or you no longer have access to it.')
+    expect(deleted.find('.ag-perr-btn').exists()).toBe(true)
+  })
+
+  it('waits for a draft that is still starting instead of calling it deleted', async () => {
+    agent.loadArtifact = vi.fn(async () => {
+      throw failWith(404)
+    })
+    const call = { status: 'planning', active: true, saved: false, error: '', kind: 'page', title: 'Acme website' }
+    const wrapper = mount(Harness, { props: { artifactId: 'new1', call, header: true } })
+    await flushPromises()
+    expect(wrapper.find('.ag-artv-state').text()).toBe('Starting the draft…')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+    expect(wrapper.find('.ag-ph-title-text').text()).toBe('Acme website')
+
+    await wrapper.setProps({ call: { ...call, status: 'cancelled', active: false, error: 'Stopped' } })
+    await flushPromises()
+    expect(agent.loadArtifact).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[role="alert"]').text()).toContain("This draft wasn't saved.")
+  })
+
+  it('does not show a draft picked up mid-stream, which holds only its tail', async () => {
+    agent.artifacts.t1 = {
+      id: 't1',
+      kind: 'page',
+      draft: { status: 'drafting', kind: 'page', content: '<p>end of the page</p></body></html>', partial: true },
+    }
+    const wrapper = mount(Harness, { props: { artifactId: 't1' } })
+    await nextTick()
+    expect(wrapper.find('iframe').exists()).toBe(false)
+    expect(wrapper.find('.ag-artv-state').text()).toBe('Drafting… It shows here when the draft is finished.')
+  })
+
+  it('stops treating a draft as live once its agent call has ended', async () => {
+    // The run stopped without the draft's own end event reaching this tab.
+    agent.artifacts.s1 = { id: 's1', kind: 'page', draft: { status: 'drafting', kind: 'page', content: '<h1>Half a page' } }
+    const stopped = { status: 'cancelled', active: false, saved: false, error: 'Stopped', kind: 'page', title: 'Acme' }
+    const wrapper = mount(Harness, { props: { artifactId: 's1', call: stopped, header: true } })
+    await flushPromises()
+    expect(wrapper.find('.ag-ph-status').text()).toBe('Draft failed')
+    expect(wrapper.find('[role="alert"]').text()).toContain("The agent couldn't finish this draft.")
+    expect(wrapper.find('[role="alert"]').text()).toContain('Stopped')
+
+    // A call that finished: the saved copy is what shows.
+    agent.artifacts.s2 = {
+      id: 's2',
+      kind: 'page',
+      version: 1,
+      content: '<h1>Saved page</h1>',
+      draft: { status: 'drafting', kind: 'page', content: '<h1>Half a page' },
+    }
+    const done = mount(Harness, { props: { artifactId: 's2', call: { ...stopped, status: 'done', saved: true, error: '' } } })
+    await flushPromises()
+    const docs = done.findAll('iframe').map((f) => f.attributes('srcdoc'))
+    expect(docs.some((d) => d.includes('Saved page'))).toBe(true)
+    expect(docs.some((d) => d.includes('Half a page'))).toBe(false)
   })
 })

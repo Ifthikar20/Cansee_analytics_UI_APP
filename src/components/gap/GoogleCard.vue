@@ -55,10 +55,11 @@
 
     <div v-if="aiOverview.shown" class="gc-block">
       <h3 class="gc-sub">Google's AI Overview</h3>
-      <p class="gc-line">
-        {{ aiOverview.mentions_you ? 'Mentions you' : "Doesn't mention you" }}
-        · {{ aiOverview.cites_you ? 'cites your site' : "doesn't cite your site" }}
+      <p v-if="overviewUnread" class="gc-line">
+        Google showed an AI Overview for this query, but its content was not captured, so mentions and citations were
+        not measured.
       </p>
+      <p v-else class="gc-line">{{ mentionText }} · {{ citeText }}</p>
     </div>
 
     <div class="gc-block">
@@ -79,6 +80,7 @@
 <script setup>
 import { computed } from 'vue'
 import { ExternalLink } from '@lucide/vue'
+import { aiOverviewUnread } from '@/lib/gap'
 import { timeAgo } from '@/utils/timeAgo'
 
 const props = defineProps({
@@ -88,6 +90,17 @@ const props = defineProps({
 })
 
 const aiOverview = computed(() => props.google.ai_overview || {})
+const overviewUnread = computed(() => aiOverviewUnread(aiOverview.value))
+
+// null means not measured, which is never read as "no".
+const mentionText = computed(() => {
+  const v = aiOverview.value.mentions_you
+  return v === true ? 'Mentions you' : v === false ? "Doesn't mention you" : 'Mentions not measured'
+})
+const citeText = computed(() => {
+  const v = aiOverview.value.cites_you
+  return v === true ? 'cites your site' : v === false ? "doesn't cite your site" : 'citations not measured'
+})
 
 function shortUrl(url) {
   try {

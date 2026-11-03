@@ -1,11 +1,14 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
-import { loadUiPrefs, saveUiPrefs } from '@/lib/agent/storage'
+import { computed, ref, watch } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { loadActivitySeen, loadUiPrefs, saveActivitySeen, saveUiPrefs } from '@/lib/agent/storage'
 
 // Agent workspace chrome: sidebar and drawer, recents, dialogs, screen reader
 // announcements and composer focus. Device preferences (sidebar and recents
-// collapsed, activity last seen) persist in cs-agent-ui-v1; everything else
-// lives for the page.
+// collapsed) persist in cs-agent-ui-v1. Which chats and activity a user has
+// seen is that user's: activity last seen persists per user
+// (cs-agent-activity-seen-v1:<uid>, removed on logout), and sign-out or
+// another user drops both. Everything else lives for the page.
 
 const ANNOUNCE_DEDUPE_MS = 1500
 const ANNOUNCE_CLEAR_MS = 8000
@@ -13,9 +16,8 @@ const COMPOSER_SELECTOR = '.ag-composer textarea, .ag-composer [contenteditable=
 const COMPOSER_RETRY_MS = 50
 const COMPOSER_RETRIES = 30
 
-const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
-
 export const useAgentUiStore = defineStore('agentUi', () => {
+    const auth = useAuthStore()
     const prefs = loadUiPrefs()
 
     // Docked means the sidebar sits in the layout (>= 1024px); below that it
@@ -32,7 +34,7 @@ export const useAgentUiStore = defineStore('agentUi', () => {
     // Bumped on every focusComposer() so a composer can watch it.
     const composerFocusRequest = ref(0)
     const unseenChats = ref({})
-    const activitySeenAt = ref(isPlainObject(prefs.activitySeenAt) ? { ...prefs.activitySeenAt } : {})
+    const activitySeenAt = ref({})
     const politeAnnouncement = ref({ id: 0, text: '' })
     const assertiveAnnouncement = ref({ id: 0, text: '' })
 
@@ -124,6 +126,11 @@ export const useAgentUiStore = defineStore('agentUi', () => {
 
     /* ── Activity ── */
 
+    function currentUserId() {
+        const id = auth.user?.id
+        return id === null || id === undefined || id === '' ? null : String(id)
+    }
+
     function activitySeenAtFor(websiteId) {
         return activitySeenAt.value[String(websiteId)] || null
     }
@@ -134,7 +141,7 @@ export const useAgentUiStore = defineStore('agentUi', () => {
         const prev = activitySeenAt.value[key]
         if (prev && Date.parse(prev) >= Date.parse(at)) return
         activitySeenAt.value = { ...activitySeenAt.value, [key]: at }
-        saveUiPrefs({ activitySeenAt: activitySeenAt.value })
+        saveActivitySeen(currentUserId(), activitySeenAt.value)
     }
 
     /* ── Dialogs ── */
@@ -251,17 +258,39 @@ export const useAgentUiStore = defineStore('agentUi', () => {
         })
     }
 
-    /** Sign-out: drop per-session state; device preferences stay. */
+    /** Sign-out: drop per-session and per-user state; device preferences stay. */
     function reset() {
         drawerOpen.value = false
         filterOpen.value = false
         shortcutsOpen.value = false
         addProjectOpen.value = false
         unseenChats.value = {}
+        activitySeenAt.value = {}
         politeAnnouncement.value = { id: politeAnnouncement.value.id, text: '' }
         assertiveAnnouncement.value = { id: assertiveAnnouncement.value.id, text: '' }
         lastAnnounced = { text: '', politeness: '', at: 0 }
     }
+
+    // Sign-out from anywhere in the app (clearAuth drops the token), not
+    // only from the workspace menu. Synchronous, so nothing of the old user
+    // renders after it.
+    watch(
+        () => auth.accessToken,
+        (token, before) => {
+            if (!token && before) reset()
+        },
+        { flush: 'sync' }
+    )
+    // Each user reads their own activity watermark; another user also
+    // starts with no unseen chats.
+    watch(
+        currentUserId,
+        (uid, before) => {
+            if (before && uid !== before) unseenChats.value = {}
+            activitySeenAt.value = loadActivitySeen(uid)
+        },
+        { immediate: true, flush: 'sync' }
+    )
 
     return {
         docked,

@@ -10,7 +10,10 @@
 //   drafts: {[artifactId]: Draft},
 // }
 // Draft = {artifactId, kind, title, agentKey, baseVersion, request, status: drafting|done|failed,
-//          content, data, version, summary, warnings, error, startedAt, updatedAt}
+//          content, data, version, summary, warnings, error, startedAt, updatedAt, partial}
+// `partial` marks a draft whose start this client never saw (it resumed
+// after artifact.started, e.g. a reload mid-draft): `content` then holds
+// only the text streamed since, not the document.
 //
 // Effects: {type:'pane.open', tab, activate} | {type:'pane.update', tabId, patch}
 //          {type:'chat.updated', chatId, title} | {type:'artifact.started'|'artifact.completed'|
@@ -164,12 +167,15 @@ function updatedTabStatus(kind, patch, data) {
     return inferred === 'loading' ? undefined : inferred
 }
 
+function agentCallFor(state, artifactId) {
+    return partsOf(state).find((p) => p && p.type === 'agent_call' && String(p.artifact_id) === String(artifactId)) || null
+}
+
 function requestForArtifact(state, artifactId) {
-    const parts = partsOf(state)
-    const call = parts.find((p) => p && p.type === 'agent_call' && String(p.artifact_id) === String(artifactId))
+    const call = agentCallFor(state, artifactId)
     if (call && call.request !== undefined) return call.request
     let max = null
-    for (const p of parts) {
+    for (const p of partsOf(state)) {
         if (p && Number.isFinite(Number(p.request))) max = max === null ? Number(p.request) : Math.max(max, Number(p.request))
     }
     return max
@@ -183,12 +189,16 @@ function withDraft(state, artifactId, draft) {
     return { ...state, drafts: { ...state.drafts, [String(artifactId)]: draft } }
 }
 
+// Only artifact.started carries kind, title and agent. A draft first seen
+// through a later event takes them from the agent_call part that names the
+// artifact, so it still opens in the right viewer.
 function blankDraft(state, artifactId, event) {
+    const call = agentCallFor(state, artifactId)
     return {
         artifactId: String(artifactId),
-        kind: event.kind || '',
-        title: event.title || '',
-        agentKey: event.agent_key || '',
+        kind: event.kind || call?.kind || '',
+        title: event.title || call?.title || '',
+        agentKey: event.agent_key || call?.agent || '',
         baseVersion: event.base_version ?? null,
         request: requestForArtifact(state, artifactId),
         status: 'drafting',
@@ -200,6 +210,7 @@ function blankDraft(state, artifactId, event) {
         error: null,
         startedAt: toEpochMs(event.ts),
         updatedAt: toEpochMs(event.ts),
+        partial: false,
     }
 }
 
@@ -388,7 +399,9 @@ const HANDLERS = {
 
     [EVENT.ARTIFACT_DELTA](state, e) {
         if (!e.artifact_id || typeof e.append !== 'string') return { state }
-        const draft = draftOf(state, e.artifact_id) || blankDraft(state, e.artifact_id, e)
+        // A delta with no draft yet: the text before it was streamed before
+        // this client's resume point (a snapshot, by contrast, is whole).
+        const draft = draftOf(state, e.artifact_id) || { ...blankDraft(state, e.artifact_id, e), partial: true }
         return {
             state: withDraft(state, e.artifact_id, {
                 ...draft,

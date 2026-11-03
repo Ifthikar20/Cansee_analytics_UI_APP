@@ -19,7 +19,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { inject, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import AgSpinner from '@/components/agent/common/AgSpinner.vue'
 import { createStreamingRenderer, onHighlighterReady } from '@/lib/agent/markdown/renderer'
 import { useAgentPaneStore } from '@/stores/agentPane'
@@ -28,7 +28,9 @@ import { useToast } from '@/composables/useToast'
 
 // Markdown documents and reports. The HTML comes from the shared renderer
 // (markdown-it with raw HTML off, then DOMPurify). While a draft streams only
-// the last block is parsed again, at most once per animation frame.
+// the last block is parsed again, at most once per animation frame. Inside
+// the browser pane a plain click on a web link opens it as a pane tab;
+// elsewhere (the full-page artifact view) the link opens a new browser tab.
 
 const props = defineProps({
   markdown: { type: String, default: '' },
@@ -37,6 +39,7 @@ const props = defineProps({
 })
 
 const pane = useAgentPaneStore()
+const inPane = inject('agInBrowserPane', false)
 const toast = useToast()
 const root = ref(null)
 const blocks = shallowRef([])
@@ -76,7 +79,7 @@ async function onClick(event) {
     return
   }
   const link = event.target.closest?.('a[href]')
-  if (!link || !root.value?.contains(link)) return
+  if (!inPane || !link || !root.value?.contains(link)) return
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
   const href = link.getAttribute('href') || ''
   if (!/^https?:/i.test(href)) return

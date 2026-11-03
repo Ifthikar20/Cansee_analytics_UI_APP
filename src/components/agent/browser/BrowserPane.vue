@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-import { computed, inject, nextTick, ref, watch } from 'vue'
+import { computed, inject, nextTick, provide, ref, watch } from 'vue'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { PANE_PANEL_ID, tabDomId } from './ids'
 import PaneEmpty from './PaneEmpty.vue'
@@ -50,9 +50,14 @@ const currentLayout = computed(() => props.layout || injectedLayout?.value || 's
 const tab = computed(() => pane.activeTab)
 const body = ref(null)
 
+// Views inside the pane open links as pane tabs; elsewhere (the full-page
+// artifact view) links open as usual.
+provide('agInBrowserPane', true)
+
 const source = useArtifactSource(
   () => (tab.value?.kind === 'artifact' ? tab.value.artifactId : null),
-  () => (tab.value?.kind === 'artifact' ? tab.value.version : null)
+  () => (tab.value?.kind === 'artifact' ? tab.value.version : null),
+  { call: (id) => pane.artifactCall(id) }
 )
 
 const fixedView = computed(() => {

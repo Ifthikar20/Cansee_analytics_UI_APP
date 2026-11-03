@@ -26,6 +26,7 @@
               type="button"
               role="tab"
               class="ag-tab-main"
+              :aria-label="pane.titleOf(tab)"
               :aria-selected="tab.id === pane.activeId ? 'true' : 'false'"
               :aria-controls="tab.id === pane.activeId ? PANE_PANEL_ID : undefined"
               :tabindex="tab.id === focusId ? 0 : -1"
@@ -33,8 +34,9 @@
               @click="activate(tab.id)"
               @focus="focusId = tab.id"
             >
-              <TabIcon :tab="tab" />
-              <span class="ag-tab-title">{{ pane.titleOf(tab) }}</span>
+              <TabIcon v-if="!pageInPlaceOfIcon(tab)" :tab="tab" />
+              <span v-if="serpPage(tab)" class="ag-tab-page ag-tnum" aria-hidden="true">p{{ serpPage(tab) }}</span>
+              <span class="ag-tab-title">{{ tabLabel(tab) }}</span>
             </button>
           </AgTooltip>
           <button
@@ -90,8 +92,10 @@ import TabIcon from './TabIcon.vue'
 // 192x34 tabs, a new-tab button 12px after them, then expand and hide on the
 // right. Tabs share the room like browser tabs: 192px while they fit, then
 // evenly narrower; narrow inactive tabs show only their icon while the active
-// tab keeps at least 136px. Roving focus: arrows move between tabs, Enter or
-// Space opens one, Delete closes the focused tab.
+// tab keeps at least 136px. Google results tabs carry their page number in a
+// badge that never truncates, and the query as their label; a narrow one
+// shows the badge in place of its search icon. Roving focus: arrows move
+// between tabs, Enter or Space opens one, Delete closes the focused tab.
 
 defineProps({
   canExpand: { type: Boolean, default: true },
@@ -142,6 +146,27 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (observer) observer.disconnect()
 })
+
+// The results page a Google tab shows, or null.
+function serpPage(tab) {
+  if (tab.kind !== 'serp') return null
+  const n = Number(tab.data?.page)
+  return Number.isInteger(n) && n > 0 ? n : null
+}
+
+// Google tabs read as their query (the page is the badge); restored tabs
+// whose data has not loaded yet fall back to the title.
+function tabLabel(tab) {
+  const query = tab.kind === 'serp' ? tab.data?.query : ''
+  return typeof query === 'string' && query.trim() ? query : pane.titleOf(tab)
+}
+
+// A narrow inactive tab has room for one glyph. While the search loads or
+// after it failed that is the status icon; otherwise the page badge.
+function pageInPlaceOfIcon(tab) {
+  const narrow = tab.id !== pane.activeId && sizes.value.narrow
+  return narrow && serpPage(tab) !== null && tab.status !== 'loading' && tab.status !== 'error'
+}
 
 function setTabRef(id, el) {
   if (el) tabEls.set(id, el)
@@ -324,6 +349,21 @@ watch(
   white-space: nowrap;
 }
 
+.ag-tab-page {
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--ag-ghost-hover);
+  color: var(--ag-fg-2);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.ag-tab.is-active .ag-tab-page {
+  background: var(--ag-row-hover);
+}
+
 .ag-tab-close {
   display: grid;
   flex-shrink: 0;
@@ -350,6 +390,11 @@ watch(
 }
 
 .ag-tab.is-narrow :is(.ag-tab-title, .ag-tab-close) {
+  display: none;
+}
+
+/* One glyph per narrow tab: the status icon wins over the page badge. */
+.ag-tab.is-narrow .ag-tabicon + .ag-tab-page {
   display: none;
 }
 

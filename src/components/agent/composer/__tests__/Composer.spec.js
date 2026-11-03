@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent } from 'vue'
 import Composer from '@/components/agent/composer/Composer.vue'
+import { useAgentUiStore } from '@/stores/agentUi'
 
 const Passthrough = defineComponent({
   inheritAttrs: false,
@@ -190,12 +191,62 @@ describe('Composer keyboard and IME', () => {
   })
 })
 
+describe('Composer length limit', () => {
+  it('shows no counter for an ordinary message', () => {
+    const w = mountComposer({ modelValue: 'research turonote' })
+    expect(w.find('.ag-composer-count').exists()).toBe(false)
+  })
+
+  it('shows the count as the message nears the limit, and still sends', () => {
+    const w = mountComposer({ modelValue: 'a'.repeat(18500) })
+    expect(w.find('.ag-composer-count').text()).toBe(`${(18500).toLocaleString()} / ${(20000).toLocaleString()}`)
+    expect(w.find(`#${w.find('textarea').attributes('aria-describedby')}`).text()).toContain('characters used')
+    key(w.find('textarea').element, { key: 'Enter' })
+    expect(w.emitted('submit')).toHaveLength(1)
+  })
+
+  it('does not send a message over the limit and says why', () => {
+    const w = mountComposer({ modelValue: 'a'.repeat(25000) })
+    const count = w.find('.ag-composer-count')
+    expect(count.classes()).toContain('is-over')
+    expect(count.text()).toContain('Too long')
+    expect(w.find('button[type="submit"]').attributes('disabled')).toBeDefined()
+    expect(w.find(`#${w.find('textarea').attributes('aria-describedby')}`).text()).toContain('too long to send')
+    const event = key(w.find('textarea').element, { key: 'Enter' })
+    expect(event.defaultPrevented).toBe(true)
+    expect(w.emitted('submit')).toBeUndefined()
+    expect(useAgentUiStore().assertiveAnnouncement.text).toContain('too long to send')
+  })
+})
+
 describe('Composer agent chip', () => {
   it('removes the selected agent', async () => {
     const w = mountComposer({ agent: 'gap_analyst' })
     expect(w.text()).toContain('Gap Analyst')
     await w.find('button[aria-label="Stop using Gap Analyst"]').trigger('click')
     expect(w.emitted('update:agent')).toEqual([[null]])
+  })
+
+  it('does not send with a picked writing agent the allowance cannot start, and says why', async () => {
+    const why = 'Needs at least $0.32 of AI allowance; $0.20 left this month.'
+    const w = mountComposer({
+      modelValue: 'build a page for the spring sale',
+      agent: 'landing_page',
+      agents: [{ key: 'landing_page', name: 'Landing Page Agent', unavailable: why }],
+    })
+    expect(w.find('.ag-composer-agent-why').text()).toBe(why)
+    expect(w.find('button[type="submit"]').attributes('disabled')).toBeDefined()
+    expect(w.find(`#${w.find('textarea').attributes('aria-describedby')}`).text()).toContain(why)
+    const event = key(w.find('textarea').element, { key: 'Enter' })
+    expect(event.defaultPrevented).toBe(true)
+    expect(w.emitted('submit')).toBeUndefined()
+    expect(useAgentUiStore().assertiveAnnouncement.text).toBe(why)
+
+    // Without the agent the message can go.
+    await w.setProps({ agent: null })
+    expect(w.find('.ag-composer-agent-why').exists()).toBe(false)
+    key(w.find('textarea').element, { key: 'Enter' })
+    expect(w.emitted('submit')).toEqual([['build a page for the spring sale']])
   })
 })
 

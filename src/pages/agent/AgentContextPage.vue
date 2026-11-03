@@ -101,15 +101,21 @@ function adopt(ctx) {
   saveError.value = ''
 }
 
+// Loads and saves name the page's own project, so the store never reads or
+// writes another project's context for this form, and an answer that comes
+// back after the page moved to another project is dropped.
 async function load() {
-  if (!wid.value || typeof agent.loadContext !== 'function') return
+  const id = wid.value
+  if (!id || typeof agent.loadContext !== 'function') return
   status.value = 'loading'
   loadError.value = ''
   try {
-    const ctx = await agent.loadContext()
+    const ctx = await agent.loadContext({ websiteId: id })
+    if (wid.value !== id) return
     adopt(ctx ?? agent.context)
     status.value = 'ready'
   } catch (err) {
+    if (wid.value !== id) return
     loadError.value = errorMessage(err, "Couldn't load the context.")
     status.value = 'error'
   }
@@ -183,19 +189,24 @@ async function save() {
     ui.announce(saveError.value, 'assertive')
     return
   }
+  const id = wid.value
   saving.value = true
   try {
-    const saved = await agent.saveContext({
-      audience: form.audience.trim(),
-      voice: form.voice.trim(),
-      offerings: offerings.map(({ name, description, url }) => ({ name, description, url })),
-      rules,
-      revision: revision.value,
-    })
-    adopt(saved ?? agent.context)
+    const saved = await agent.saveContext(
+      {
+        audience: form.audience.trim(),
+        voice: form.voice.trim(),
+        offerings: offerings.map(({ name, description, url }) => ({ name, description, url })),
+        rules,
+        revision: revision.value,
+      },
+      { websiteId: id },
+    )
+    if (wid.value === id) adopt(saved ?? agent.context)
     toast.success('Context saved')
     ui.announce('Context saved')
   } catch (err) {
+    if (wid.value !== id) return
     if (errorCode(err) === 'revision_conflict' || errorStatus(err) === 409) {
       conflict.value = true
       ui.announce('Someone else saved this context first.', 'assertive')
@@ -280,7 +291,7 @@ const savedLine = computed(() => {
 <template>
   <AgPage
     title="Context"
-    :intro="`What every agent knows about ${projectName}. It reads this before it writes a page, an article, an ad campaign or a report.`"
+    :intro="`What the agents use when they write for ${projectName}. They read it before they write a page, an article or an ad campaign.`"
     :busy="status === 'loading'"
     @keydown="onKeydown"
   >

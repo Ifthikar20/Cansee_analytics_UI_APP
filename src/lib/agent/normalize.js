@@ -8,6 +8,7 @@ import { ERROR_CODE } from './types'
 const FALLBACK_COPY = {
     [ERROR_CODE.AGENT_DISABLED]: 'The agent is turned off for this workspace.',
     [ERROR_CODE.AGENT_UNAVAILABLE]: 'The agent is temporarily unavailable. Try again in a moment.',
+    [ERROR_CODE.MAINTENANCE]: 'CanSee is down for maintenance. Try again in a few minutes.',
     [ERROR_CODE.AGENT_NOT_CONFIGURED]: 'The agent is not set up yet: no Anthropic API key is configured.',
     [ERROR_CODE.ALLOWANCE_EXCEEDED]: "You've used this month's AI allowance.",
     [ERROR_CODE.AGENT_BUSY]: 'You already have a run in progress. Wait for it to finish, then try again.',

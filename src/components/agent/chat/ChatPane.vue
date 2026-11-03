@@ -92,7 +92,7 @@ const busy = computed(() => isBusy(store, chatKey.value))
 const run = computed(() => activeRunOf(store, chatKey.value))
 const stopping = computed(() => Boolean(run.value && (run.value.phase === 'cancelling' || run.value.cancelRequested)))
 const loading = computed(() => Boolean(props.chatId && (!state.value || state.value.loading) && !state.value?.loaded))
-const agents = computed(() => agentList(store.catalog))
+const agents = computed(() => agentList(store.catalog, store.status))
 const atBottom = computed(() => thread.value?.isAtBottom ?? true)
 
 const title = computed(() => {

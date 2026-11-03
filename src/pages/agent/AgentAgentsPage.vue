@@ -24,7 +24,8 @@ const error = ref('')
 
 const wid = computed(() => props.websiteId || (route.params?.websiteId ? String(route.params.websiteId) : null))
 const catalog = computed(() => asList(agent.catalog))
-const agents = computed(() => (catalog.value.length ? agentList(catalog.value) : []))
+// With GET status/, a writing agent the AI allowance cannot start says why.
+const agents = computed(() => (catalog.value.length ? agentList(catalog.value, agent.status) : []))
 
 const DELIVERS = {
   report: 'Writes a report you can save to Reports',
@@ -99,7 +100,14 @@ onMounted(() => {
           <span class="ag-agent-starter-text">{{ item.starter }}</span>
         </p>
         <div class="ag-agent-actions">
-          <AgButton size="sm" :to="wid ? useTo(item) : null" :disabled="!wid" :aria-label="`Use ${item.name}`">
+          <p v-if="item.unavailable" :id="`ag-agent-why-${item.key}`" class="ag-agent-why">{{ item.unavailable }}</p>
+          <AgButton
+            size="sm"
+            :to="wid && !item.unavailable ? useTo(item) : null"
+            :disabled="!wid || Boolean(item.unavailable)"
+            :aria-label="`Use ${item.name}`"
+            :aria-describedby="item.unavailable ? `ag-agent-why-${item.key}` : undefined"
+          >
             Use
           </AgButton>
         </div>
@@ -188,9 +196,20 @@ onMounted(() => {
 
 .ag-agent-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 12px;
   margin-top: auto;
   padding-top: 4px;
+}
+
+.ag-agent-why {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--ag-warning);
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .ag-agent.is-skeleton {

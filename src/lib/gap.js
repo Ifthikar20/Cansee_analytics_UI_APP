@@ -61,6 +61,18 @@ export function googleLabel(google) {
   return `#${google.position}`
 }
 
+/**
+ * True when Google showed an AI Overview whose content was never read: Google
+ * loaded it separately and SerpAPI returned only a token (`captured` false),
+ * or neither mention nor citation was measured (both null). Whether it names
+ * or cites the brand is then unknown, not "no".
+ */
+export function aiOverviewUnread(overview) {
+  if (!overview || !overview.shown) return false
+  if (overview.captured === false) return true
+  return overview.mentions_you == null && overview.cites_you == null
+}
+
 /** "+85" / "-62" for a gap value; empty when there is nothing to compare. */
 export function gapValue(value) {
   if (value === null || value === undefined) return ''

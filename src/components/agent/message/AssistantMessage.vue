@@ -44,11 +44,12 @@
           :live="live"
         />
         <ArtifactCard
-          v-if="call.artifact_id || call.status === 'error' || live"
+          v-if="call.artifact_id || call.status === 'error' || call.status === 'cancelled' || live"
           :artifact-id="call.artifact_id || null"
           :title="artifactTitle(call)"
-          :kind="call.kind || agentKind(call.agent)"
+          :kind="callKind(call)"
           :version="Number(call.version) || null"
+          :base-version="Number(call.base_version) || null"
           :project-name="projectName"
           :status="call.status || ''"
           :progress="typeof call.progress === 'string' ? call.progress : ''"
@@ -68,6 +69,8 @@
       :message="errorMessage"
       :status="message.status"
       :can-retry="canRetry"
+      :retryable="serverRetryable"
+      :website-id="websiteId"
       :busy="busy"
       @retry="retry"
     />
@@ -112,7 +115,7 @@ import SourceList from './SourceList.vue'
 import StepTimeline from './StepTimeline.vue'
 import WorkedLabel from './WorkedLabel.vue'
 import { errorInfo, messageCitations, messageText, splitParts } from './parts'
-import { AGENTS } from '@/lib/agent/agentsMeta'
+import { agentMeta } from '@/lib/agent/agentsMeta'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { useAgentUiStore } from '@/stores/agentUi'
@@ -172,12 +175,21 @@ const failed = computed(() => ['failed', 'interrupted'].includes(props.message.s
 const errorCode = computed(() => props.message.error_code || props.run?.error?.code || '')
 const errorMessage = computed(() => props.message.error_message || props.run?.error?.message || '')
 const canRetry = computed(() => !isTemp.value && props.message.status !== 'streaming')
+// run.failed says whether trying again can help. A run settled on this side
+// (the stream was lost) leaves the reply interrupted, and its flag is about
+// the connection, not the reply, so it is not used.
+const serverRetryable = computed(() => {
+  const flag = props.run?.error?.retryable
+  return props.message.status === 'failed' && typeof flag === 'boolean' ? flag : null
+})
 const canSave = computed(
   () => ['complete', 'truncated'].includes(props.message.status) && Boolean(messageText(props.message))
 )
 
-function agentKind(key) {
-  return AGENTS[key]?.outputKind || 'page'
+// What the call's agent writes. Empty while the orchestrator is still
+// writing the call (no agent yet), so the card does not guess a kind.
+function callKind(call) {
+  return call.kind || agentMeta(call.agent, props.catalog).outputKind || ''
 }
 
 function artifactTitle(call) {

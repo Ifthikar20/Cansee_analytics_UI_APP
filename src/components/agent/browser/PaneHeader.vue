@@ -78,7 +78,8 @@
             v-if="artifactKind"
             :kind="artifactKind"
             :context="artifactContext"
-            :disabled="drafting || !source.ready.value"
+            :disabled="exportOff"
+            :disabled-reason="exportOffReason"
           />
         </template>
       </div>
@@ -121,6 +122,18 @@ const heading = computed(() => {
 
 const drafting = computed(() => Boolean(props.source && props.source.drafting.value))
 const artifactKind = computed(() => (props.source ? props.source.kind.value : ''))
+
+// Exports come from saved versions only: a draft, even a finished one, is
+// the agent's raw output until its saved copy (checked by the server) loads.
+const exportOff = computed(() => {
+  const s = props.source
+  return !s || drafting.value || s.showDraft.value || !s.ready.value
+})
+const exportOffReason = computed(() => {
+  if (drafting.value) return 'Export is available when the draft is finished.'
+  if (props.source?.showDraft.value) return 'Export is available once the saved version has loaded.'
+  return 'Export is available once this has loaded.'
+})
 
 const statusText = computed(() => {
   if (props.tab.kind !== 'artifact' || !props.source) return ''

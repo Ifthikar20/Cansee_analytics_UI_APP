@@ -18,6 +18,7 @@ vi.mock('@/api/client', () => ({
 import { refreshAccessToken } from '@/api/client'
 import {
     AuthError,
+    MaintenanceError,
     OfflineError,
     TransportError,
     UnsupportedTransport,
@@ -207,13 +208,43 @@ describe('openRunStream', () => {
         expect(fetchMock).toHaveBeenCalledTimes(2)
     })
 
-    it('throws AuthError when the refresh itself fails', async () => {
-        h.refreshImpl = () => Promise.reject(new Error('refresh refused'))
+    it('throws AuthError when the refresh is refused', async () => {
+        h.refreshImpl = () => {
+            // The client signs the user out on a refused refresh.
+            h.token = ''
+            return Promise.reject(Object.assign(new Error('refresh refused'), { response: { status: 401 } }))
+        }
         fetchMock.mockResolvedValueOnce(jsonResponse(401, {}))
         const err = await openRunStream({ runId: 'r1', onEvent: () => {} }).catch((e) => e)
         expect(err).toBeInstanceOf(AuthError)
         expect(err.fatal).toBe(true)
         expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('throws AuthError when the session was already over', async () => {
+        h.refreshImpl = () => {
+            h.token = ''
+            return Promise.reject(new Error('Session expired'))
+        }
+        fetchMock.mockResolvedValueOnce(jsonResponse(401, {}))
+        await expect(openRunStream({ runId: 'r1', onEvent: () => {} })).rejects.toBeInstanceOf(AuthError)
+    })
+
+    it('treats a refresh that fails with a 5xx as retryable, not as a sign-out', async () => {
+        h.refreshImpl = () => Promise.reject(Object.assign(new Error('Request failed with status code 502'), { response: { status: 502 } }))
+        fetchMock.mockResolvedValueOnce(jsonResponse(401, {}))
+        const err = await openRunStream({ runId: 'r1', onEvent: () => {} }).catch((e) => e)
+        expect(err).toBeInstanceOf(TransportError)
+        expect(err).not.toBeInstanceOf(AuthError)
+        expect(err).toMatchObject({ status: 502, retryable: true, fatal: false })
+    })
+
+    it('treats a refresh lost to the network as offline', async () => {
+        h.refreshImpl = () => Promise.reject(new Error('Network Error'))
+        fetchMock.mockResolvedValueOnce(jsonResponse(401, {}))
+        const err = await openRunStream({ runId: 'r1', onEvent: () => {} }).catch((e) => e)
+        expect(err).toBeInstanceOf(OfflineError)
+        expect(err).toMatchObject({ code: 'network', retryable: true, fatal: false })
     })
 
     it.each([404, 405, 406])('reports %i as an unsupported transport', async (status) => {
@@ -238,6 +269,21 @@ describe('openRunStream', () => {
 
         fetchMock.mockResolvedValueOnce(new Response('maintenance', { status: 503 }))
         await expect(openRunStream({ runId: 'r1', onEvent: () => {} })).rejects.toBeInstanceOf(OfflineError)
+    })
+
+    it("maps nginx's 503 maintenance to MaintenanceError, which waits for Retry-After", async () => {
+        fetchMock.mockResolvedValueOnce(
+            jsonResponse(
+                503,
+                { success: false, error: { code: 'maintenance', message: 'Cansee is down for maintenance. Try again in a few minutes.' } },
+                { 'Retry-After': '120' }
+            )
+        )
+        const err = await openRunStream({ runId: 'r1', onEvent: () => {} }).catch((e) => e)
+        expect(err).toBeInstanceOf(MaintenanceError)
+        expect(err).not.toBeInstanceOf(OfflineError)
+        expect(err).toMatchObject({ status: 503, code: 'maintenance', retryable: true, fatal: false, retryAfterMs: 120000 })
+        expect(err.serverMessage).toBe('Cansee is down for maintenance. Try again in a few minutes.')
     })
 
     it('treats agent_disabled as fatal and 5xx as retryable', async () => {

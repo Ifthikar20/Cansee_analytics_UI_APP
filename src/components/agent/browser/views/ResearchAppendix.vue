@@ -27,10 +27,7 @@
             <span v-for="(part, j) in serpMeta(cap)" :key="j"> · {{ part }}</span>
           </p>
           <p class="ag-apx-line">{{ brandLine(cap) }}</p>
-          <p v-if="cap.ai_overview && cap.ai_overview.shown" class="ag-apx-line">
-            AI Overview: mentions you {{ cap.ai_overview.mentions_you ? 'yes' : 'no' }}, cites you
-            {{ cap.ai_overview.cites_you ? 'yes' : 'no' }}.
-          </p>
+          <p v-if="cap.ai_overview && cap.ai_overview.shown" class="ag-apx-line">{{ overviewLine(cap.ai_overview) }}</p>
           <p v-if="cap.error" class="ag-apx-line is-error">{{ serpError(cap.error) }}</p>
           <div v-if="results(cap).length" class="ag-apx-table">
             <table>
@@ -118,6 +115,7 @@
 import { computed, ref, useId } from 'vue'
 import { ChevronRight } from '@lucide/vue'
 import { engineMeta } from '@/lib/engines'
+import { aiOverviewUnread } from '@/lib/gap'
 import { displayUrl, hostOf } from '@/lib/agent/url'
 import { formatCapturedAt, formatNumber, regionName } from '../format'
 
@@ -168,13 +166,30 @@ function serpError(error) {
   return error.message || 'This search did not complete.'
 }
 
+// mentions_you and cites_you are null when they were not measured.
+function overviewLine(overview) {
+  if (aiOverviewUnread(overview)) {
+    return 'AI Overview: shown, but its content was not captured, so mentions and citations were not measured.'
+  }
+  const flag = (value) => (value === true ? 'yes' : value === false ? 'no' : 'not measured')
+  return `AI Overview: mentions you ${flag(overview.mentions_you)}, cites you ${flag(overview.cites_you)}.`
+}
+
 function engineLabel(e) {
   return e.engine_label || engineMeta(e.engine).label
 }
 
+// engine_check parts carry their reason as a string ("OPENAI_API_KEY is not
+// set", "Stopped"); older or other shapes as {message}.
+function engineReason(e) {
+  const reason = typeof e.error === 'string' ? e.error : e.error?.message
+  return typeof reason === 'string' ? reason.trim() : ''
+}
+
 function engineResult(e) {
-  if (e.status === 'unavailable') return 'Not available'
-  if (e.status === 'error') return e.error?.message ? `Error: ${e.error.message}` : 'Error'
+  const why = engineReason(e)
+  if (e.status === 'unavailable') return why ? `Not available: ${why}` : 'Not available'
+  if (e.status === 'error') return why ? `Error: ${why}` : 'Error'
   if (e.status !== 'done') return 'Not finished'
   return e.mentioned ? 'Named' : 'Not named'
 }

@@ -30,7 +30,7 @@ import AgMenuItem from '@/components/agent/common/AgMenuItem.vue'
 import AgTooltip from '@/components/agent/common/AgTooltip.vue'
 import { useToast } from '@/composables/useToast'
 import { useAgentUiStore } from '@/stores/agentUi'
-import { exportActions, runExport } from './exporters'
+import { exportActions, exportErrorText, runExport } from './exporters'
 
 const props = defineProps({
   kind: { type: String, required: true },
@@ -53,8 +53,8 @@ async function run(key) {
       toast.success(message)
       ui.announce(message)
     }
-  } catch {
-    toast.error("That export didn't work. Try again.")
+  } catch (err) {
+    toast.error(exportErrorText(err))
   }
 }
 </script>

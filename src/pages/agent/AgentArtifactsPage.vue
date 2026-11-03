@@ -24,7 +24,9 @@ const SECTIONS = {
   report: {
     title: 'Reports',
     noun: 'reports',
-    intro: 'Research saved from chats. Each report keeps the Google results and AI engine answers it was written from.',
+    // A report keeps each engine's verdict on the brand, not the answer text.
+    intro:
+      'Research saved from chats. Each report keeps the Google results and the AI engine checks (named or not, rank, sentiment) it was written from.',
     empty: 'No reports yet.',
     emptyBody: 'Ask the agent to research a brand, then save the report.',
     agent: 'gap_analyst',

@@ -22,6 +22,11 @@ const MAX_STASH = 30
 const RESEARCH_KINDS = new Set(['serp', 'page'])
 const TAB_FIELDS = new Set(['title', 'status', 'mode', 'url', 'finalUrl', 'history', 'version', 'kind', 'artifactId', 'nonce'])
 const ACTIVE_AGENT_STATUSES = new Set(['planning', 'drafting', 'validating'])
+const SETTLED_AGENT_STATUSES = new Set(['done', 'error', 'cancelled'])
+// Reply statuses after which none of its steps is still running, whatever
+// the last event about a step said.
+const ENDED_STATUSES = new Set(['complete', 'truncated', 'refused', 'cancelled', 'failed', 'interrupted'])
+const LAYOUTS = new Set(['split', 'overlay', 'fullscreen'])
 
 function isPhone() {
     try {
@@ -50,11 +55,12 @@ function tokenUserId(token) {
     }
 }
 
+// The same title the server gives a results tab, page number included.
 export function serpTitle(capture) {
     const query = capture && typeof capture.query === 'string' ? capture.query : ''
     if (!query) return 'Google'
     const page = Number(capture.page)
-    return page > 1 ? `Google · ${query} · p${page}` : `Google · ${query}`
+    return Number.isInteger(page) && page > 0 ? `Google · ${query} · p${page}` : `Google · ${query}`
 }
 
 // Same rule as the reducer: a capture is settled once it has an error, a
@@ -116,27 +122,54 @@ function pageFields(data) {
     return { url: d.url || null, finalUrl: d.final_url || null, history: historyFor(d.url || null) }
 }
 
-function partStatus(part) {
+function running(part) {
+    return part.status === 'running' || part.status === 'queued'
+}
+
+function partStatus(part, ended) {
     if (part.status === 'error') return 'error'
-    if (part.status === 'running' || part.status === 'queued') return 'loading'
+    if (running(part)) return ended ? 'error' : 'loading'
     return 'missing'
 }
 
+// What the server writes on a step it closes when a run ends; a reply that
+// was settled on this side gets the same.
+function endedError(messageStatus) {
+    if (messageStatus === 'cancelled') return { code: 'stopped', message: 'Stopped' }
+    if (messageStatus === 'interrupted') return { code: 'interrupted', message: 'Interrupted' }
+    return { code: 'not_finished', message: 'Not finished' }
+}
+
+function errorText(error) {
+    if (typeof error === 'string') return error
+    return error && typeof error.message === 'string' ? error.message : ''
+}
+
 // Research and artifact tabs referenced by the messages, oldest first.
+//
+// An artifact gets one spec, from its first call; later calls on it (its
+// revisions) update the spec, so agentStatus and callId are the latest
+// call's. saved: a call finished, recorded a version, or revised an earlier
+// version. unsaved: none did and none is running, so the artifact was never
+// created: the agent names it when it starts and saves it only when a draft
+// passes its checks.
 export function researchTabs(messages) {
     const out = []
     const seen = new Set()
+    const artifacts = new Map()
     for (const m of messages || []) {
         if (!m || m.role !== 'assistant') continue
         const research = m.research || {}
         const serps = research.serp || {}
         const pages = research.pages || {}
+        const ended = ENDED_STATUSES.has(m.status)
         for (const part of m.parts || []) {
             if (!part) continue
             if ((part.type === 'serp' || part.type === 'page_inspect') && typeof part.tab_id === 'string') {
                 if (seen.has(part.tab_id)) continue
                 seen.add(part.tab_id)
                 const captureId = part.tab_id.replace(/^(serp|page):/, '')
+                const error = part.error || (ended && running(part) ? endedError(m.status) : null)
                 if (part.type === 'serp') {
                     const capture = serps[captureId] || null
                     const status = captureStatus('serp', capture)
@@ -144,44 +177,68 @@ export function researchTabs(messages) {
                         query: part.query,
                         page: part.page,
                         location: part.location,
-                        error: part.error || null,
+                        error,
                     }
                     out.push({
                         id: part.tab_id,
                         kind: 'serp',
                         title: serpTitle(data),
-                        status: status === 'loading' ? partStatus(part) : status,
+                        status: status === 'loading' ? partStatus(part, ended) : status,
                         data,
                         complete: status !== 'loading',
                     })
                 } else {
                     const capture = pages[captureId] || null
                     const status = captureStatus('page', capture)
-                    const data = capture || { url: part.url, error: part.error || null }
+                    const data = capture || { url: part.url, error }
                     out.push({
                         id: part.tab_id,
                         kind: 'page',
                         title: part.title || capture?.seo?.title || hostOf(part.url) || 'Page',
-                        status: status === 'loading' ? partStatus(part) : status,
+                        status: status === 'loading' ? partStatus(part, ended) : status,
                         data,
                         complete: status !== 'loading',
                     })
                 }
             } else if (part.type === 'agent_call' && part.artifact_id !== undefined && part.artifact_id !== null) {
                 const id = `artifact:${part.artifact_id}`
-                if (seen.has(id)) continue
-                seen.add(id)
-                out.push({
-                    id,
-                    kind: 'artifact',
-                    artifactId: part.artifact_id,
-                    title: part.title || '',
-                    status: 'ready',
-                    agentStatus: part.status,
-                })
+                // A call still marked as working in a reply that ended did not finish.
+                const cut = ended && !SETTLED_AGENT_STATUSES.has(part.status)
+                const call = {
+                    agentStatus: cut ? (m.status === 'cancelled' ? 'cancelled' : 'error') : part.status,
+                    callId: part.id ?? null,
+                    error: errorText(part.error) || (cut ? endedError(m.status).message : ''),
+                }
+                // base_version > 0: the call revises an artifact saved before it.
+                const saved =
+                    part.status === 'done' ||
+                    (part.version !== undefined && part.version !== null) ||
+                    Number(part.base_version) > 0
+                const spec = artifacts.get(id)
+                if (spec) {
+                    Object.assign(spec, call, {
+                        saved: spec.saved || saved,
+                        title: part.title || spec.title,
+                        artifactKind: part.kind || spec.artifactKind,
+                    })
+                } else {
+                    const added = {
+                        id,
+                        kind: 'artifact',
+                        artifactId: part.artifact_id,
+                        title: part.title || '',
+                        status: 'ready',
+                        ...call,
+                        saved,
+                        artifactKind: part.kind || '',
+                    }
+                    artifacts.set(id, added)
+                    out.push(added)
+                }
             }
         }
     }
+    for (const spec of artifacts.values()) spec.unsaved = !spec.saved && !ACTIVE_AGENT_STATUSES.has(spec.agentStatus)
     return out
 }
 
@@ -200,8 +257,15 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
     const activeId = ref(null)
     const returnFocusEl = ref(null)
     const factsOpen = ref(prefs.seoFactsOpen !== false)
+    // The workspace layout (split, overlay or fullscreen), once it has
+    // measured itself; null before.
+    const layout = ref(null)
+    // The agent had tabs to show while the pane stayed closed.
+    const attention = ref(false)
 
+    let openedByAgent = false
     let closed = new Set()
+    // Agent calls whose artifact was opened, so each call opens it once.
     let autoOpened = new Set()
     let stash = new Map()
     let restored = false
@@ -361,10 +425,39 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         return added
     }
 
-    // Opens the pane for agent-driven tabs, except on phones where the pane is
-    // a full-screen dialog the user opens.
+    // Opens the pane for the user: a click, a key, a link.
+    function show() {
+        open.value = true
+        openedByAgent = false
+        attention.value = false
+    }
+
+    // Opens the pane for agent-driven tabs where it sits beside the chat. As
+    // an overlay (a narrow workspace) or a full-screen dialog (phones) it
+    // would cover the chat the user is typing in, so it stays closed and
+    // `attention` marks that there is something to see.
     function reveal() {
-        if (!isPhone()) open.value = true
+        if (open.value) return
+        const covers = layout.value ? layout.value !== 'split' : isPhone()
+        if (covers) {
+            attention.value = true
+            return
+        }
+        open.value = true
+        openedByAgent = true
+        attention.value = false
+    }
+
+    // The workspace reports its layout once it has measured itself, and null
+    // when it unmounts. A pane the agent opened while the layout was not
+    // known yet, or before the workspace narrowed, closes again.
+    function setLayout(value) {
+        layout.value = LAYOUTS.has(value) ? value : null
+        if (open.value && openedByAgent && layout.value && layout.value !== 'split') {
+            open.value = false
+            expanded.value = false
+            attention.value = true
+        }
     }
 
     function select(tab) {
@@ -373,7 +466,10 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
     }
 
     function specFields(spec) {
-        const { complete: _c, agentStatus: _s, ...fields } = spec
+        if (spec.kind === 'artifact') {
+            return { id: spec.id, kind: 'artifact', artifactId: spec.artifactId, title: spec.title, status: spec.status }
+        }
+        const { complete: _c, ...fields } = spec
         if (spec.kind === 'page') Object.assign(fields, pageFields(spec.data))
         const kept = stash.get(spec.id)
         if (kept && !spec.complete) Object.assign(fields, kept)
@@ -384,7 +480,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         const key = chatKey.value
         if (!key || typeof id !== 'string') return null
         const spec = researchTabs(messageList(key)).find((s) => s.id === id)
-        if (!spec) return null
+        if (!spec || spec.unsaved) return null
         closed.delete(id)
         return addTab(specFields(spec))
     }
@@ -393,7 +489,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         const tab = byId(id) || reopenFromResearch(id)
         if (!tab) return null
         select(tab)
-        open.value = true
+        show()
         return tab.id
     }
 
@@ -418,6 +514,13 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         if (!incoming) return current
         if (!current) return { ...incoming }
         return { ...current, ...incoming }
+    }
+
+    // The fields that hold a value: an empty field in live data does not
+    // erase what the stored copy knows, such as the error a step ended with.
+    function present(data) {
+        if (!data) return data
+        return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== null && value !== undefined))
     }
 
     function openSerp(input, { activate = false } = {}) {
@@ -499,9 +602,26 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         if (activate) {
             select(tab)
             if (options.reveal === false) return tabId
-            open.value = true
+            show()
         }
         return tabId
+    }
+
+    // What the bound chat knows about the agent call that writes an
+    // artifact: {status, active, saved, error, kind, title}, or null.
+    function artifactCall(id) {
+        const key = chatKey.value
+        if (!key || id === undefined || id === null || id === '') return null
+        const spec = researchTabs(messageList(key)).find((s) => s.id === `artifact:${id}`)
+        if (!spec) return null
+        return {
+            status: spec.agentStatus || '',
+            active: ACTIVE_AGENT_STATUSES.has(spec.agentStatus),
+            saved: spec.saved,
+            error: spec.error,
+            kind: spec.artifactKind,
+            title: spec.title,
+        }
     }
 
     function openNewTab() {
@@ -588,8 +708,12 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
 
     function setOpen(value, { returnFocus } = {}) {
         if (returnFocus !== undefined) setReturnFocus(returnFocus)
-        open.value = Boolean(value)
-        if (!open.value) expanded.value = false
+        if (value) {
+            show()
+            return
+        }
+        open.value = false
+        expanded.value = false
     }
 
     function toggleOpen(options = {}) {
@@ -643,7 +767,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         }
         const active = byId(saved.active) || tabs.value[0] || null
         if (active && !activeId.value) select(active)
-        if (saved.open && tabs.value.length && !isPhone()) open.value = true
+        if (saved.open && tabs.value.length) reveal()
         restored = true
     }
 
@@ -653,14 +777,16 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
             if (!tab.title && spec.title) tab.title = spec.title
             return
         }
-        // Live data from browser events wins over the stored research copy.
+        // Live data from browser events wins over the stored research copy
+        // while the step runs. A step that ended without a capture (an error,
+        // or a run that stopped) settles the tab.
         if (tab.status === 'ready' || tab.status === 'error') return
-        if (!spec.complete && tab.status === 'loading') return
+        if (!spec.complete && spec.status === 'loading' && tab.status === 'loading') return
         if (!spec.complete && stash.has(spec.id)) {
             Object.assign(tab, stash.get(spec.id))
             return
         }
-        tab.data = spec.complete ? mergeData(tab.data, spec.data) : mergeData(spec.data, tab.data)
+        tab.data = spec.complete ? mergeData(tab.data, spec.data) : mergeData(spec.data, present(tab.data))
         tab.status = spec.status
         if (!tab.title) tab.title = spec.title
         if (spec.kind === 'page') {
@@ -684,10 +810,12 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         for (const spec of candidates) {
             const tab = byId(spec.id)
             if (tab) hydrate(tab, spec)
-            else if (!closed.has(spec.id)) lastAdded = addTab(specFields(spec))
-            if (spec.kind === 'artifact' && ACTIVE_AGENT_STATUSES.has(spec.agentStatus) && !autoOpened.has(spec.id)) {
-                autoOpened.add(spec.id)
-                openArtifact(spec.artifactId, { activate: true, reveal: !isPhone() })
+            else if (!closed.has(spec.id) && !spec.unsaved) lastAdded = addTab(specFields(spec))
+            const call = `${spec.id}|${spec.callId ?? ''}`
+            if (spec.kind === 'artifact' && ACTIVE_AGENT_STATUSES.has(spec.agentStatus) && !autoOpened.has(call)) {
+                autoOpened.add(call)
+                openArtifact(spec.artifactId, { activate: true, reveal: false })
+                reveal()
             }
         }
         if (chatLoaded(key)) {
@@ -708,6 +836,8 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         tabs.value = []
         activeId.value = null
         expanded.value = false
+        attention.value = false
+        openedByAgent = false
         closed = new Set()
         autoOpened = new Set()
         stash = new Map()
@@ -769,10 +899,10 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
             for (const m of messageList(key)) {
                 if (m.role !== 'assistant') continue
                 const r = m.research || {}
-                sig += `${m.id}:${(m.parts || []).length}:${Object.keys(r.serp || {}).length}:${Object.keys(r.pages || {}).length}`
+                sig += `${m.id}:${m.status || ''}:${(m.parts || []).length}:${Object.keys(r.serp || {}).length}:${Object.keys(r.pages || {}).length}`
                 for (const p of m.parts || []) {
                     if (!p) continue
-                    if (p.type === 'agent_call') sig += `:${p.artifact_id ?? ''}/${p.status || ''}`
+                    if (p.type === 'agent_call') sig += `:${p.artifact_id ?? ''}/${p.status || ''}/${p.version ?? ''}`
                     else if (p.type === 'serp' || p.type === 'page_inspect') sig += `:${p.tab_id || ''}/${p.status || ''}`
                 }
                 sig += '|'
@@ -817,10 +947,13 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         activeId,
         returnFocusEl,
         factsOpen,
+        layout,
+        attention,
         activeTab,
         hasTabs,
         titleOf,
         artifactOf,
+        artifactCall,
         bindChat,
         rekeyChat,
         openArtifact,
@@ -840,6 +973,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         setRatio,
         setFactsOpen,
         setReturnFocus,
+        setLayout,
         reset,
     }
 })

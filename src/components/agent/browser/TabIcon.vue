@@ -9,6 +9,7 @@ import { computed } from 'vue'
 import { CircleAlert, FileChartColumn, FileText, Globe, Search, SquareTerminal, Table } from '@lucide/vue'
 import AgSpinner from '@/components/agent/common/AgSpinner.vue'
 import { useAgentPaneStore } from '@/stores/agentPane'
+import { draftStatusOf } from './useArtifactSource'
 
 // Favicons by kind. Third-party favicons are never loaded.
 
@@ -20,14 +21,17 @@ const pane = useAgentPaneStore()
 
 const artifact = computed(() => (props.tab.kind === 'artifact' ? pane.artifactOf(props.tab.artifactId) : null))
 const artifactKind = computed(() => artifact.value?.kind || artifact.value?.draft?.kind || '')
+const draftStatus = computed(() =>
+  artifact.value?.draft ? draftStatusOf(artifact.value.draft, pane.artifactCall(props.tab.artifactId)) : ''
+)
 
 const busy = computed(() => {
-  if (props.tab.kind === 'artifact') return artifact.value?.draft?.status === 'drafting'
+  if (props.tab.kind === 'artifact') return draftStatus.value === 'drafting'
   return props.tab.status === 'loading'
 })
 
 const failed = computed(() => {
-  if (props.tab.kind === 'artifact') return artifact.value?.draft?.status === 'failed'
+  if (props.tab.kind === 'artifact') return draftStatus.value === 'failed'
   return props.tab.status === 'error'
 })
 

@@ -15,6 +15,7 @@ const SERVICE_COPY = {
     agent_disabled: 'The agent is switched off, so pages cannot be opened here.',
     agent_unavailable: 'The agent service is offline right now. Try again in a minute.',
     agent_not_configured: 'The agent is not set up on this server yet.',
+    maintenance: 'CanSee is down for maintenance. Try again in a few minutes.',
 }
 
 // Fetch errors (as opposed to a BrowseResult that carries its own error).

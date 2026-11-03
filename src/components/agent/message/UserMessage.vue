@@ -3,8 +3,8 @@
     <p class="ag-user-bubble">{{ text }}</p>
     <div v-if="sendFailed" class="ag-user-failed" role="alert">
       <CircleAlert class="ag-user-failed-icon" aria-hidden="true" />
-      <span>{{ failureText }}</span>
-      <button type="button" class="ag-user-retry" :disabled="busy" @click="emit('retry')">Retry</button>
+      <span>{{ failure.text }}</span>
+      <button v-if="failure.retry" type="button" class="ag-user-retry" :disabled="busy" @click="emit('retry')">Retry</button>
     </div>
     <div v-else class="ag-user-actions" :class="{ 'has-branches': siblings.count > 1 }">
       <BranchNav
@@ -68,12 +68,19 @@ const text = computed(() => {
 const sending = computed(() => props.message.status === 'sending')
 const sendFailed = computed(() => props.message.status === 'send_failed')
 
-const failureText = computed(() => {
-  const err = props.message.error || {}
+// A refused send keeps the server's reason (too long, chat deleted, sending
+// too fast); the code's copy stands in only when there is none. Retry re-posts
+// the same text, so it is offered only when that can succeed.
+const failure = computed(() => {
+  const err = props.message.send?.error || {}
   const code = err.code || props.message.error_code || ''
-  const message = err.message || props.message.error_message || ''
+  const message = String(err.message || props.message.error_message || '').trim()
   const copy = errorCopy(code, message, 'failed')
-  return code || message ? `Not sent. ${copy.title}` : 'Not sent.'
+  const reason = message || (code ? copy.title : '')
+  return {
+    text: reason ? `Not sent. ${reason}` : 'Not sent.',
+    retry: copy.retry && err.retryable !== false,
+  }
 })
 
 async function copy() {

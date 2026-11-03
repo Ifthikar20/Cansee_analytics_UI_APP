@@ -22,9 +22,19 @@
           <ChevronRight class="ag-plus-sub-chevron" aria-hidden="true" />
         </DropdownMenuSubTrigger>
         <AgMenuSubContent>
-          <AgMenuItem v-for="a in agents" :key="a.key" @select="emit('select-agent', a.key)">
+          <AgMenuItem
+            v-for="a in agents"
+            :key="a.key"
+            :disabled="Boolean(a.unavailable)"
+            :text-value="a.name"
+            @select="emit('select-agent', a.key)"
+          >
             <component :is="a.icon" aria-hidden="true" />
-            <span class="ag-menu-text">{{ a.name }}</span>
+            <span v-if="a.unavailable" class="ag-menu-text ag-plus-agent">
+              <span>{{ a.name }}</span>
+              <span class="ag-plus-why">{{ a.unavailable }}</span>
+            </span>
+            <span v-else class="ag-menu-text">{{ a.name }}</span>
             <template v-if="a.key === agent" #trail><Check aria-hidden="true" /></template>
           </AgMenuItem>
         </AgMenuSubContent>
@@ -39,7 +49,8 @@
 
 <script setup>
 // The composer's "+": pick an agent for the next message, or open a new tab
-// in the browser pane to visit a page.
+// in the browser pane to visit a page. An agent the AI allowance cannot
+// start is listed, disabled, with the reason.
 import { DropdownMenuRoot, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuTrigger } from 'reka-ui'
 import { Check, ChevronRight, Globe, Plus } from '@lucide/vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
@@ -58,6 +69,17 @@ const emit = defineEmits(['select-agent', 'open-page'])
 </script>
 
 <style scoped>
+.ag-plus-agent {
+  display: grid;
+  white-space: normal;
+}
+
+.ag-plus-why {
+  color: var(--ag-fg-3);
+  font-size: 12px;
+  line-height: 16px;
+}
+
 .ag-plus-sub .ag-plus-sub-chevron {
   width: 14px;
   height: 14px;

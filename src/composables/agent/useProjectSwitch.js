@@ -5,10 +5,11 @@ import { useAppStore } from '@/stores/app'
 // their section; a chat, an artifact or the projects list land on the new
 // project's agent home, because chats and artifacts belong to one project.
 //
-// Navigation comes first: the :websiteId guard makes the project active and
-// the shell's agent.init(newId) resets the old project's scope (transports
-// detach, runs keep going on the server). A page that blocks the navigation
-// (unsaved context edits) therefore leaves the old project fully in place.
+// Navigation comes first: the router makes the project active once the
+// navigation is confirmed, and the shell's agent.init(newId) resets the old
+// project's scope (transports detach, runs keep going on the server). A page
+// that blocks the navigation (unsaved context edits) therefore leaves the old
+// project fully in place.
 
 const KEEP_SECTION = new Set(['agent-context', 'agent-agents', 'agent-reports', 'agent-documents', 'agent-sheets'])
 

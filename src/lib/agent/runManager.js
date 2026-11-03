@@ -8,7 +8,7 @@
 // terminal event, a fatal error, or detach (which never cancels the run).
 import { BACKOFF_BASE_MS, backoffDelay, sleep } from './backoff'
 import { POLL_WAIT_SECONDS, pollRunEvents } from './poller'
-import { OfflineError, TransportError, UnsupportedTransport, isAbortError, openRunStream } from './streamClient'
+import { MaintenanceError, OfflineError, TransportError, UnsupportedTransport, isAbortError, openRunStream } from './streamClient'
 import { EVENT, TERMINAL_EVENT_TYPES, TRANSPORT_STATE } from './types'
 
 export const WATCHDOG_MS = 45000
@@ -165,6 +165,7 @@ class RunSession {
                     }
                     failure = err || new TransportError('transport failed')
                     if (err instanceof OfflineError) this.report(TRANSPORT_STATE.OFFLINE)
+                    else if (err instanceof MaintenanceError) this.report(TRANSPORT_STATE.MAINTENANCE)
                     if (this.mode === 'sse') {
                         this.sseFailures += 1
                         if (this.sseFailures >= SSE_FAILURES_BEFORE_POLL) this.switchToPolling()
@@ -178,7 +179,9 @@ class RunSession {
                 if (!failure) continue
                 const delay = this.deps.backoff(this.attempt, { base: this.retryBase ?? BACKOFF_BASE_MS })
                 this.attempt += 1
-                if (!(failure instanceof OfflineError)) this.report(TRANSPORT_STATE.RECONNECTING)
+                if (!(failure instanceof OfflineError || failure instanceof MaintenanceError)) {
+                    this.report(TRANSPORT_STATE.RECONNECTING)
+                }
                 await this.deps.sleep(Math.max(delay, Number(failure.retryAfterMs) || 0), this.stopCtrl.signal)
             }
         } finally {

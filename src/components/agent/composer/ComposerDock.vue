@@ -7,6 +7,7 @@
       <StatusBanner
         :code="bannerCode"
         :allowance="store.status?.allowance || null"
+        :detail="store.statusError?.message || ''"
         :checking="store.statusLoading"
         @recheck="recheck"
       />
@@ -60,7 +61,7 @@ const props = defineProps({
 const emit = defineEmits(['update:agent', 'sent', 'edit-last', 'jump'])
 
 const BLOCKING = new Set(['agent_disabled', 'agent_not_configured', 'allowance_exceeded'])
-const KNOWN = new Set([...BLOCKING, 'agent_unavailable'])
+const KNOWN = new Set([...BLOCKING, 'agent_unavailable', 'maintenance'])
 
 const store = useAgentStore()
 const pane = useAgentPaneStore()
@@ -78,7 +79,7 @@ const draft = useComposerDraft(
   text
 )
 
-const agents = computed(() => agentList(store.catalog))
+const agents = computed(() => agentList(store.catalog, store.status))
 
 const bannerCode = computed(() => {
   const s = store.status
@@ -94,6 +95,8 @@ const bannerCode = computed(() => {
   } else if (store.statusError) {
     const code = store.statusError.code
     if (KNOWN.has(code)) return code
+    // Nothing is known about the agent: say so, without blocking a send.
+    return 'status_unknown'
   }
   return ''
 })

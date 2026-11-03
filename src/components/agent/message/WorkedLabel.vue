@@ -70,6 +70,7 @@ const note = computed(() => {
   if (!props.running) return ''
   if (props.transport === 'reconnecting') return 'Reconnecting'
   if (props.transport === 'offline') return 'Connection lost, retrying'
+  if (props.transport === 'maintenance') return 'Down for maintenance, retrying'
   if (props.retrying) return 'Retrying'
   return ''
 })

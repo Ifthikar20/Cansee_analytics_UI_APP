@@ -57,16 +57,18 @@
     </div>
 
     <div class="ag-chat-head-end">
-      <AgIconButton
-        v-if="!pane.open && pane.hasTabs"
-        label="Show browser"
-        shortcut="mod+\"
-        :size="32"
-        muted
-        @click="pane.setOpen(true, { returnFocus: $event.currentTarget })"
-      >
-        <IconPanelRight />
-      </AgIconButton>
+      <span v-if="!pane.open && pane.hasTabs" class="ag-chat-head-browser">
+        <AgIconButton
+          :label="pane.attention ? 'Show browser (new tabs)' : 'Show browser'"
+          shortcut="mod+\"
+          :size="32"
+          muted
+          @click="pane.setOpen(true, { returnFocus: $event.currentTarget })"
+        >
+          <IconPanelRight />
+        </AgIconButton>
+        <span v-if="pane.attention" class="ag-chat-head-dot" aria-hidden="true" />
+      </span>
       <DropdownMenuRoot :modal="false">
         <DropdownMenuTrigger as-child>
           <AgIconButton label="More" :size="32" :icon-size="20" muted>
@@ -256,6 +258,26 @@ function exportTranscript() {
   flex-shrink: 0;
   align-items: center;
   gap: 4px;
+}
+
+.ag-chat-head-browser {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* The agent opened tabs while the pane had to stay closed. */
+.ag-chat-head-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border: 1.5px solid var(--ag-pane-bg);
+  border-radius: 999px;
+  background: var(--ag-accent);
+  box-sizing: content-box;
+  pointer-events: none;
 }
 
 .ag-chat-title {

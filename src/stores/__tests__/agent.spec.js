@@ -63,6 +63,7 @@ import agentApi from '@/api/agent'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { useAgentUiStore } from '@/stores/agentUi'
+import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { getLastChat, getLastProject, loadDraft, loadPaneState, saveDraft, savePaneState, setLastChat } from '@/lib/agent/storage'
 import {
@@ -243,6 +244,42 @@ describe('agent store: loading', () => {
         expect(agentApi.getChat).toHaveBeenCalledTimes(1)
     })
 
+    it('keeps its project when the active website changes without the workspace URL', async () => {
+        await initProject()
+        // A page that blocked a project switch still shows project 5.
+        useAppStore().setActiveWebsite({ id: 6, name: 'Other' })
+        await flush()
+        expect(store.websiteId).toBe('5')
+        expect(agentApi.listChats).toHaveBeenCalledTimes(1)
+    })
+
+    it('context calls refuse a project the store is not on', async () => {
+        await initProject()
+        agentApi.putContext.mockResolvedValue(ok({ audience: 'Alpha', revision: 1 }))
+        await expect(store.saveContext({ audience: 'Alpha' }, { websiteId: '6' })).rejects.toMatchObject({
+            code: 'project_changed',
+        })
+        await expect(store.loadContext({ websiteId: '6' })).rejects.toMatchObject({ code: 'project_changed' })
+        expect(agentApi.putContext).not.toHaveBeenCalled()
+        expect(agentApi.getContext).not.toHaveBeenCalled()
+
+        await store.saveContext({ audience: 'Alpha' }, { websiteId: '5' })
+        expect(agentApi.putContext).toHaveBeenCalledWith('5', expect.objectContaining({ audience: 'Alpha' }), {
+            _silentError: true,
+        })
+    })
+
+    it('an unscoped store takes the project the page names over the active website', async () => {
+        useAppStore().setActiveWebsite({ id: 6, name: 'Other' })
+        agentApi.status.mockResolvedValue(ok({ enabled: true }))
+        agentApi.listChats.mockResolvedValue(ok({ results: [], next_cursor: null }))
+        agentApi.agents.mockResolvedValue(ok([]))
+        agentApi.getContext.mockResolvedValue(ok({ revision: 0 }))
+        await store.loadContext({ websiteId: '5' })
+        expect(store.websiteId).toBe('5')
+        expect(agentApi.getContext).toHaveBeenCalledWith('5', { _silentError: true })
+    })
+
     it('openChat keeps a 404 out of the last-chat memory', async () => {
         await initProject()
         agentApi.getChat.mockRejectedValueOnce(axiosError(404, { code: 'not_found', message: 'Not found.' }))
@@ -334,6 +371,24 @@ describe('agent store: a research turn end to end', () => {
         const keys = agentApi.sendMessage.mock.calls.map((c) => c[3].idempotencyKey)
         expect(keys[1]).toBe(keys[0])
         expect(store.visiblePath(CHAT_ID).map((m) => m.id)).toEqual([USER_MESSAGE_ID, ASSISTANT_ID])
+    })
+
+    it('editing a failed send posts the new text with a new Idempotency-Key', async () => {
+        await initProject()
+        agentApi.getChat.mockResolvedValueOnce(ok(chatDetail()))
+        // The response was lost: the server may have started a turn with this key.
+        agentApi.sendMessage.mockRejectedValueOnce(axiosError(502, {}))
+        await store.send({ chatId: CHAT_ID, text: 'Old question' })
+        await flush()
+        const [failed] = store.visiblePath(CHAT_ID)
+        expect(failed.status).toBe('send_failed')
+
+        agentApi.sendMessage.mockResolvedValueOnce(accepted())
+        await store.editMessage(failed.id, 'New question')
+        const [first, second] = agentApi.sendMessage.mock.calls
+        expect(second[2].text).toBe('New question')
+        expect(second[3].idempotencyKey).toEqual(expect.any(String))
+        expect(second[3].idempotencyKey).not.toBe(first[3].idempotencyKey)
     })
 
     it('sends a follow-up under the current leaf', async () => {
@@ -448,23 +503,195 @@ describe('agent store: resync, stop and transport loss', () => {
         expect(store.isChatBusy(CHAT_ID)).toBe(false)
     })
 
-    it('stop cancels, then settles locally after 8 seconds without a terminal event', async () => {
+    /** The chat detail the server returns while a stopped run winds down, then after it ended. */
+    function stoppingDetail({ runStatus = 'running', messageStatus = 'streaming', partsSeq = 12 } = {}) {
+        return ok(
+            chatDetail({
+                current_leaf_id: ASSISTANT_ID,
+                messages: [
+                    userMessage(),
+                    emptyAssistant({
+                        status: messageStatus,
+                        parts: [{ id: 'p-text', type: 'text', request: 1, text: 'Partial and saved' }],
+                        parts_seq: partsSeq,
+                    }),
+                ],
+                active_run: runStatus ? { id: RUN_ID, status: runStatus, message_id: ASSISTANT_ID, last_seq: partsSeq } : null,
+            })
+        )
+    }
+
+    it('stop asks the server after 8 seconds and stays busy while the run still runs there', async () => {
         vi.useFakeTimers()
         await initProject()
         await openRunningChat()
-        agentApi.cancelRun.mockResolvedValueOnce(ok({ status: 'cancelling' }))
+        agentApi.cancelRun.mockResolvedValueOnce(ok({ status: 'running' }))
         await store.stop(CHAT_ID)
         expect(agentApi.cancelRun).toHaveBeenCalledWith(RUN_ID)
         expect(store.runs[RUN_ID]).toMatchObject({ phase: 'cancelling', cancelRequested: true })
         expect(store.isChatBusy(CHAT_ID)).toBe(true)
 
-        vi.advanceTimersByTime(7999)
+        // A tool in flight (the engine checks) keeps the run going past 8 s.
+        agentApi.getChat.mockResolvedValueOnce(stoppingDetail())
+        await vi.advanceTimersByTimeAsync(7999)
+        expect(agentApi.getChat).toHaveBeenCalledTimes(1)
+        await vi.advanceTimersByTimeAsync(1)
+        expect(agentApi.getChat).toHaveBeenCalledTimes(2)
         expect(store.runs[RUN_ID].phase).toBe('cancelling')
-        vi.advanceTimersByTime(1)
+        expect(store.isChatBusy(CHAT_ID)).toBe(true)
+        expect(rm.detached).not.toContain(RUN_ID)
+
+        // The next check finds it over without its terminal event reaching
+        // this tab: the saved message is what the server ended with.
+        agentApi.getChat.mockResolvedValueOnce(stoppingDetail({ runStatus: null, messageStatus: 'cancelled', partsSeq: 30 }))
+        await vi.advanceTimersByTimeAsync(8000)
+        expect(rm.detached).toContain(RUN_ID)
         expect(store.runs[RUN_ID].phase).toBe('cancelled')
+        expect(store.runs[RUN_ID].settledLocally).toBe(false)
+        expect(store.messages[ASSISTANT_ID]).toMatchObject({ status: 'cancelled', parts_seq: 30 })
+        expect(store.messages[ASSISTANT_ID].parts[0].text).toBe('Partial and saved')
+        expect(store.isChatBusy(CHAT_ID)).toBe(false)
+    })
+
+    it('stop confirms at once when the server says the run already ended', async () => {
+        vi.useFakeTimers()
+        await initProject()
+        await openRunningChat()
+        agentApi.cancelRun.mockResolvedValueOnce(ok({ status: 'completed' }))
+        agentApi.getChat.mockResolvedValueOnce(stoppingDetail({ runStatus: null, messageStatus: 'complete', partsSeq: 40 }))
+        await store.stop(CHAT_ID)
+        await vi.advanceTimersByTimeAsync(0)
+        // It finished before the stop took effect: done, not cancelled.
+        expect(store.runs[RUN_ID].phase).toBe('done')
+        expect(store.messages[ASSISTANT_ID].status).toBe('complete')
+        expect(store.isChatBusy(CHAT_ID)).toBe(false)
+        await vi.advanceTimersByTimeAsync(20000)
+        expect(agentApi.getChat).toHaveBeenCalledTimes(2)
+    })
+
+    it('stop settles locally when the server does not know the run', async () => {
+        await initProject()
+        await openRunningChat()
+        agentApi.cancelRun.mockRejectedValueOnce(axiosError(404, { code: 'not_found', message: 'Not found.' }))
+        await store.stop(CHAT_ID)
+        expect(store.runs[RUN_ID]).toMatchObject({ phase: 'cancelled', settledLocally: true })
         expect(store.messages[ASSISTANT_ID].status).toBe('cancelled')
         expect(rm.detached).toContain(RUN_ID)
         expect(store.isChatBusy(CHAT_ID)).toBe(false)
+    })
+
+    it('follows a run again when the server still runs it after this tab gave up on its stream', async () => {
+        await initProject()
+        await openRunningChat()
+        rm.hooks.onClose(RUN_ID, { terminal: false, error: { isTransportError: true, status: 401, code: 'unauthorized', retryable: false } })
+        expect(store.runs[RUN_ID]).toMatchObject({ phase: 'failed', settledLocally: true })
+        expect(store.isChatBusy(CHAT_ID)).toBe(false)
+
+        agentApi.getChat.mockResolvedValueOnce(stoppingDetail({ partsSeq: 18 }))
+        await store.openChat(CHAT_ID, { force: true })
+        expect(store.runs[RUN_ID]).toMatchObject({ phase: 'running', settledLocally: false, error: null, lastSeq: 18 })
+        expect(rm.attached.at(-1)).toEqual({ id: RUN_ID, lastSeq: 18 })
+        expect(store.messages[ASSISTANT_ID].status).toBe('streaming')
+        expect(store.isChatBusy(CHAT_ID)).toBe(true)
+    })
+
+    it('the chat list follows a run this tab gave up on while the server still runs it', async () => {
+        await initProject()
+        await openRunningChat()
+        rm.hooks.onClose(RUN_ID, { terminal: false, error: { isTransportError: true, code: 'resync_failed', retryable: false } })
+        agentApi.listChats.mockResolvedValueOnce(ok({ results: [{ id: CHAT_ID, active_run_id: RUN_ID }], next_cursor: null }))
+        agentApi.getChat.mockResolvedValueOnce(stoppingDetail({ partsSeq: 20 }))
+        await store.loadChats()
+        await flush()
+        expect(agentApi.getChat).toHaveBeenCalledTimes(2)
+        expect(rm.attached.at(-1)).toEqual({ id: RUN_ID, lastSeq: 20 })
+        expect(store.recents[0].running).toBe(true)
+    })
+
+    it('a send refused with run_in_progress loads the chat so its active run shows', async () => {
+        await initProject()
+        agentApi.getChat.mockResolvedValueOnce(
+            ok(chatDetail({ current_leaf_id: ASSISTANT_ID, messages: [userMessage(), emptyAssistant({ status: 'complete' })] }))
+        )
+        await store.openChat(CHAT_ID)
+        agentApi.sendMessage.mockRejectedValueOnce(
+            axiosError(409, { code: 'run_in_progress', message: 'This chat is already working on a reply.', details: { run_id: 'run-9' } })
+        )
+        agentApi.getChat.mockResolvedValueOnce(
+            ok(
+                chatDetail({
+                    current_leaf_id: 'a9',
+                    messages: [
+                        userMessage(),
+                        emptyAssistant({ status: 'complete' }),
+                        userMessage({ id: 'u9', parent_id: ASSISTANT_ID, sibling_ids: ['u9'] }),
+                        emptyAssistant({ id: 'a9', parent_id: 'u9', sibling_ids: ['a9'], parts_seq: 4 }),
+                    ],
+                    active_run: { id: 'run-9', status: 'running', message_id: 'a9', last_seq: 6 },
+                })
+            )
+        )
+        await store.send({ chatId: CHAT_ID, text: 'Hello again' })
+        await flush()
+        expect(agentApi.getChat).toHaveBeenCalledTimes(2)
+        expect(rm.attached.at(-1)).toEqual({ id: 'run-9', lastSeq: 4 })
+        expect(store.isChatBusy(CHAT_ID)).toBe(true)
+    })
+
+    it('a Stop pressed while a regenerate is posting cancels that run and leaves nothing behind', async () => {
+        await initProject()
+        agentApi.getChat.mockResolvedValueOnce(
+            ok(chatDetail({ current_leaf_id: ASSISTANT_ID, messages: [userMessage(), emptyAssistant({ status: 'complete' })] }))
+        )
+        await store.openChat(CHAT_ID)
+        let resolveRegenerate
+        agentApi.regenerate.mockImplementationOnce(() => new Promise((resolve) => (resolveRegenerate = resolve)))
+        agentApi.cancelRun.mockResolvedValue(ok({ status: 'running' }))
+        const pending = store.regenerate(ASSISTANT_ID)
+        await store.stop(CHAT_ID)
+        expect(agentApi.cancelRun).not.toHaveBeenCalled()
+        resolveRegenerate(
+            ok({
+                assistant_message: emptyAssistant({ id: 'a2', sibling_ids: [ASSISTANT_ID, 'a2'] }),
+                run: { id: 'run-2', chat_id: CHAT_ID, message_id: 'a2', status: 'queued', last_seq: 0 },
+            })
+        )
+        await pending
+        expect(agentApi.cancelRun).toHaveBeenCalledWith('run-2')
+        expect(store.chatState[CHAT_ID].cancelOnStart).toBe(false)
+
+        // The next message's run is not cancelled by a leftover flag.
+        rm.hooks.applyEvents('run-2', [eventFactory({ runId: 'run-2', messageId: 'a2' })('run.cancelled')])
+        agentApi.sendMessage.mockResolvedValueOnce(
+            accepted({
+                user_message: userMessage({ id: 'u3', parent_id: 'a2', sibling_ids: ['u3'] }),
+                assistant_message: emptyAssistant({ id: 'a3', parent_id: 'u3', sibling_ids: ['a3'] }),
+                run: { id: 'run-3', chat_id: CHAT_ID, message_id: 'a3', status: 'queued', last_seq: 0 },
+            })
+        )
+        await store.send({ chatId: CHAT_ID, text: 'Next question' })
+        await flush()
+        expect(agentApi.cancelRun).toHaveBeenCalledTimes(1)
+        expect(store.runs['run-3'].phase).toBe('queued')
+    })
+
+    it('a Stop pressed while a regenerate fails does not cancel the next message', async () => {
+        await initProject()
+        agentApi.getChat.mockResolvedValueOnce(
+            ok(chatDetail({ current_leaf_id: ASSISTANT_ID, messages: [userMessage(), emptyAssistant({ status: 'complete' })] }))
+        )
+        await store.openChat(CHAT_ID)
+        let rejectRegenerate
+        agentApi.regenerate.mockImplementationOnce(() => new Promise((_, reject) => (rejectRegenerate = reject)))
+        const pending = store.regenerate(ASSISTANT_ID)
+        await store.stop(CHAT_ID)
+        rejectRegenerate(axiosError(500, { code: 'server_error' }))
+        await expect(pending).rejects.toMatchObject({ status: 500 })
+        expect(store.chatState[CHAT_ID].cancelOnStart).toBe(false)
+        agentApi.sendMessage.mockResolvedValueOnce(accepted())
+        await store.send({ chatId: CHAT_ID, text: 'Hello' })
+        await flush()
+        expect(agentApi.cancelRun).not.toHaveBeenCalled()
     })
 
     it('stop ends with the server event when it arrives in time', async () => {
@@ -568,6 +795,41 @@ describe('agent store: branches, reports and artifacts', () => {
         expect(store.messages[ASSISTANT_ID].feedback).toBeNull()
     })
 
+    it('a chat opened mid-draft knows what the draft is, and that it only has its tail', async () => {
+        await initProject()
+        agentApi.getChat.mockResolvedValueOnce(
+            ok(
+                chatDetail({
+                    current_leaf_id: ASSISTANT_ID,
+                    messages: [
+                        userMessage(),
+                        emptyAssistant({
+                            parts: [
+                                {
+                                    id: 'call',
+                                    type: 'agent_call',
+                                    request: 2,
+                                    agent: 'landing_page',
+                                    status: 'drafting',
+                                    artifact_id: 'art-5',
+                                    title: 'Battery page',
+                                    kind: 'page',
+                                },
+                            ],
+                            parts_seq: 40,
+                        }),
+                    ],
+                    active_run: { id: RUN_ID, status: 'running', message_id: ASSISTANT_ID, last_seq: 44 },
+                })
+            )
+        )
+        await store.openChat(CHAT_ID)
+        const e = eventFactory({ start: 40 })
+        rm.hooks.applyEvents(RUN_ID, [e('artifact.delta', { artifact_id: 'art-5', append: '<section>tail</section>' })])
+        expect(store.artifact('art-5')).toMatchObject({ kind: 'page', title: 'Battery page', agent_key: 'landing_page' })
+        expect(store.artifact('art-5').draft).toMatchObject({ status: 'drafting', partial: true })
+    })
+
     it('a drafted artifact is replaced by its saved version once it completes', async () => {
         await initProject()
         await openRunningChat()
@@ -603,6 +865,119 @@ describe('agent store: branches, reports and artifacts', () => {
     })
 })
 
+describe('agent store: what a run leaves when it ends', () => {
+    function startDraft(start = 10) {
+        const e = eventFactory({ start })
+        rm.hooks.applyEvents(RUN_ID, [
+            e('part.added', { part: { id: 'call', type: 'agent_call', request: 2, agent: 'landing_page', status: 'drafting', artifact_id: 'art-1' } }),
+            e('artifact.started', { artifact_id: 'art-1', kind: 'page', title: 'Battery page', agent_key: 'landing_page', base_version: 0 }),
+            e('artifact.delta', { artifact_id: 'art-1', append: '<h1>Half a page' }),
+        ])
+        expect(store.artifact('art-1').draft).toMatchObject({ status: 'drafting', runId: RUN_ID })
+        return e
+    }
+
+    it('fails a draft the run was still writing when it was stopped', async () => {
+        await initProject()
+        await openRunningChat()
+        const e = startDraft()
+        rm.hooks.applyEvents(RUN_ID, [e('run.cancelled')])
+        expect(store.artifact('art-1').draft).toMatchObject({
+            status: 'failed',
+            error: { code: 'stopped', message: 'Stopped' },
+            content: '<h1>Half a page',
+        })
+    })
+
+    it('fails a draft as not finished when the run ended any other way', async () => {
+        await initProject()
+        await openRunningChat()
+        startDraft()
+        rm.hooks.onClose(RUN_ID, { terminal: false, error: { isTransportError: true, status: 404, code: 'not_found', retryable: false } })
+        expect(store.runs[RUN_ID].phase).toBe('failed')
+        expect(store.artifact('art-1').draft).toMatchObject({ status: 'failed', error: { code: 'not_finished', message: 'Not finished' } })
+    })
+
+    it('loads the saved copy of a draft whose end event never arrived but whose call saved it', async () => {
+        await initProject()
+        await openRunningChat()
+        startDraft()
+        agentApi.getChat.mockResolvedValueOnce(
+            ok(
+                chatDetail({
+                    current_leaf_id: ASSISTANT_ID,
+                    messages: [
+                        userMessage(),
+                        emptyAssistant({
+                            status: 'complete',
+                            parts_seq: 30,
+                            parts: [{ id: 'call', type: 'agent_call', request: 2, agent: 'landing_page', status: 'done', artifact_id: 'art-1', version: 1 }],
+                        }),
+                    ],
+                })
+            )
+        )
+        agentApi.getArtifact.mockResolvedValueOnce(
+            ok({ id: 'art-1', kind: 'page', title: 'Battery page', latest_version: 1, version: 1, content: '<h1>Saved</h1>' })
+        )
+        const result = await rm.hooks.onResync(RUN_ID, 'buffer_expired')
+        await flush()
+        expect(result.active).toBe(false)
+        expect(agentApi.getArtifact).toHaveBeenCalledWith('5', 'art-1', { _silentError: true })
+        expect(store.artifact('art-1')).toMatchObject({ content: '<h1>Saved</h1>', version: 1, draft: null })
+    })
+
+    it('marks a generated title as generated and keeps a name the user gave the chat', async () => {
+        await initProject()
+        await openRunningChat()
+        const e = eventFactory({ start: 10 })
+        rm.hooks.applyEvents(RUN_ID, [e('chat.updated', { chat_id: CHAT_ID, title: 'Battery research' })])
+        expect(store.chats.byId[CHAT_ID]).toMatchObject({ title: 'Battery research', title_source: 'model' })
+
+        agentApi.updateChat.mockResolvedValueOnce(ok(chatDetail({ title: 'My name', title_source: 'user' })))
+        await store.renameChat(CHAT_ID, 'My name')
+        rm.hooks.applyEvents(RUN_ID, [e('chat.updated', { chat_id: CHAT_ID, title: 'Another title' })])
+        expect(store.chats.byId[CHAT_ID]).toMatchObject({ title: 'My name', title_source: 'user' })
+    })
+
+    it("asks for a new chat's generated title when it was saved after the first reply ended", async () => {
+        vi.useFakeTimers()
+        await initProject()
+        agentApi.createChat.mockResolvedValueOnce(ok(chatDetail()))
+        agentApi.sendMessage.mockResolvedValueOnce(accepted())
+        await store.send({ chatId: null, text: 'Research Turonote' })
+        await vi.advanceTimersByTimeAsync(0)
+        const e = eventFactory()
+        rm.hooks.applyEvents(RUN_ID, [e('run.started'), e('run.completed', { status: 'complete' })])
+        expect(agentApi.getChat).not.toHaveBeenCalled()
+
+        // Not there at the first check: the first-message title shows meanwhile.
+        agentApi.getChat.mockResolvedValueOnce(ok(chatDetail({ title: 'Research Turonote', title_source: 'auto' })))
+        await vi.advanceTimersByTimeAsync(2000)
+        expect(agentApi.getChat).toHaveBeenCalledTimes(1)
+        expect(store.chats.byId[CHAT_ID]).toMatchObject({ title: 'Research Turonote', title_source: 'auto' })
+
+        agentApi.getChat.mockResolvedValueOnce(ok(chatDetail({ title: 'Turonote visibility', title_source: 'model' })))
+        await vi.advanceTimersByTimeAsync(6000)
+        expect(agentApi.getChat).toHaveBeenCalledTimes(2)
+        expect(store.chats.byId[CHAT_ID]).toMatchObject({ title: 'Turonote visibility', title_source: 'model' })
+
+        // Nothing more to ask once it is there.
+        await vi.advanceTimersByTimeAsync(60000)
+        expect(agentApi.getChat).toHaveBeenCalledTimes(2)
+    })
+
+    it('does not ask for a title that arrived with the reply, nor for chats it did not start', async () => {
+        vi.useFakeTimers()
+        await initProject()
+        await openRunningChat()
+        rm.hooks.applyEvents(RUN_ID, [eventFactory({ start: 10 })('run.completed', { status: 'complete' })])
+        await vi.advanceTimersByTimeAsync(60000)
+        // The one call is openRunningChat's own load.
+        expect(agentApi.getChat).toHaveBeenCalledTimes(1)
+    })
+})
+
 describe('agent store: deletes and resets', () => {
     it('deleteChat drops the chat, its messages and its stored keys', async () => {
         await initProject()
@@ -635,6 +1010,15 @@ describe('agent store: deletes and resets', () => {
         await late
         expect(store.messages.x).toBeUndefined()
         expect(store.chatState['other-chat']).toBeUndefined()
+    })
+
+    it('a sign-out anywhere resets the store before clearAuth returns', async () => {
+        await initProject()
+        await openRunningChat()
+        auth.clearAuth()
+        expect(store.websiteId).toBeNull()
+        expect(store.messages).toEqual({})
+        expect(rm.detached).toContain(RUN_ID)
     })
 
     it('signing out resets everything and clears per-user keys', async () => {

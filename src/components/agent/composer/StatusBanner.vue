@@ -14,14 +14,18 @@
 
 <script setup>
 // Why the agent cannot answer right now, above the composer. Every state is
-// a real server answer (status/ or a refused send); nothing is guessed.
+// a real server answer (status/ or a refused send), or says that status/
+// could not be reached; nothing is guessed.
 import { computed } from 'vue'
-import { CircleAlert, CirclePause, Gauge, PlugZap } from '@lucide/vue'
+import { CircleAlert, CirclePause, CloudOff, Gauge, PlugZap, Wrench } from '@lucide/vue'
 
 const props = defineProps({
-  // agent_disabled | agent_unavailable | agent_not_configured | allowance_exceeded | allowance_warning
+  // agent_disabled | agent_unavailable | maintenance | agent_not_configured | allowance_exceeded
+  // | allowance_warning | status_unknown (status/ failed and nothing is known)
   code: { type: String, default: '' },
   allowance: { type: Object, default: null },
+  // Why status/ failed, for status_unknown.
+  detail: { type: String, default: '' },
   checking: { type: Boolean, default: false },
 })
 
@@ -41,12 +45,22 @@ const usage = computed(() => {
 
 const copy = computed(() => {
   switch (props.code) {
+    // Every agent endpoint but status/ refuses while it is off, so saved work
+    // cannot be opened until then.
     case 'agent_disabled':
       return {
         tone: 'muted',
         icon: CirclePause,
         title: 'The agent is switched off.',
-        body: 'It has been turned off on this server. Your chats and reports are still here.',
+        body: 'It has been turned off on this server. Your chats and reports are kept and open again once it is back on.',
+      }
+    case 'status_unknown':
+      return {
+        tone: 'muted',
+        icon: CloudOff,
+        title: "We couldn't check the agent's status.",
+        body: props.detail.trim(),
+        recheck: true,
       }
     case 'agent_unavailable':
       return {
@@ -54,6 +68,15 @@ const copy = computed(() => {
         icon: PlugZap,
         title: "The agent service isn't reachable right now.",
         body: 'Your chats are safe. Try again in a minute.',
+        recheck: true,
+      }
+    // nginx's maintenance switch, not the agent being down.
+    case 'maintenance':
+      return {
+        tone: 'muted',
+        icon: Wrench,
+        title: 'CanSee is down for maintenance.',
+        body: 'Your chats are safe. Try again in a few minutes.',
         recheck: true,
       }
     case 'agent_not_configured':

@@ -8,6 +8,7 @@
   >
     <div v-if="agent" class="ag-composer-agent">
       <AgentChip :agent="agent" :catalog="catalog" @remove="emit('update:agent', null)" />
+      <span v-if="agentUnavailable" class="ag-composer-agent-why">{{ agentUnavailable }}</span>
     </div>
     <label :for="fieldId" class="ag-sr-only">{{ label }}</label>
     <textarea
@@ -27,9 +28,7 @@
       @compositionstart="ime.onCompositionstart"
       @compositionend="ime.onCompositionend"
     ></textarea>
-    <p :id="hintId" class="ag-sr-only">
-      {{ coarse ? 'Use the Send button to send.' : 'Enter sends, Shift+Enter adds a new line.' }}
-    </p>
+    <p :id="hintId" class="ag-sr-only">{{ hint }}</p>
     <div class="ag-composer-footer">
       <PlusMenu
         :agents="agents"
@@ -40,6 +39,9 @@
       />
       <span v-if="dictationText" class="ag-composer-interim" aria-hidden="true">{{ dictationText }}</span>
       <span class="ag-composer-spacer"></span>
+      <span v-if="lengthText" class="ag-composer-count" :class="{ 'is-over': length.over }" aria-hidden="true">
+        {{ lengthText.short }}
+      </span>
       <DictationButton :disabled="blocked" @text="insertDictation" @interim="dictationText = $event" />
       <SendStopButton :busy="busy" :stopping="stopping" :disabled="!canSubmit" @stop="emit('stop')" />
     </div>
@@ -48,13 +50,15 @@
 
 <script setup>
 // The message box: selected agent chip, auto-growing textarea, and a footer
-// with "+", dictation and the round Send / Stop button. Presentational: the
-// dock owns the text, the agent and what Send and Stop do.
+// with "+", the length counter near the server's limit, dictation and the
+// round Send / Stop button. Presentational: the dock owns the text, the
+// agent and what Send and Stop do.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import AgentChip from './AgentChip.vue'
 import DictationButton from './DictationButton.vue'
 import PlusMenu from './PlusMenu.vue'
 import SendStopButton from './SendStopButton.vue'
+import { lengthCopy, messageLength } from './messageLimit'
 import { useImeSafeEnter } from '@/composables/agent/useImeSafeEnter'
 import { usePlatform } from '@/composables/agent/usePlatform'
 import { agentMeta } from '@/lib/agent/agentsMeta'
@@ -63,7 +67,7 @@ import { useAgentUiStore } from '@/stores/agentUi'
 const props = defineProps({
   modelValue: { type: String, default: '' },
   agent: { type: String, default: null },
-  // [{key, name, icon, starter}] from agentList()
+  // [{key, name, icon, starter, unavailable}] from agentList(catalog, status)
   agents: { type: Array, default: () => [] },
   catalog: { type: Array, default: null },
   // The agent is working on this chat (Send becomes Stop).
@@ -89,7 +93,25 @@ const hintId = `ag-composer-hint-${uid}`
 const field = ref(null)
 const dictationText = ref('')
 
-const canSubmit = computed(() => !props.blocked && props.modelValue.trim().length > 0)
+// A message over the server's limit would only come back refused.
+const length = computed(() => messageLength(props.modelValue))
+const lengthText = computed(() => (length.value.near ? lengthCopy(length.value) : null))
+
+// A picked writing agent the allowance cannot start would fail only after the
+// orchestrator's turn was paid for, so Send waits until it is removed.
+const agentUnavailable = computed(() =>
+  props.agent ? props.agents.find((a) => a && a.key === props.agent)?.unavailable || '' : ''
+)
+
+const canSubmit = computed(
+  () => !props.blocked && !agentUnavailable.value && !length.value.over && props.modelValue.trim().length > 0
+)
+
+const hint = computed(() => {
+  const keys = coarse.value ? 'Use the Send button to send.' : 'Enter sends, Shift+Enter adds a new line.'
+  const notes = [agentUnavailable.value, lengthText.value?.long].filter(Boolean)
+  return [...notes, keys].join(' ')
+})
 
 const placeholderText = computed(() => {
   if (props.agent) {
@@ -105,7 +127,16 @@ const ime = useImeSafeEnter({
 })
 
 function submit() {
-  if (props.busy || !canSubmit.value) return
+  if (props.busy) return
+  if (agentUnavailable.value && !props.blocked) {
+    ui.announce(agentUnavailable.value, 'assertive')
+    return
+  }
+  if (length.value.over && !props.blocked) {
+    ui.announce(lengthText.value.long, 'assertive')
+    return
+  }
+  if (!canSubmit.value) return
   emit('submit', props.modelValue.trim())
 }
 
@@ -201,8 +232,18 @@ defineExpose({ focus })
 
 .ag-composer-agent {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
   padding: 12px 16px 0;
   cursor: default;
+}
+
+.ag-composer-agent-why {
+  min-width: 0;
+  color: var(--ag-warning);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 /* 16 top padding + one 24px line + room below: 72 with the 8px bottom pad,
@@ -266,6 +307,22 @@ defineExpose({ focus })
   font-style: italic;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ag-composer-count {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ag-fg-3);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-composer-count.is-over {
+  color: var(--ag-danger);
+  font-weight: 500;
 }
 
 @media (pointer: coarse) {

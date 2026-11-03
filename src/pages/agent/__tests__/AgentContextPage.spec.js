@@ -77,6 +77,7 @@ describe('AgentContextPage', () => {
   it('loads the context into the form with who saved it last', async () => {
     const { wrapper } = await setup()
     expect(fakeAgent.loadContext).toHaveBeenCalledTimes(1)
+    expect(fakeAgent.loadContext).toHaveBeenCalledWith({ websiteId: 'w1' })
     expect(wrapper.find('#ag-ctx-audience').element.value).toBe(CONTEXT.audience)
     expect(wrapper.find('#ag-ctx-voice').element.value).toBe(CONTEXT.voice)
     expect(wrapper.findAll('.ag-ctx-offering')).toHaveLength(1)
@@ -85,6 +86,14 @@ describe('AgentContextPage', () => {
     expect(saveButton(wrapper).attributes('disabled')).toBeDefined()
     expect(wrapper.find('a[href="/settings/brand-facts"]').exists()).toBe(true)
     expect(wrapper.find('a[href="/settings/project"]').exists()).toBe(true)
+  })
+
+  it('promises only what the agents do with it', async () => {
+    const { wrapper } = await setup()
+    const intro = wrapper.find('.ag-page-intro').text()
+    expect(intro).toContain('a page, an article or an ad campaign')
+    // The research report is written without reading the brand context.
+    expect(intro).not.toMatch(/report/i)
   })
 
   it('starts blank for a project with no context yet', async () => {
@@ -106,16 +115,20 @@ describe('AgentContextPage', () => {
     await offerings[1].find('input[type="text"]').setValue('Pro plan')
     await saveButton(wrapper).trigger('click')
     await flushPromises()
-    expect(fakeAgent.saveContext).toHaveBeenCalledWith({
-      audience: CONTEXT.audience,
-      voice: 'Warm, direct',
-      offerings: [
-        { name: 'Battery care plan', description: 'Yearly check', url: 'https://example.com/care' },
-        { name: 'Pro plan', description: '', url: 'https://example.com/pro' },
-      ],
-      rules: ['Never promise range figures'],
-      revision: 4,
-    })
+    expect(fakeAgent.saveContext).toHaveBeenCalledWith(
+      {
+        audience: CONTEXT.audience,
+        voice: 'Warm, direct',
+        offerings: [
+          { name: 'Battery care plan', description: 'Yearly check', url: 'https://example.com/care' },
+          { name: 'Pro plan', description: '', url: 'https://example.com/pro' },
+        ],
+        rules: ['Never promise range figures'],
+        revision: 4,
+      },
+      // The project the form belongs to, never whatever the store is on.
+      { websiteId: 'w1' }
+    )
     expect(wrapper.find('.ag-ctx-state').text()).toBe('Saved by You just now')
   })
 

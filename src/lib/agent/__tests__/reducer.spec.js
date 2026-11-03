@@ -293,7 +293,66 @@ describe('artifacts', () => {
     it('creates a draft for a delta whose start it missed', () => {
         const e = eventFactory()
         const out = reduceEvents(snapshot(), [e('artifact.delta', { artifact_id: 'art-4', append: '# Title' })])
-        expect(out.drafts['art-4']).toMatchObject({ status: 'drafting', content: '# Title' })
+        expect(out.drafts['art-4']).toMatchObject({ status: 'drafting', content: '# Title', partial: true })
+    })
+
+    // A reload mid-draft resumes after parts_seq, which the sub-agent's
+    // checkpoints have moved past artifact.started: only the persisted
+    // agent_call part says what is being written.
+    it('takes kind, title and agent from the agent_call part when it resumed past artifact.started', () => {
+        const e = eventFactory({ start: 40 })
+        const resumed = snapshot({
+            message: {
+                parts: [
+                    {
+                        id: 'call',
+                        type: 'agent_call',
+                        request: 2,
+                        agent: 'landing_page',
+                        agent_name: 'Landing Page Agent',
+                        status: 'drafting',
+                        artifact_id: 'art-5',
+                        title: 'Battery page',
+                        kind: 'page',
+                    },
+                ],
+                parts_seq: 40,
+            },
+            run: { lastSeq: 40 },
+        })
+        const out = reduceEvents(resumed, [e('artifact.delta', { artifact_id: 'art-5', append: '<section>tail</section>' })])
+        expect(out.drafts['art-5']).toMatchObject({
+            kind: 'page',
+            title: 'Battery page',
+            agentKey: 'landing_page',
+            request: 2,
+            status: 'drafting',
+            // Only the text since the resume point: not the document.
+            partial: true,
+            content: '<section>tail</section>',
+        })
+    })
+
+    it('keeps a sheet first seen through a snapshot whole, with the kind from its agent_call part', () => {
+        const e = eventFactory({ start: 40 })
+        const resumed = snapshot({
+            message: {
+                parts: [{ id: 'call', type: 'agent_call', request: 1, agent: 'ad_campaign', status: 'drafting', artifact_id: 'art-6', title: 'Ads', kind: 'sheet' }],
+            },
+            run: { lastSeq: 40 },
+        })
+        const out = reduceEvents(resumed, [e('artifact.snapshot', { artifact_id: 'art-6', content: '{"campaign":{"name":"Notes"}}' })])
+        expect(out.drafts['art-6']).toMatchObject({ kind: 'sheet', title: 'Ads', agentKey: 'ad_campaign', partial: false })
+        expect(out.drafts['art-6'].data).toEqual({ campaign: { name: 'Notes' } })
+    })
+
+    it('a draft that saw artifact.started is whole', () => {
+        const e = eventFactory()
+        const out = reduceEvents(snapshot(), [
+            e('artifact.started', { artifact_id: 'art-7', kind: 'document', title: 'Article', agent_key: 'aeo_article', base_version: null }),
+            e('artifact.delta', { artifact_id: 'art-7', append: '# Article' }),
+        ])
+        expect(out.drafts['art-7']).toMatchObject({ kind: 'document', partial: false, content: '# Article' })
     })
 })
 

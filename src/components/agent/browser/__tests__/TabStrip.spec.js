@@ -99,4 +99,37 @@ describe('TabStrip', () => {
     await wrapper.find('button[aria-label="Hide browser"]').trigger('click')
     expect(wrapper.emitted('close-pane')).toHaveLength(1)
   })
+
+  it('labels Google tabs with their query and a page badge that is never cut off', async () => {
+    for (const page of [1, 2]) {
+      pane.openSerp({ capture_id: `n${page}`, query: 'best note app', page, results: [] }, { activate: page === 2 })
+    }
+    await nextTick()
+    const tab = wrapper.find(`#${tabDomId('serp:n2')}`)
+    expect(tab.find('.ag-tab-page').text()).toBe('p2')
+    expect(tab.find('.ag-tab-title').text()).toBe('best note app')
+    expect(tab.attributes('aria-label')).toBe('Google · best note app · p2')
+    expect(wrapper.find(`#${tabDomId('serp:n1')} .ag-tab-page`).text()).toBe('p1')
+    // No page number, no badge.
+    expect(wrapper.find(`#${tabDomId('serp:a')} .ag-tab-page`).exists()).toBe(false)
+  })
+
+  it('shows the page badge in place of the icon on narrow tabs, unless the status icon is needed', async () => {
+    wrapper.unmount()
+    const width = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth')
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, get: () => 300 })
+    try {
+      pane.openSerp({ capture_id: 'n2', query: 'best note app', page: 2, results: [] })
+      pane.openSerp({ id: 'serp:n3', kind: 'serp', status: 'loading', data: { capture_id: 'n3', query: 'best note app', page: 3 } })
+      wrapper = mount(TabStrip, { attachTo: document.body })
+      await nextTick()
+      const ready = wrapper.find(`#${tabDomId('serp:n2')}`)
+      expect(ready.element.closest('.ag-tab').classList.contains('is-narrow')).toBe(true)
+      expect(ready.find('.ag-tabicon').exists()).toBe(false)
+      expect(ready.find('.ag-tab-page').text()).toBe('p2')
+      expect(wrapper.find(`#${tabDomId('serp:n3')} .ag-tabicon`).exists()).toBe(true)
+    } finally {
+      if (width) Object.defineProperty(HTMLElement.prototype, 'clientWidth', width)
+    }
+  })
 })

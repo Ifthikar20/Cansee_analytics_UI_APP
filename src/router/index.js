@@ -346,7 +346,8 @@ router.beforeEach(async (to, from, next) => {
     // Guard: a page addressed by :websiteId follows the URL, not a stale
     // store selection, so a shared link to project B behaves the same
     // whether or not project A was active. On a cold load (hard refresh,
-    // deep link) the store is empty, so load the list first.
+    // deep link) the store is empty, so load the list first. The project
+    // becomes active in afterEach, once the navigation is confirmed.
     if (to.params.websiteId && auth.isAuthenticated) {
         const app = useAppStore()
         if (!app.websites.length) {
@@ -359,10 +360,20 @@ router.beforeEach(async (to, from, next) => {
         if (!target) {
             return next({ name: 'dashboard' })
         }
-        app.setActiveWebsite(target)
     }
 
     next()
+})
+
+// Make the URL's project active only after the navigation went through.
+// Guards that run after beforeEach (a page's beforeRouteUpdate with
+// unsaved edits) can still cancel it, and a cancelled switch must leave
+// the page's own project active.
+router.afterEach((to, from, failure) => {
+    if (failure || !to.params.websiteId) return
+    const app = useAppStore()
+    const target = app.websites.find(w => String(w.id) === String(to.params.websiteId))
+    if (target) app.setActiveWebsite(target)
 })
 
 export default router

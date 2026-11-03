@@ -118,12 +118,41 @@ export function agentMeta(key, catalog = null) {
     }
 }
 
-/** The ordered agent list: catalog order when loaded, else AGENT_ORDER. */
-export function agentList(catalog = null) {
-    if (Array.isArray(catalog) && catalog.length) {
-        return catalog.filter((a) => a && a.key).map((a) => agentMeta(a.key, catalog))
-    }
-    return AGENT_ORDER.map((key) => agentMeta(key))
+function usd(value) {
+    const n = Number(value)
+    if (value === null || value === undefined || value === '' || !Number.isFinite(n)) return ''
+    return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+/**
+ * Why a writing agent cannot start now, or '' when it can or GET status/
+ * does not say. status.writers[key] is {available, needs_usd}: whether the
+ * remaining AI allowance covers the least that agent needs. Picking it
+ * anyway would fail only after the orchestrator's turn was paid for.
+ */
+export function writerUnavailable(key, status = null) {
+    const writers = status && typeof status.writers === 'object' ? status.writers : null
+    const writer = writers ? writers[key] : null
+    if (!writer || writer.available !== false) return ''
+    const needs = usd(writer.needs_usd)
+    const cap = Number(status.allowance?.cap_usd)
+    const spent = Number(status.allowance?.spent_usd)
+    const left = cap > 0 && Number.isFinite(spent) ? usd(Math.max(0, cap - spent)) : ''
+    const head = needs ? `Needs at least ${needs} of AI allowance` : 'Needs more AI allowance than is left'
+    return left ? `${head}; ${left} left this month.` : `${head}.`
+}
+
+/**
+ * The ordered agent list: catalog order when loaded, else AGENT_ORDER.
+ * With GET status/, each entry's `unavailable` says why it cannot start
+ * now ('' when it can).
+ */
+export function agentList(catalog = null, status = null) {
+    const list =
+        Array.isArray(catalog) && catalog.length
+            ? catalog.filter((a) => a && a.key).map((a) => agentMeta(a.key, catalog))
+            : AGENT_ORDER.map((key) => agentMeta(key))
+    return list.map((a) => ({ ...a, unavailable: writerUnavailable(a.key, status) }))
 }
 
 export function kindMeta(kind) {

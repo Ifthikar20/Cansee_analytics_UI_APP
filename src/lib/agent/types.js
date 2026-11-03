@@ -188,6 +188,8 @@ export const TRANSPORT_STATE = Object.freeze({
     OPEN: 'open',
     RECONNECTING: 'reconnecting',
     OFFLINE: 'offline',
+    // The site is down for maintenance; the transport waits for Retry-After.
+    MAINTENANCE: 'maintenance',
     CLOSED: 'closed',
     ERROR: 'error',
 })
@@ -217,4 +219,6 @@ export const ERROR_CODE = Object.freeze({
     NETWORK: 'network',
     UNAUTHORIZED: 'unauthorized',
     INTERRUPTED: 'interrupted',
+    // 503 from nginx's maintenance switch, with Retry-After.
+    MAINTENANCE: 'maintenance',
 })

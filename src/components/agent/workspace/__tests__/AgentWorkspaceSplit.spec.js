@@ -118,6 +118,41 @@ describe('AgentWorkspaceSplit', () => {
     wrapper.unmount()
   })
 
+  it('keeps the chat usable in an overlay layout while the agent opens tabs', async () => {
+    width = 767
+    const wrapper = mountSplit()
+    await nextTick()
+    await nextTick()
+    expect(pane.layout).toBe('overlay')
+    const composer = document.createElement('textarea')
+    wrapper.find('.chat-slot').element.append(composer)
+    composer.focus()
+
+    pane.openSerp(
+      { id: 'serp:c1', kind: 'serp', title: 'Google · q · p1', status: 'loading', data: { capture_id: 'c1', query: 'q', page: 1 } },
+      { activate: true }
+    )
+    await nextTick()
+    await nextTick()
+    expect(pane.open).toBe(false)
+    expect(pane.attention).toBe(true)
+    expect(wrapper.find('section[aria-label="Chat"]').attributes('inert')).toBeUndefined()
+    expect(document.activeElement).toBe(composer)
+    wrapper.unmount()
+    expect(pane.layout).toBe(null)
+  })
+
+  it('reports a split layout, where the agent opens the pane beside the chat', async () => {
+    const wrapper = mountSplit()
+    await nextTick()
+    expect(pane.layout).toBe('split')
+    pane.openSerp({ id: 'serp:c1', kind: 'serp', status: 'loading', data: { capture_id: 'c1', query: 'q', page: 1 } }, { activate: true })
+    await nextTick()
+    expect(pane.open).toBe(true)
+    expect(wrapper.find('[role="separator"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
   it('gives the whole width to the pane when expanded', async () => {
     pane.setOpen(true)
     pane.setExpanded(true)

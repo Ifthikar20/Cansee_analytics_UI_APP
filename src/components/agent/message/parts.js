@@ -186,36 +186,70 @@ export function checkProgress(checks) {
   return { settled, total: list.length, live: settled < list.length }
 }
 
+// Keyed by the codes the backend sends: run.failed and a failed reply's
+// error_code (llm/errors.py, llm/gate.py, runtime/runner.py, the sweeper)
+// and the refusals a send can get. `retry` is the backend's `retryable`, so
+// no Retry is offered that hits the same limit again or spends another
+// reply's cost to do so.
 const ERROR_COPY = {
+  // The account and the server.
   allowance_exceeded: {
     title: "You've used your AI allowance for this period.",
     body: 'Upgrade your plan or wait for the allowance to reset.',
     retry: false,
     billing: true,
   },
-  agent_busy: { title: 'Another reply is still running.', body: 'Wait for it to finish, then try again.', retry: true },
-  run_in_progress: { title: 'This chat is already working on a reply.', body: '', retry: false },
   agent_disabled: { title: 'The agent is switched off on this server.', body: '', retry: false },
-  agent_unavailable: { title: "The agent service isn't reachable right now.", body: 'Try again in a minute.', retry: true },
   agent_not_configured: {
     title: "The agent isn't set up on this server yet.",
     body: 'No model API key is configured.',
     retry: false,
   },
-  interrupted: { title: 'The reply was interrupted before it finished.', body: '', retry: true },
-  overloaded: { title: 'The model is overloaded right now.', body: 'Try again in a moment.', retry: true },
+  agent_unavailable: { title: "The agent service isn't reachable right now.", body: 'Try again in a minute.', retry: true },
+  // nginx's maintenance switch (503 with Retry-After), not the agent being down.
+  maintenance: { title: 'CanSee is down for maintenance.', body: 'Try again in a few minutes.', retry: true },
+  // Another run, or sending faster than runs can start.
+  agent_busy: { title: 'The agent is busy right now.', body: 'Wait a moment, then try again.', retry: true },
+  run_in_progress: { title: 'This chat is already working on a reply.', body: 'Wait for it to finish, then try again.', retry: true },
+  // The AI service.
+  upstream_overloaded: { title: 'The AI service is overloaded right now.', body: 'Try again in a minute.', retry: true },
+  upstream_unavailable: { title: 'The AI service is unavailable right now.', body: 'Try again shortly.', retry: true },
+  upstream_unreachable: { title: "The AI service couldn't be reached.", body: '', retry: true },
+  upstream_error: { title: 'The AI service had an error.', body: '', retry: true },
   rate_limited: { title: 'Too many requests right now.', body: 'Try again in a moment.', retry: true },
-  timeout: { title: 'The reply took too long and was stopped.', body: '', retry: true },
-  deadline_exceeded: { title: 'The reply took too long and was stopped.', body: '', retry: true },
-  cost_limit: { title: 'This reply reached its spending limit and was stopped.', body: '', retry: true },
-  max_requests: { title: 'This reply reached its step limit and was stopped.', body: '', retry: true },
+  upstream_auth: {
+    title: "The agent's API key was rejected.",
+    body: 'An administrator needs to fix it before the agent can answer.',
+    retry: false,
+  },
+  model_not_found: {
+    title: 'The configured model is not available.',
+    body: 'An administrator needs to change it before the agent can answer.',
+    retry: false,
+  },
+  bad_request: { title: 'The AI service rejected this request.', body: '', retry: false },
+  context_too_long: {
+    title: 'This chat is too long to continue.',
+    body: 'Start a new chat to keep going.',
+    retry: false,
+    newChat: true,
+  },
+  // The reply's own limits.
+  run_timeout: { title: 'The reply took too long and was stopped.', body: '', retry: true },
+  run_cost_limit: { title: 'This reply reached its cost limit and was stopped.', body: '', retry: false },
+  request_limit: { title: 'This reply reached its step limit and was stopped.', body: '', retry: false },
+  max_tokens: { title: 'The reply needed more room than one response allows.', body: '', retry: true },
+  pause_limit: { title: 'The web research took too many steps to finish.', body: '', retry: true },
+  invalid_tool_input: { title: "The model sent tool input that couldn't be read.", body: '', retry: true },
+  internal_error: { title: 'Something went wrong on our side.', body: '', retry: true },
+  interrupted: { title: 'The reply was interrupted before it finished.', body: '', retry: true },
   network: { title: 'The connection to the agent was lost.', body: '', retry: true },
 }
 
-/** Copy for a failed or interrupted reply. */
+/** Copy for a failed or interrupted reply, or a refused send. */
 export function errorCopy(code, message, status) {
   const key = code || (status === 'interrupted' ? 'interrupted' : '')
-  const known = ERROR_COPY[key]
+  const known = Object.prototype.hasOwnProperty.call(ERROR_COPY, key) ? ERROR_COPY[key] : null
   if (known) return { ...known, code: key, body: known.body || '' }
   return {
     code: key,

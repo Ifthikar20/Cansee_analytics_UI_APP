@@ -67,15 +67,19 @@
           <Sparkles :size="14" aria-hidden="true" />
           AI Overview
         </h3>
-        <div class="ag-serp-aio-chips">
-          <span class="ag-serp-flag" :class="{ 'is-yes': overview.mentions_you }">
-            Mentions you: {{ overview.mentions_you ? 'Yes' : 'No' }}
+        <p v-if="overviewUnread" class="ag-serp-aio-note">
+          Google showed an AI Overview for this query, but its content was not captured, so mentions and citations were
+          not measured.
+        </p>
+        <div v-else class="ag-serp-aio-chips">
+          <span class="ag-serp-flag" :class="{ 'is-yes': overview.mentions_you === true }">
+            Mentions you: {{ flagText(overview.mentions_you) }}
           </span>
-          <span class="ag-serp-flag" :class="{ 'is-yes': overview.cites_you }">
-            Cites you: {{ overview.cites_you ? 'Yes' : 'No' }}
+          <span class="ag-serp-flag" :class="{ 'is-yes': overview.cites_you === true }">
+            Cites you: {{ flagText(overview.cites_you) }}
           </span>
         </div>
-        <template v-if="references.length">
+        <template v-if="references.length && !overviewUnread">
           <p class="ag-serp-aio-sub">Sources Google cited</p>
           <ul class="ag-serp-refs">
             <li v-for="(ref, i) in references" :key="`${ref.url}-${i}`">
@@ -94,9 +98,7 @@
           </ul>
         </template>
       </section>
-      <p v-else-if="overview && overview.shown === false" class="ag-serp-note">
-        Google showed no AI Overview for this query.
-      </p>
+      <p v-else-if="overview && overview.shown === false" class="ag-serp-note">{{ noOverviewText }}</p>
 
       <ol v-if="results.length" class="ag-serp-results" aria-label="Google results">
         <li
@@ -152,6 +154,7 @@ import { computed } from 'vue'
 import { CircleAlert, Info, MapPin, Search, Sparkles } from '@lucide/vue'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { firstLetter, hostOf } from '@/lib/agent/url'
+import { aiOverviewUnread } from '@/lib/gap'
 import { safeHref } from '@/utils/safeHref'
 import { formatCapturedAt, regionName } from '../format'
 
@@ -186,12 +189,35 @@ const loading = computed(
 
 const errorInfo = computed(() => {
   const error = capture.value.error
-  if (!error) return null
+  if (!error) {
+    // Never read a failed search as an empty results page.
+    return props.tab.status === 'error' ? { title: 'Google search did not complete.', body: '' } : null
+  }
   if (error.code === 'serp_not_configured') {
     return { title: "Google search isn't available yet.", body: 'No rankings are shown until Google search is set up.' }
   }
   return { title: 'Google search did not complete.', body: error.message || '' }
 })
+
+// mentions_you and cites_you are null when they were not measured.
+function flagText(value) {
+  if (value === true) return 'Yes'
+  if (value === false) return 'No'
+  return 'Not measured'
+}
+
+// Google can load its AI Overview after the page, and then SerpAPI returns
+// only a token for it: the overview was shown but never read (`captured`
+// false, mentions_you and cites_you null).
+const overviewUnread = computed(() => aiOverviewUnread(overview.value))
+
+// Captures that record `captured` tell that case apart from no overview;
+// older ones cannot, so for them "none captured" is all that is known.
+const noOverviewText = computed(() =>
+  overview.value && 'captured' in overview.value
+    ? 'Google showed no AI Overview for this query.'
+    : 'No AI Overview was captured for this query.'
+)
 
 const page = computed(() => {
   const n = Number(capture.value.page)
@@ -379,6 +405,13 @@ function openInPane(event, url) {
   border-color: color-mix(in srgb, var(--ag-you) 32%, transparent);
   background: var(--ag-you-bg);
   color: var(--ag-you);
+}
+
+.ag-serp-aio-note {
+  margin: 8px 0 0;
+  color: var(--ag-fg-2);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 .ag-serp-aio-sub {

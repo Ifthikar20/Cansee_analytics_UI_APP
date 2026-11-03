@@ -1,7 +1,7 @@
 import { createApp, h } from 'vue'
 import { ClipboardCopy, FileCode, FileDown, Printer, Sheet } from '@lucide/vue'
 import { renderMarkdown } from '@/lib/agent/markdown/renderer'
-import { sanitizePageHtml } from '@/lib/agent/srcdoc'
+import { UNSETTLED_HTML, sanitizePageHtml } from '@/lib/agent/srcdoc'
 import { adCampaignRows, serpRows, toCsv, toTsv } from '@/lib/agent/csv'
 import { copyText, downloadText, printHtml, safeFilename, standaloneHtml } from '@/lib/agent/download'
 import ResearchAppendix from './views/ResearchAppendix.vue'
@@ -31,6 +31,12 @@ const ACTIONS = {
 
 export function exportActions(kind) {
   return ACTIONS[kind] || []
+}
+
+// What to tell the user when runExport throws.
+export function exportErrorText(err) {
+  if (err?.message === UNSETTLED_HTML) return "This page's HTML couldn't be cleaned safely, so it wasn't exported."
+  return "That export didn't work. Try again."
 }
 
 // Renders a component to static HTML (Vue escapes every text node).

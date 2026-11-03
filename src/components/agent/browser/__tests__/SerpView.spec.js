@@ -104,4 +104,41 @@ describe('SerpView', () => {
     const empty = render({ data: serpCapture({ results: [], ai_overview: null, people_also_ask: [] }) })
     expect(empty.text()).toContain('Google returned no organic results on this page.')
   })
+
+  it('never reports an AI Overview it did not capture as absent', () => {
+    // Google loaded the overview later; SerpAPI sent only a token for it.
+    const deferred = render({
+      data: serpCapture({
+        ai_overview: { shown: true, captured: false, mentions_you: null, cites_you: null, references: [] },
+      }),
+    })
+    expect(deferred.find('.ag-serp-aio').text()).toContain(
+      'Google showed an AI Overview for this query, but its content was not captured, so mentions and citations were not measured.'
+    )
+    expect(deferred.findAll('.ag-serp-flag')).toHaveLength(0)
+    expect(deferred.text()).not.toContain('Google showed no AI Overview')
+
+    // Neither value measured reads the same, whatever else the capture says.
+    const unread = render({ data: serpCapture({ ai_overview: { shown: true, mentions_you: null, cites_you: null, references: [] } }) })
+    expect(unread.find('.ag-serp-aio-note').exists()).toBe(true)
+    expect(unread.findAll('.ag-serp-flag')).toHaveLength(0)
+
+    const unmeasured = render({ data: serpCapture({ ai_overview: { shown: true, mentions_you: null, cites_you: true, references: [] } }) })
+    expect(unmeasured.findAll('.ag-serp-flag').map((f) => f.text())).toEqual(['Mentions you: Not measured', 'Cites you: Yes'])
+
+    const none = render({
+      data: serpCapture({ ai_overview: { shown: false, captured: true, mentions_you: false, cites_you: false, references: [] } }),
+    })
+    expect(none.find('.ag-serp-note').text()).toBe('Google showed no AI Overview for this query.')
+
+    // A capture from before `captured` existed cannot tell the two apart.
+    const legacy = render({ data: serpCapture({ ai_overview: { shown: false, mentions_you: false, cites_you: false, references: [] } }) })
+    expect(legacy.find('.ag-serp-note').text()).toBe('No AI Overview was captured for this query.')
+  })
+
+  it('shows a failed search as failed even without an error message', () => {
+    const wrapper = render({ status: 'error', data: { query: 'q', page: 1 } })
+    expect(wrapper.find('[role="alert"]').text()).toContain('Google search did not complete.')
+    expect(wrapper.text()).not.toContain('Google returned no organic results')
+  })
 })

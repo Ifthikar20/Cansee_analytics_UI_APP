@@ -9,6 +9,7 @@
 // | cs-agent-last-chat:<uid>:<wid>        | last chat id in that project          |
 // | cs-agent-tabs-v1:<uid>:<wid>          | pane state per chat, LRU of 30 chats  |
 // | cs-agent-draft-v1:<uid>:<wid>:<cid>   | composer draft (`new` before a chat)  |
+// | cs-agent-activity-seen-v1:<uid>       | activity last seen, per project       |
 //
 // Logout removes every per-user key (clearUserData).
 
@@ -17,12 +18,14 @@ const LAST_PROJECT_PREFIX = 'cs-agent-last-project:'
 const LAST_CHAT_PREFIX = 'cs-agent-last-chat:'
 const TABS_PREFIX = 'cs-agent-tabs-v1:'
 const DRAFT_PREFIX = 'cs-agent-draft-v1:'
+const ACTIVITY_SEEN_PREFIX = 'cs-agent-activity-seen-v1:'
 
 export const USER_KEY_PREFIXES = Object.freeze([
     LAST_PROJECT_PREFIX,
     LAST_CHAT_PREFIX,
     TABS_PREFIX,
     DRAFT_PREFIX,
+    ACTIVITY_SEEN_PREFIX,
 ])
 
 export const PANE_STATE_CHAT_LIMIT = 30
@@ -35,6 +38,7 @@ export const storageKeys = Object.freeze({
     lastChat: (uid, wid) => `${LAST_CHAT_PREFIX}${uid}:${wid}`,
     tabs: (uid, wid) => `${TABS_PREFIX}${uid}:${wid}`,
     draft: (uid, wid, cid) => `${DRAFT_PREFIX}${uid}:${wid}:${cid || NEW_CHAT}`,
+    activitySeen: (uid) => `${ACTIVITY_SEEN_PREFIX}${uid}`,
 })
 
 function backend() {
@@ -137,6 +141,19 @@ export function clearLastChat(uid, wid, cid) {
     const key = storageKeys.lastChat(uid, wid)
     if (present(cid) && readRaw(key) !== String(cid)) return
     removeKey(key)
+}
+
+/* ── Activity last seen ({websiteId: ISO time}; who opened what is per user) ── */
+
+export function loadActivitySeen(uid) {
+    if (!present(uid)) return {}
+    const map = readJSON(storageKeys.activitySeen(uid), {})
+    return isPlainObject(map) ? map : {}
+}
+
+export function saveActivitySeen(uid, map) {
+    if (!present(uid) || !isPlainObject(map)) return
+    writeJSON(storageKeys.activitySeen(uid), map)
 }
 
 /* ── Pane state per chat (ids and urls only; LRU of 30 chats per project) ── */

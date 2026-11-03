@@ -4,12 +4,13 @@
     <div class="ag-msg-error-text">
       <p class="ag-msg-error-title">{{ copy.title }}</p>
       <p v-if="copy.body" class="ag-msg-error-body">{{ copy.body }}</p>
-      <div v-if="(copy.retry && canRetry) || copy.billing" class="ag-msg-error-actions">
-        <button v-if="copy.retry && canRetry" type="button" class="ag-msg-error-btn" :disabled="busy" @click="emit('retry')">
+      <div v-if="showRetry || copy.billing || newChatTo" class="ag-msg-error-actions">
+        <button v-if="showRetry" type="button" class="ag-msg-error-btn" :disabled="busy" @click="emit('retry')">
           <RotateCcw aria-hidden="true" />
           Retry
         </button>
         <router-link v-if="copy.billing" class="ag-msg-error-link" to="/billing">See plans</router-link>
+        <router-link v-if="newChatTo" class="ag-msg-error-link" :to="newChatTo">Start a new chat</router-link>
       </div>
     </div>
   </div>
@@ -17,7 +18,8 @@
 
 <script setup>
 // A reply that failed or was interrupted: copy specific to the error code,
-// the server's own message for codes the UI does not know, and Retry.
+// the server's own message for codes the UI does not know, and Retry when
+// trying again can help.
 import { computed } from 'vue'
 import { CircleAlert, RotateCcw } from '@lucide/vue'
 import { errorCopy } from './parts'
@@ -27,12 +29,22 @@ const props = defineProps({
   message: { type: String, default: '' },
   status: { type: String, default: 'failed' },
   canRetry: { type: Boolean, default: true },
+  // run.failed's `retryable` while the run is in the store; null falls back
+  // to the code's copy (a reply loaded from the server has no flag).
+  retryable: { type: Boolean, default: null },
+  websiteId: { type: [String, Number], default: null },
   busy: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['retry'])
 
 const copy = computed(() => errorCopy(props.code, props.message, props.status))
+const showRetry = computed(() => props.canRetry && (props.retryable ?? copy.value.retry))
+const newChatTo = computed(() =>
+  copy.value.newChat && props.websiteId !== null && props.websiteId !== ''
+    ? { name: 'agent-home', params: { websiteId: String(props.websiteId) } }
+    : null
+)
 </script>
 
 <style scoped>

@@ -16,7 +16,7 @@
       v-else-if="blocking === 'error'"
       :title="blockingError.title"
       :body="blockingError.body"
-      retry
+      :retry="blockingError.retry !== false"
       @retry="retry"
     />
     <PaneError
@@ -26,7 +26,7 @@
     />
     <div v-else-if="blocking === 'empty'" class="ag-artv-state" role="status">
       <AgSpinner :size="14" />
-      Starting the draft…
+      {{ source.draft.value?.partial ? 'Drafting… It shows here when the draft is finished.' : 'Starting the draft…' }}
     </div>
 
     <template v-else>
@@ -76,7 +76,9 @@ const failureText = computed(() => {
   return failure?.message || 'Ask the agent to try again.'
 })
 
-const blockingError = computed(() => props.source.versionError.value || props.source.error.value || { title: '', body: '' })
+const blockingError = computed(
+  () => props.source.versionError.value || props.source.error.value || { title: '', body: '', retry: true }
+)
 
 const blocking = computed(() => {
   const s = props.source
@@ -86,7 +88,7 @@ const blocking = computed(() => {
   }
   if (s.ready.value) return ''
   if (s.failure.value) return 'failed'
-  if (s.drafting.value || s.showDraft.value) return 'empty'
+  if (s.drafting.value || s.showDraft.value || s.state.value === 'waiting') return 'empty'
   if (s.state.value === 'error') return 'error'
   return 'loading'
 })
@@ -107,6 +109,20 @@ const notice = computed(() => {
       text: `Viewing version ${selected.value} of ${s.latestVersion.value}.`,
       action: { label: 'Show latest', run: () => emit('version', null) },
     }
+  }
+  // A finished draft stays on screen until its saved copy loads. Until then
+  // it is the agent's raw output, before the server checked it, so it says
+  // so and Export waits for the saved copy.
+  if (s.showDraft.value && !live.value) {
+    if (s.state.value === 'error') {
+      return {
+        tone: 'is-error',
+        icon: CircleAlert,
+        text: "The saved version couldn't be loaded. This is the unchecked draft, and export is off until the saved version loads.",
+        action: { label: 'Retry', run: retry },
+      }
+    }
+    return { tone: '', icon: AgSpinner, text: 'Draft finished. Loading the saved version…' }
   }
   if (kind.value === 'page' && s.warnings.value.length && !live.value) {
     const n = s.warnings.value.length

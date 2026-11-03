@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('@/api/client', () => ({ authHeaders: () => ({}), refreshAccessToken: async () => '' }))
 
 import { createRunManager, SSE_FAILURES_BEFORE_POLL } from '../runManager'
-import { AuthError, TransportError, UnsupportedTransport } from '../streamClient'
+import { AuthError, MaintenanceError, TransportError, UnsupportedTransport } from '../streamClient'
 
 const ev = (seq, type = 'part.delta', extra = {}) => ({ v: 1, seq, type, run_id: 'r1', message_id: 'm1', ...extra })
 const microtask = (fn) => {
@@ -107,6 +107,18 @@ describe('runManager', () => {
             .mockImplementationOnce(streamOf([ev(1, 'run.completed')]))
         await manager.attach({ id: 'r1', lastSeq: 0 }).done
         expect(hooks.backoff).toHaveBeenCalledWith(0, { base: 3000 })
+    })
+
+    it('reports maintenance and waits for its Retry-After before trying again', async () => {
+        const { manager, hooks, batches, states } = setup()
+        hooks.openStream
+            .mockRejectedValueOnce(new MaintenanceError('maintenance', { retryAfterMs: 120000 }))
+            .mockImplementationOnce(streamOf([ev(1, 'run.completed')]))
+        await manager.attach({ id: 'r1', lastSeq: 0 }).done
+        expect(states.slice(0, 2)).toEqual(['sse:connecting', 'sse:maintenance'])
+        expect(states).not.toContain('sse:offline')
+        expect(hooks.sleep.mock.calls[0][0]).toBe(120000)
+        expect(batches.flat()).toEqual([1])
     })
 
     it('switches to long-polling at once when SSE is unsupported', async () => {

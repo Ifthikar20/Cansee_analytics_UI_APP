@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { countIssue, describePath, matchSyntax, measure, sheetWarnings } from '../views/sheetModel'
 import { charCount, formatBytes, formatMs, regionName } from '../format'
-import { documentHtml, exportActions } from '../exporters'
+import { documentHtml, exportActions, exportErrorText } from '../exporters'
 import { pageErrorInfo } from '../pageMode'
 import { safeFilename } from '@/lib/agent/download'
+import { UNSETTLED_HTML } from '@/lib/agent/srcdoc'
 
 describe('sheet model', () => {
   it('describes warning paths in plain words', () => {
@@ -81,6 +82,11 @@ describe('exports', () => {
     expect(html).not.toMatch(/data-v-/)
   })
 
+  it('says why a page export was refused', () => {
+    expect(exportErrorText(new Error(UNSETTLED_HTML))).toBe("This page's HTML couldn't be cleaned safely, so it wasn't exported.")
+    expect(exportErrorText(new Error('copy_failed'))).toBe("That export didn't work. Try again.")
+  })
+
   it('words page fetch errors by code', () => {
     expect(pageErrorInfo({ code: 'timeout', message: 'Read timed out' })).toEqual({
       code: 'timeout',
@@ -89,5 +95,13 @@ describe('exports', () => {
     })
     expect(pageErrorInfo({ code: 'weird', message: 'Odd failure' }).title).toBe('Odd failure')
     expect(pageErrorInfo(null)).toBe(null)
+    // The browse service's limits on markup and on pages read at once.
+    expect(pageErrorInfo({ code: 'too_complex', message: 'The page has more than 80,000 HTML tags, too many to read here.' })).toEqual({
+      code: 'too_complex',
+      title: 'The page has too much markup to read here.',
+      body: 'The page has more than 80,000 HTML tags, too many to read here.',
+    })
+    const busy = 'Too many pages are being read right now. Try again in a moment.'
+    expect(pageErrorInfo({ code: 'busy', message: busy })).toEqual({ code: 'busy', title: busy, body: '' })
   })
 })

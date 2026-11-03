@@ -60,6 +60,11 @@ describe('agentPane store', () => {
       expect(pane.titleOf(pane.activeTab)).toBe('Google · best note app · p2')
     })
 
+    it('titles every results page with its number, as the server does', () => {
+      pane.openSerp(serpCapture({ capture_id: 'p1', page: 1 }))
+      expect(pane.titleOf(pane.tabs[0])).toBe('Google · best note app · p1')
+    })
+
     it('merges browser.update patches into data (reducer and contract shapes)', () => {
       pane.openSerp(serpSpec('a'), { activate: true })
       pane.updateTab('serp:a', { data: { results: [], brand_positions: [] }, status: 'ready' })
@@ -239,6 +244,117 @@ describe('agentPane store', () => {
       expect(pane.open).toBe(true)
     })
 
+    it('settles a loading results tab when its step ends without a capture', async () => {
+      agent.messages.m2 = {
+        ...assistant('m2', [{ id: 'p1', type: 'serp', status: 'running', tab_id: 'serp:c1', query: 'q', page: 1 }]),
+        status: 'streaming',
+      }
+      agent.paths.c = ['m2']
+      agent.chatState.c = { loaded: true }
+      pane.bindChat('c')
+      pane.openSerp(serpSpec('c1'), { activate: true })
+      expect(pane.activeTab.status).toBe('loading')
+
+      // The resync brings the reply the sweeper closed.
+      agent.messages.m2.status = 'interrupted'
+      agent.messages.m2.parts[0] = {
+        ...agent.messages.m2.parts[0],
+        status: 'error',
+        error: { code: 'interrupted', message: 'Interrupted' },
+      }
+      await nextTick()
+      expect(pane.activeTab.status).toBe('error')
+      expect(pane.activeTab.data.error).toEqual({ code: 'interrupted', message: 'Interrupted' })
+    })
+
+    it('settles loading research tabs when the reply ended here with steps still running', async () => {
+      agent.messages.m2 = {
+        ...assistant('m2', [
+          { id: 'p1', type: 'serp', status: 'running', tab_id: 'serp:c1', query: 'q', page: 1 },
+          { id: 'p2', type: 'page_inspect', status: 'running', tab_id: 'page:p9', url: 'https://turonote.test/' },
+        ]),
+        status: 'streaming',
+      }
+      agent.paths.c = ['m2']
+      agent.chatState.c = { loaded: true }
+      pane.bindChat('c')
+      pane.openSerp(serpSpec('c1'))
+      pane.openPage({ id: 'page:p9', kind: 'page', status: 'loading', data: { capture_id: 'p9', url: 'https://turonote.test/' } })
+
+      // The stream gave up: the run was settled locally, no part was closed.
+      agent.messages.m2.status = 'cancelled'
+      await nextTick()
+      const serp = pane.tabs.find((t) => t.id === 'serp:c1')
+      const page = pane.tabs.find((t) => t.id === 'page:p9')
+      expect(serp.status).toBe('error')
+      expect(serp.data.error).toEqual({ code: 'stopped', message: 'Stopped' })
+      expect(page.status).toBe('error')
+      expect(page.data.error.code).toBe('stopped')
+    })
+
+    it('never opens a tab for an artifact the agent did not save', () => {
+      agent.messages.m2 = assistant('m2', [
+        { id: 'p1', type: 'agent_call', status: 'cancelled', artifact_id: 'a8', title: 'Acme page', kind: 'page', error: 'Stopped' },
+        { id: 'p2', type: 'agent_call', status: 'error', artifact_id: 'a9', title: 'Guide', kind: 'document', error: 'The page is incomplete.' },
+        { id: 'p3', type: 'agent_call', status: 'done', artifact_id: 'a10', version: 1, title: 'Ads', kind: 'sheet' },
+        // A failed revision of an artifact saved in another chat.
+        { id: 'p4', type: 'agent_call', status: 'error', artifact_id: 'a11', base_version: 2, kind: 'page', error: 'Upstream' },
+      ])
+      agent.paths.c = ['m2']
+      agent.chatState.c = { loaded: true }
+
+      const specs = researchTabs(agent.visiblePath('c'))
+      expect(specs.map((s) => [s.id, s.unsaved])).toEqual([
+        ['artifact:a8', true],
+        ['artifact:a9', true],
+        ['artifact:a10', false],
+        ['artifact:a11', false],
+      ])
+      pane.bindChat('c')
+      expect(pane.tabs.map((t) => t.id)).toEqual(['artifact:a10', 'artifact:a11'])
+      expect(pane.activateTab('artifact:a9')).toBe(null)
+      expect(pane.artifactCall('a9')).toEqual({
+        status: 'error',
+        active: false,
+        saved: false,
+        error: 'The page is incomplete.',
+        kind: 'document',
+        title: 'Guide',
+      })
+      expect(pane.artifactCall('a10').saved).toBe(true)
+    })
+
+    it('treats a call still drafting in a reply that ended as not finished', () => {
+      agent.messages.m2 = {
+        ...assistant('m2', [{ id: 'p1', type: 'agent_call', status: 'drafting', artifact_id: 'a8', kind: 'page' }]),
+        status: 'interrupted',
+      }
+      agent.paths.c = ['m2']
+      pane.bindChat('c')
+      expect(pane.tabs).toHaveLength(0)
+      expect(pane.open).toBe(false)
+      expect(pane.artifactCall('a8')).toMatchObject({ status: 'error', active: false, saved: false, error: 'Interrupted' })
+    })
+
+    it('opens the artifact again for each new draft of it', async () => {
+      agent.messages.m2 = assistant('m2', [{ id: 'p1', type: 'agent_call', status: 'drafting', artifact_id: 'a7', kind: 'page' }])
+      agent.paths.c = ['m2']
+      pane.bindChat('c')
+      expect(pane.activeId).toBe('artifact:a7')
+      agent.messages.m2.parts[0] = { id: 'p1', type: 'agent_call', status: 'done', artifact_id: 'a7', version: 1, kind: 'page' }
+      await nextTick()
+      pane.closeTab('artifact:a7')
+      expect(pane.open).toBe(false)
+
+      // A later turn revises it.
+      agent.messages.m4 = assistant('m4', [{ id: 'p9', type: 'agent_call', status: 'planning', artifact_id: 'a7', kind: 'page' }])
+      agent.paths.c = ['m2', 'm4']
+      await nextTick()
+      expect(pane.activeId).toBe('artifact:a7')
+      expect(pane.open).toBe(true)
+      expect(pane.artifactCall('a7')).toMatchObject({ status: 'planning', active: true, saved: true })
+    })
+
     it('moves the new chat state to its id', () => {
       vi.useFakeTimers()
       pane.bindChat('new')
@@ -248,6 +364,34 @@ describe('agentPane store', () => {
       expect(pane.tabs).toHaveLength(1)
       const stored = JSON.parse(localStorage.getItem(TABS_KEY))
       expect(stored.chats.c42.state.tabs[0].url).toBe('https://example.com/')
+    })
+
+    it('does not open the pane for the agent where it would cover the chat', () => {
+      pane.setLayout('overlay')
+      pane.openSerp(serpSpec('a'), { activate: true })
+      expect(pane.activeId).toBe('serp:a')
+      expect(pane.open).toBe(false)
+      expect(pane.attention).toBe(true)
+
+      pane.setOpen(true)
+      expect(pane.open).toBe(true)
+      expect(pane.attention).toBe(false)
+      // Opened by the user, it stays open as an overlay.
+      pane.setLayout('overlay')
+      expect(pane.open).toBe(true)
+    })
+
+    it('closes a pane the agent opened once the layout turns out to be an overlay', () => {
+      pane.openSerp(serpSpec('a'), { activate: true })
+      expect(pane.open).toBe(true)
+      pane.setLayout('overlay')
+      expect(pane.open).toBe(false)
+      expect(pane.attention).toBe(true)
+
+      pane.setLayout('split')
+      pane.openSerp(serpSpec('b'), { activate: true })
+      expect(pane.open).toBe(true)
+      expect(pane.attention).toBe(false)
     })
 
     it('resets when the project changes', () => {

@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useAgentUiStore } from '@/stores/agentUi'
+import { useAuthStore } from '@/stores/auth'
 
 const PREFS_KEY = 'cs-agent-ui-v1'
+const SEEN_KEY = (uid) => `cs-agent-activity-seen-v1:${uid}`
 
 function freshStore() {
   setActivePinia(createPinia())
@@ -47,15 +49,20 @@ describe('agentUi preferences', () => {
   })
 
   it('survives a storage that throws', () => {
+    setActivePinia(createPinia())
+    // The app creates the auth store at start, before the workspace opens.
+    useAuthStore().user = { id: 7 }
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('denied')
     })
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('denied')
     })
-    const ui = freshStore()
+    const ui = useAgentUiStore()
     expect(() => ui.setSidebarCollapsed(true)).not.toThrow()
     expect(ui.sidebarCollapsed).toBe(true)
+    expect(() => ui.markActivitySeen('w1', '2026-11-02T10:00:00Z')).not.toThrow()
+    expect(ui.activitySeenAtFor('w1')).toBe('2026-11-02T10:00:00Z')
   })
 })
 
@@ -111,12 +118,46 @@ describe('agentUi unseen chats and activity', () => {
     expect(ui.isUnseen(42)).toBe(false)
   })
 
-  it('only moves the activity watermark forward', () => {
+  it('only moves the activity watermark forward, stored for the signed-in user', () => {
     const ui = freshStore()
+    useAuthStore().user = { id: 7 }
     ui.markActivitySeen('w1', '2026-11-02T10:00:00Z')
     ui.markActivitySeen('w1', '2026-11-01T10:00:00Z')
     expect(ui.activitySeenAtFor('w1')).toBe('2026-11-02T10:00:00Z')
-    expect(JSON.parse(localStorage.getItem(PREFS_KEY)).activitySeenAt).toEqual({ w1: '2026-11-02T10:00:00Z' })
+    expect(JSON.parse(localStorage.getItem(SEEN_KEY(7)))).toEqual({ w1: '2026-11-02T10:00:00Z' })
+    // Not in the device prefs every user of this browser shares.
+    expect(localStorage.getItem(PREFS_KEY)).toBeNull()
+  })
+
+  it("keeps each user's activity read state apart and drops it on sign-out", () => {
+    const ui = freshStore()
+    const auth = useAuthStore()
+    auth.accessToken = 'token-a'
+    auth.user = { id: 7 }
+    ui.markActivitySeen('12', '2026-11-02T15:00:00Z')
+
+    auth.clearAuth()
+    expect(ui.activitySeenAtFor('12')).toBeNull()
+    expect(localStorage.getItem(SEEN_KEY(7))).toBeNull()
+
+    // Another member of project 12 signs in on the same browser.
+    auth.accessToken = 'token-b'
+    auth.user = { id: 8 }
+    expect(ui.activitySeenAtFor('12')).toBeNull()
+
+    // Each user's own stored watermark comes back with them.
+    localStorage.setItem(SEEN_KEY(9), JSON.stringify({ 12: '2026-11-01T09:00:00Z' }))
+    auth.user = { id: 9 }
+    expect(ui.activitySeenAtFor('12')).toBe('2026-11-01T09:00:00Z')
+  })
+
+  it('forgets unseen chats when another user signs in', () => {
+    const ui = freshStore()
+    const auth = useAuthStore()
+    auth.user = { id: 7 }
+    ui.markUnseen('c1')
+    auth.user = { id: 8 }
+    expect(ui.isUnseen('c1')).toBe(false)
   })
 })
 
@@ -193,6 +234,23 @@ describe('agentUi.focusComposer', () => {
 })
 
 describe('agentUi.reset', () => {
+  it('runs on a sign-out from anywhere in the app, not only the workspace menu', () => {
+    const ui = freshStore()
+    const auth = useAuthStore()
+    auth.accessToken = 'token'
+    auth.user = { id: 7 }
+    ui.setSidebarCollapsed(true)
+    ui.openShortcuts()
+    ui.markUnseen('c1')
+    ui.announce('Reply finished')
+    // An expired session or the main app's sign-out, not WorkspaceSwitcher.
+    auth.clearAuth()
+    expect(ui.isUnseen('c1')).toBe(false)
+    expect(ui.shortcutsOpen).toBe(false)
+    expect(ui.politeAnnouncement.text).toBe('')
+    expect(ui.sidebarCollapsed).toBe(true)
+  })
+
   it('closes dialogs and forgets unseen chats but keeps device prefs', () => {
     const ui = freshStore()
     ui.setSidebarCollapsed(true)

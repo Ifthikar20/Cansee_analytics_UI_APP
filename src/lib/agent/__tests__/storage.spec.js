@@ -7,6 +7,7 @@ import {
     clearUserData,
     getLastChat,
     getLastProject,
+    loadActivitySeen,
     loadDraft,
     loadPaneState,
     loadUiPrefs,
@@ -15,6 +16,7 @@ import {
     paneStateChatIds,
     readJSON,
     removePaneState,
+    saveActivitySeen,
     saveDraft,
     savePaneState,
     saveUiPrefs,
@@ -188,6 +190,17 @@ describe('clearUserData', () => {
         expect(getLastProject(8)).toBeNull()
         expect(loadUiPrefs()).toEqual({ sidebarCollapsed: true })
         expect(localStorage.getItem('cs-access')).toBe('token')
+    })
+
+    it('treats activity read state as per user', () => {
+        saveActivitySeen(7, { 12: '2026-11-02T15:00:00Z' })
+        saveActivitySeen(8, { 12: '2026-11-01T09:00:00Z' })
+        expect(localStorage.getItem(storageKeys.activitySeen(7))).not.toBeNull()
+        expect(loadActivitySeen(8)).toEqual({ 12: '2026-11-01T09:00:00Z' })
+        expect(clearUserData(7)).toBe(1)
+        expect(loadActivitySeen(7)).toEqual({})
+        expect(loadActivitySeen(8)).toEqual({ 12: '2026-11-01T09:00:00Z' })
+        expect(loadActivitySeen(null)).toEqual({})
     })
 })
 

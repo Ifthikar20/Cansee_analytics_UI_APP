@@ -34,7 +34,7 @@ export class UnsupportedTransport extends TransportError {
     }
 }
 
-/** 401 after a refresh, or the refresh itself was refused. */
+/** 401 after a refresh, or the refresh itself was refused (the session is over). */
 export class AuthError extends TransportError {
     constructor(message = 'unauthorized', opts = {}) {
         super(message, { status: 401, code: ERROR_CODE.UNAUTHORIZED, retryable: false, fatal: true, ...opts })
@@ -47,6 +47,14 @@ export class OfflineError extends TransportError {
     constructor(message = 'offline', opts = {}) {
         super(message, { code: ERROR_CODE.AGENT_UNAVAILABLE, retryable: true, ...opts })
         this.name = 'OfflineError'
+    }
+}
+
+/** 503 maintenance: the site is down for maintenance. Retry after `retryAfterMs` (Retry-After). */
+export class MaintenanceError extends TransportError {
+    constructor(message = 'maintenance', opts = {}) {
+        super(message, { status: 503, ...opts, code: ERROR_CODE.MAINTENANCE, retryable: true, fatal: false })
+        this.name = 'MaintenanceError'
     }
 }
 
@@ -107,6 +115,11 @@ export async function errorFromResponse(res) {
     const retryAfterMs = parseRetryAfter(res.headers?.get?.('Retry-After'))
     const opts = { status: res.status, code, serverMessage, details, retryAfterMs }
 
+    // nginx's maintenance switch: not the agent being down, and not worth a
+    // quick retry; Retry-After says when to come back.
+    if (res.status === 503 && code === ERROR_CODE.MAINTENANCE) {
+        return new MaintenanceError(serverMessage || 'maintenance', opts)
+    }
     if (res.status === 503 && (code === ERROR_CODE.AGENT_UNAVAILABLE || !code)) {
         return new OfflineError(serverMessage || 'agent unavailable', { ...opts, code: ERROR_CODE.AGENT_UNAVAILABLE })
     }
@@ -121,6 +134,22 @@ export async function errorFromResponse(res) {
         ...opts,
         retryable: res.status === 429 || res.status >= 500,
     })
+}
+
+/**
+ * Why a token refresh failed. Only a refused refresh (401/403, after which
+ * the client has signed the user out) ends the session; a network blip or a
+ * 5xx from /auth/refresh/ leaves the user signed in, so the transport backs
+ * off and tries again.
+ */
+function refreshFailure(err) {
+    const status = Number(err?.response?.status) || 0
+    const serverMessage = err?.message || ''
+    if (status === 401 || status === 403 || !tokenFromHeaders(authHeaders())) {
+        return new AuthError('refresh failed', { serverMessage })
+    }
+    if (!status) return new OfflineError('refresh failed', { code: ERROR_CODE.NETWORK, serverMessage })
+    return new TransportError('refresh failed', { status, serverMessage, retryable: true })
 }
 
 /**
@@ -146,7 +175,7 @@ export async function fetchWithAuth(url, init = {}) {
             try {
                 await refreshAccessToken()
             } catch (err) {
-                throw new AuthError('refresh failed', { serverMessage: err?.message || '' })
+                throw refreshFailure(err)
             }
             res = await send()
             if (res.status === 401) {

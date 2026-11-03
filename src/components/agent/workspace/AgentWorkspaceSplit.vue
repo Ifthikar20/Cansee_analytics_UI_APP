@@ -38,7 +38,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, provide, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, provide, ref, watch } from 'vue'
 import { useMediaQuery } from '@vueuse/core'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { useAgentUiStore } from '@/stores/agentUi'
@@ -86,6 +86,15 @@ const layout = computed(() => {
 })
 
 provide('agWorkspaceLayout', layout)
+
+// The store opens the pane for the agent only beside the chat, never over it,
+// so it needs the layout once the width is measured.
+watch(
+  () => (phone.value || width.value > 0 ? layout.value : null),
+  (value) => pane.setLayout(value),
+  { immediate: true }
+)
+onBeforeUnmount(() => pane.setLayout(null))
 
 const expanded = computed(() => layout.value === 'split' && paneVisible.value && pane.expanded)
 const showHandle = computed(() => layout.value === 'split' && paneVisible.value && !expanded.value)

@@ -4,16 +4,16 @@
       <component :is="kindInfo.icon" />
     </span>
     <div class="ag-card-text">
-      <p class="ag-card-title">{{ title || kindInfo.label }}</p>
+      <p class="ag-card-title">{{ heading }}</p>
       <p class="ag-card-sub">{{ subtitle }}</p>
     </div>
     <button
-      v-if="artifactId"
+      v-if="canOpen"
       type="button"
       class="ag-card-open"
       :aria-expanded="expanded ? 'true' : 'false'"
       :aria-controls="controls || undefined"
-      :aria-label="`Open ${title || kindInfo.label}`"
+      :aria-label="`Open ${heading}`"
       @click="emit('open', $event)"
     >
       Open
@@ -24,15 +24,21 @@
 <script setup>
 // The deliverable of a sub-agent run: kind icon, title, "{project} website"
 // and Open, which shows the artifact (or its live draft) in the browser pane.
+// Until the call names its agent there is no kind, and the card says only
+// that an agent is being prepared.
 import { computed } from 'vue'
+import { SquareDashed } from '@lucide/vue'
 import { kindMeta } from '@/lib/agent/agentsMeta'
 import { isLiveStatus } from './parts'
 
 const props = defineProps({
   artifactId: { type: [String, Number], default: null },
   title: { type: String, default: '' },
-  kind: { type: String, default: 'page' },
+  // '' while the orchestrator is still writing the call
+  kind: { type: String, default: '' },
   version: { type: Number, default: null },
+  // agent_call base_version: above 0 when the call revises an artifact saved before it
+  baseVersion: { type: Number, default: null },
   projectName: { type: String, default: '' },
   // agent_call status
   status: { type: String, default: '' },
@@ -46,8 +52,23 @@ const props = defineProps({
 
 const emit = defineEmits(['open'])
 
-const kindInfo = computed(() => kindMeta(props.kind))
-const failed = computed(() => props.status === 'error')
+const PENDING = { icon: SquareDashed, color: 'var(--ag-fg-3)' }
+
+const unnamed = computed(() => !props.kind)
+const kindInfo = computed(() => (unnamed.value ? PENDING : kindMeta(props.kind)))
+// A stopped call ends like a failed one: not finished.
+const failed = computed(() => ['error', 'cancelled'].includes(props.status))
+const working = computed(() => props.live && isLiveStatus(props.status))
+// A failed or stopped call with no version that revised nothing saved before
+// it never saved its artifact, so there is nothing to open.
+const neverSaved = computed(() => failed.value && !props.version && !(props.baseVersion > 0))
+const canOpen = computed(() => Boolean(props.artifactId) && !neverSaved.value)
+
+const heading = computed(() => {
+  if (props.title) return props.title
+  if (unnamed.value) return working.value ? 'Preparing an agent' : 'Agent not started'
+  return kindInfo.value.label
+})
 
 const SUBJECT = {
   page: 'website',
@@ -59,9 +80,11 @@ const SUBJECT = {
 const subtitle = computed(() => {
   if (failed.value) {
     const msg = typeof props.error === 'string' ? props.error : props.error?.message
-    return msg ? `Not finished: ${msg}` : 'Not finished'
+    const reason = msg || (props.status === 'cancelled' ? 'Stopped' : '')
+    return reason ? `Not finished: ${reason}` : 'Not finished'
   }
-  if (props.live && isLiveStatus(props.status)) {
+  if (unnamed.value) return working.value ? 'Writing the brief…' : 'Not finished'
+  if (working.value) {
     const planning = props.status === 'preparing' || props.status === 'planning'
     return planning && props.progress.trim() ? props.progress.trim() : 'Drafting…'
   }
