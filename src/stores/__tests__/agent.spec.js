@@ -1180,6 +1180,47 @@ describe('agent store: research agents', () => {
         expect(store.visiblePath(CHAT_ID).map((m) => m.id)).toEqual([USER_MESSAGE_ID, ASSISTANT_ID])
     })
 
+    it('opens an agent\'s Google page in the background, placed by its task, with the run as the reveal key', async () => {
+        await initProject()
+        const live = { status: 'running', result: '', tone: null, ended_at: null, duration_ms: null, pane: null, error: null, detail: null }
+        const running = {
+            ...expectedSwarmPart(),
+            status: 'running',
+            ended_at: null,
+            duration_ms: null,
+            table_version: null,
+            tasks: expectedSwarmPart().tasks.map((t) => ({ ...t, ...live })),
+        }
+        agentApi.getChat.mockResolvedValueOnce(
+            ok(
+                chatDetail({
+                    current_leaf_id: ASSISTANT_ID,
+                    messages: [userMessage(), emptyAssistant({ parts: [running], parts_seq: 10 })],
+                    active_run: { id: RUN_ID, status: 'running', message_id: ASSISTANT_ID, last_seq: 10 },
+                })
+            )
+        )
+        const pane = useAgentPaneStore()
+        pane.bindChat(CHAT_ID)
+        await store.openChat(CHAT_ID)
+        expect(pane.tabs).toHaveLength(0)
+        const openSerp = vi.spyOn(pane, 'openSerp')
+
+        const e = eventFactory({ start: 10 })
+        rm.hooks.applyEvents(RUN_ID, [
+            e('research.recorded', { kind: 'serp', capture_id: CAPTURE_ID, capture: SWARM_SERP_CAPTURE, task_id: 'google.p1.page1' }),
+            e('research.recorded', { kind: 'page', capture_id: 'pg-1', capture: { url: 'https://evernote.com/' }, task_id: 'engines.p1.claude' }),
+        ])
+        expect(openSerp).toHaveBeenCalledTimes(1)
+        const [tab, options] = openSerp.mock.calls[0]
+        expect(tab).toMatchObject({ id: `serp:${CAPTURE_ID}`, kind: 'serp', status: 'ready' })
+        expect(options).toEqual({ activate: false, background: true, order: { group: `${SWARM_ID}:1`, index: 0 }, revealKey: RUN_ID })
+        // The page capture waits for its row; the Google page is the pane's tab.
+        expect(pane.tabs.map((t) => t.id)).toEqual([`serp:${CAPTURE_ID}`])
+        expect(pane.activeId).toBe(`serp:${CAPTURE_ID}`)
+        expect(store.messages[ASSISTANT_ID].research.pages['pg-1'].url).toBe('https://evernote.com/')
+    })
+
     it('swarmTable reads the tables in loaded messages before API data', async () => {
         await initProject()
         await openSwarmChat()

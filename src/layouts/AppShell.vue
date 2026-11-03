@@ -123,17 +123,35 @@
       </div>
 
       <nav v-show="navOpen" id="shell-sheet" class="shell-sheet" aria-label="Main">
-        <router-link
-          v-for="item in navItems"
-          :key="item.label"
-          :to="item.to"
-          class="shell-sheet-link"
-          :class="{ 'is-active': item.active }"
-          @click="navOpen = false"
-        >{{ item.label }}</router-link>
+        <template v-for="item in navItems" :key="item.label">
+          <!-- Under Analytics, the section link below is the current page. -->
+          <router-link
+            :to="item.to"
+            class="shell-sheet-link"
+            :class="{ 'is-active': item.active }"
+            :aria-current="item.active && item.key !== 'analytics' ? 'page' : null"
+            @click="navOpen = false"
+          >{{ item.label }}</router-link>
+          <template v-if="item.key === 'analytics'">
+            <template v-for="section in sheetSections" :key="section.key">
+              <router-link
+                v-if="section.to"
+                :to="section.to"
+                class="shell-sheet-link is-sub"
+                :class="{ 'is-current': section.active }"
+                :aria-current="section.active ? 'page' : null"
+                @click="navOpen = false"
+              >{{ section.label }}</router-link>
+              <a v-else class="shell-sheet-link is-sub is-disabled" role="link" aria-disabled="true">{{ section.label }}</a>
+            </template>
+          </template>
+        </template>
       </nav>
     </header>
     <div class="shell-rule" aria-hidden="true"></div>
+    <div v-if="analyticsKey" class="shell-subnav">
+      <AnalyticsNav :website-id="activeWebsite?.id ?? null" />
+    </div>
 
     <main class="shell-main">
       <router-view v-slot="{ Component }">
@@ -150,9 +168,10 @@
 </template>
 
 <script setup>
-// The signed-in app frame: one top bar, three destinations. Replaces the
-// old sidebar layout and its eleven entries; everything else now lives
-// inside Overview, a prompt's page, Sources, or Settings.
+// The signed-in app frame: one top bar, three destinations (Analytics,
+// Agent, Settings). Analytics has its own sub-nav under the bar (Overview,
+// Visibility, Countries, Traffic, AI traffic, Sources); its top link
+// returns to the section last used for the active project.
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -167,11 +186,15 @@ import FeedbackWidget from '@/components/feedback/FeedbackWidget.vue'
 import { FEEDBACK_ENABLED } from '@/api/feedbackClient'
 import ToastContainer from '@/components/ToastContainer.vue'
 import AddProjectDialog from '@/components/projects/AddProjectDialog.vue'
+import AnalyticsNav from '@/components/analytics/AnalyticsNav.vue'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import {
+  ANALYTICS_SECTIONS, analyticsHomeRoute, analyticsSectionOf, rememberAnalyticsSection, sectionRoute,
+} from '@/lib/analyticsNav'
 
 const router = useRouter()
 const route = useRoute()
@@ -186,23 +209,26 @@ const ROLE_LABELS = { owner: 'Owner', admin: 'Admin', member: 'Member', viewer: 
 const roleLabel = computed(() => ROLE_LABELS[authStore.orgRole] || authStore.orgRole || '')
 const activeWebsite = computed(() => appStore.activeWebsite)
 
+// The Analytics section of the current route ('countries'...), or null.
+const analyticsKey = computed(() => analyticsSectionOf(route.name))
+// The section memory lives in sessionStorage; this bumps the links that read it.
+const remembered = ref(0)
+
 const navItems = computed(() => {
   const name = String(route.name || '')
   const wid = activeWebsite.value?.id
+  void remembered.value
   return [
-    { label: 'Overview', to: { name: 'dashboard' }, active: name === 'dashboard' || name === 'prompt' },
-    {
-      label: 'Sources',
-      to: wid ? { name: 'sources-urls', params: { websiteId: wid } } : { name: 'dashboard' },
-      active: name.startsWith('sources'),
-    },
+    { key: 'analytics', label: 'Analytics', to: analyticsHomeRoute(wid), active: Boolean(analyticsKey.value) },
     {
       // The workspace has its own shell; /agent picks a project when none is active.
+      key: 'agent',
       label: 'Agent',
       to: wid ? { name: 'agent-home', params: { websiteId: wid } } : { name: 'agent' },
       active: name.startsWith('agent'),
     },
     {
+      key: 'settings',
       label: 'Settings',
       to: { path: '/settings' },
       active: route.path.startsWith('/settings') || route.path.startsWith('/billing'),
@@ -210,21 +236,51 @@ const navItems = computed(() => {
   ]
 })
 
+// The mobile sheet lists the Analytics sections under Analytics.
+const sheetSections = computed(() =>
+  ANALYTICS_SECTIONS.map((s) => ({
+    key: s.key,
+    label: s.label,
+    to: sectionRoute(s.key, activeWebsite.value?.id),
+    active: s.key === analyticsKey.value,
+  })),
+)
+
 function goSettings(section) {
   router.push({ path: '/settings', query: { section } })
 }
 
-// Keep the user on the same section, re-pointed at the new project. A
-// prompt page belongs to the old project's records, so it falls back to
-// the overview rather than 404ing on a foreign id.
+// Filters that name records of one project; they do not carry over.
+const PROJECT_QUERY = ['prompt', 'check']
+
+// Keep the user on the same page, re-pointed at the new project. A
+// prompt page and a source's detail belong to the old project's records,
+// so they fall back to their section rather than 404ing on a foreign id.
 function switchWebsite(id) {
   const website = appStore.websites.find((w) => w.id === id)
   if (!website) return
   appStore.setActiveWebsite(website)
   const name = String(route.name || '')
   if (name === 'prompt') router.push({ name: 'dashboard' })
-  else if (name.startsWith('sources')) router.push({ name: 'sources-urls', params: { websiteId: id } })
+  else if (name === 'sources-url-detail') router.push({ name: 'sources-urls', params: { websiteId: id } })
+  else if (route.params.websiteId !== undefined && name) {
+    const query = { ...route.query }
+    for (const key of PROJECT_QUERY) delete query[key]
+    router.push({ name, params: { ...route.params, websiteId: id }, query })
+  }
 }
+
+// Remember the Analytics section per project, so "Analytics" (here and in
+// the agent sidebar) returns to it.
+watch(
+  () => [analyticsKey.value, route.params.websiteId ?? activeWebsite.value?.id],
+  ([key, wid]) => {
+    if (!key || wid === undefined || wid === null) return
+    rememberAnalyticsSection(String(wid), key)
+    remembered.value += 1
+  },
+  { immediate: true },
+)
 
 async function handleLogout() {
   await authStore.logout()
@@ -477,11 +533,34 @@ useShellBootstrap()
   background: var(--accent);
 }
 
+/* Analytics sections, indented under Analytics. */
+.shell-sheet-link.is-sub {
+  padding: 8px 12px 8px 28px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+
+.shell-sheet-link.is-sub.is-current {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.shell-sheet-link.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* Dashed hairline under the bar, as on the landing page. */
 .shell-rule {
   height: 1px;
   background-image: linear-gradient(90deg, var(--border) 0 12px, transparent 12px 32px);
   background-size: 32px 1px;
+}
+
+.shell-subnav {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 12px 24px 0;
 }
 
 .shell-main {
@@ -505,6 +584,10 @@ useShellBootstrap()
   .shell-main {
     padding-left: 16px;
     padding-right: 16px;
+  }
+  .shell-subnav {
+    padding-left: 6px;
+    padding-right: 6px;
   }
   /* Phones: the project is the one switcher that matters; the org lives
      in Settings > Team. */

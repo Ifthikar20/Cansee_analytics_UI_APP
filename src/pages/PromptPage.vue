@@ -32,9 +32,10 @@
           <p class="pp-eyebrow">Prompt</p>
           <h1 class="pp-title">{{ detail.prompt.text }}</h1>
           <p class="pp-meta">
-            <span v-if="detail.prompt.location">Searched from {{ detail.prompt.location.toUpperCase() }}</span>
+            <MethodChip v-if="googleMethod" :method="googleMethod.method" :label="googleMethod.label" />
+            <span v-else-if="detail.prompt.location">Searched from {{ detail.prompt.location.toUpperCase() }}</span>
             <span v-else>Global</span>
-            <span v-if="detail.google.checked_at"> · Google checked {{ timeAgo(detail.google.checked_at) }}</span>
+            <span v-if="detail.google.checked_at">· Google checked {{ timeAgo(detail.google.checked_at) }}</span>
           </p>
         </div>
         <div class="pp-actions">
@@ -87,6 +88,88 @@
         </div>
       </section>
 
+      <section class="pp-section" aria-labelledby="pp-history-title">
+        <header class="pp-section-head is-row">
+          <div>
+            <h2 id="pp-history-title" class="pp-section-title">History</h2>
+            <p class="pp-section-sub">How this prompt has moved.</p>
+          </div>
+          <PeriodSelect v-model="historyPeriod" :periods="['30d', '90d']" />
+        </header>
+        <div class="pp-history">
+          <VizChart
+            :spec="googleHistory"
+            :loading="historyPending"
+            :error="historyFailed ? HISTORY_ERROR : ''"
+            :empty="googleEmpty"
+            @retry="loadHistory"
+          />
+          <VizChart
+            :spec="engineHistory"
+            :loading="historyPending"
+            :error="historyFailed ? HISTORY_ERROR : ''"
+            :empty="enginesEmpty"
+            @retry="loadHistory"
+          />
+        </div>
+      </section>
+
+      <section class="pp-section" aria-labelledby="pp-countries-title">
+        <header class="pp-section-head is-row">
+          <div>
+            <h2 id="pp-countries-title" class="pp-section-title">By country</h2>
+            <p class="pp-section-sub">The latest check of this prompt in each country.</p>
+          </div>
+          <Button v-if="countryRows.length" as-child variant="outline" class="rounded-full">
+            <router-link :to="checkCountries">Check countries</router-link>
+          </Button>
+        </header>
+        <Skeleton v-if="!matrix && !countriesFailed" class="h-32 rounded-2xl" />
+        <VizState
+          v-else-if="countriesFailed && !matrix"
+          kind="error"
+          title="We couldn't load country results."
+          :action="{ label: 'Try again' }"
+          @action="loadCountries"
+        />
+        <VizState
+          v-else-if="!countryRows.length"
+          title="This prompt hasn't been checked in other countries."
+          :action="{ label: 'Check countries', to: checkCountries }"
+        />
+        <div v-else class="pp-ct-scroll">
+          <table class="pp-ct">
+            <caption class="sr-only">This prompt by country</caption>
+            <thead>
+              <tr>
+                <th scope="col">Country</th>
+                <th scope="col">Google</th>
+                <th v-for="e in countryEngines" :key="e.key" scope="col">{{ e.label }}</th>
+                <th scope="col">Gap</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in countryRows" :key="row.country">
+                <th scope="row" class="pp-ct-country">{{ row.name }}</th>
+                <td>
+                  <span class="pp-ct-value" :class="{ 'is-word': !row.google || !row.google.position }">{{ googleText(row) }}</span>
+                  <span v-if="row.google?.method_label" class="pp-ct-note">{{ row.google.method_label }}</span>
+                </td>
+                <td v-for="e in countryEngines" :key="e.key">
+                  <span class="pp-ct-value" :class="{ 'is-word': !row.engines[e.key]?.mentioned }">
+                    {{ cellText(row.engines[e.key]) }}
+                  </span>
+                </td>
+                <td>
+                  <span v-if="row.gap && row.gap.definite === false" class="pp-ct-value is-word">Not definite</span>
+                  <GapBadge v-else :cls="row.gap?.class || 'no_data'" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="pp-section" aria-labelledby="pp-findings-title">
         <header class="pp-section-head">
           <h2 id="pp-findings-title" class="pp-section-title">What AI gets wrong</h2>
@@ -117,16 +200,25 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Archive, CalendarClock, RefreshCw } from '@lucide/vue'
 import api from '@/api/client'
+import countriesApi from '@/api/countries'
 import searchGapApi from '@/api/searchGap'
 import promptLibrary from '@/api/promptLibrary'
+import visibilityApi from '@/api/visibility'
 import { useToast } from '@/composables/useToast'
 import { gapMeta } from '@/lib/gap'
+import { cellText, matrixEngines, promptCountryRows } from '@/lib/analytics/countrySpecs'
+import { googleHistorySpec } from '@/lib/analytics/polishSpecs'
+import { visibilityOverTime } from '@/lib/analytics/visibilitySpecs'
 import { timeAgo } from '@/utils/timeAgo'
 import GradientCard from '@/components/GradientCard.vue'
 import GapBadge from '@/components/gap/GapBadge.vue'
 import ActionList from '@/components/gap/ActionList.vue'
 import GoogleCard from '@/components/gap/GoogleCard.vue'
 import EngineCard from '@/components/gap/EngineCard.vue'
+import MethodChip from '@/components/analytics/MethodChip.vue'
+import PeriodSelect from '@/components/analytics/PeriodSelect.vue'
+import VizChart from '@/components/charts/VizChart.vue'
+import VizState from '@/components/charts/VizState.vue'
 import ChatDetailModal from '@/components/ChatDetailModal.vue'
 import PromptScheduleModal from '@/components/prompt_library/PromptScheduleModal.vue'
 import PromptSecurityFindings from '@/components/prompt_library/PromptSecurityFindings.vue'
@@ -155,6 +247,89 @@ let refreshTimer = null
 const anyEngineConfigured = computed(() => (detail.value?.engines || []).some((e) => e.configured))
 const anyEngineAnswered = computed(() => (detail.value?.engines || []).some((e) => e.answers))
 
+// How a Google check for this prompt's location runs with the configured
+// provider (null without Google). A Global prompt on Google's default
+// keeps reading "Global".
+const googleMethod = computed(() => {
+  const method = detail.value?.google?.method
+  if (!method || !method.label) return null
+  if (!detail.value.prompt.location && method.method === 'default') return null
+  return method
+})
+
+// ── History: the visibility dashboard filtered to this prompt ──
+const HISTORY_ERROR = "We couldn't load the history."
+const historyPeriod = ref('30d')
+const history = ref(null)
+const historyLoading = ref(false)
+const historyFailed = ref(false)
+
+const historyPending = computed(() => historyLoading.value || (!history.value && !historyFailed.value))
+const googleHistory = computed(() =>
+  googleHistorySpec(history.value?.google_history, { location: detail.value?.prompt.location }),
+)
+const engineHistory = computed(() => visibilityOverTime(history.value, { id: 'prompt.engines', title: 'AI visibility' }))
+
+const googleEmpty = computed(() => {
+  if (!history.value || googleHistory.value.labels.length) return null
+  if (detail.value && !detail.value.serp_configured) return { title: "Google rank checks aren't available yet." }
+  return { title: 'No Google checks in this period.', body: 'Use Check now to record one.' }
+})
+const enginesEmpty = computed(() =>
+  history.value && history.value.has_data === false ? { title: 'No AI answers for this prompt in this period.' } : null,
+)
+
+// A late answer for another prompt or period is dropped.
+function historyKey() {
+  return `${props.websiteId}|${props.promptId}|${historyPeriod.value}`
+}
+
+async function loadHistory() {
+  const key = historyKey()
+  historyLoading.value = true
+  historyFailed.value = false
+  try {
+    const res = await visibilityApi.dashboard(props.websiteId, { period: historyPeriod.value, prompt_id: props.promptId })
+    if (key !== historyKey()) return
+    history.value = res.data
+  } catch {
+    if (key === historyKey()) historyFailed.value = true
+  } finally {
+    if (key === historyKey()) historyLoading.value = false
+  }
+}
+
+watch(historyPeriod, () => loadHistory())
+
+// ── By country: the latest country check of this prompt ──
+const matrix = ref(null)
+const countriesFailed = ref(false)
+
+const countryRows = computed(() => (matrix.value ? promptCountryRows(matrix.value, props.promptId) : []))
+const countryEngines = computed(() => (matrix.value ? matrixEngines(matrix.value) : []))
+const checkCountries = computed(() => ({
+  name: 'countries',
+  params: { websiteId: props.websiteId },
+  query: { prompt: props.promptId, check: '1' },
+}))
+
+function googleText(row) {
+  if (!row.google && matrix.value?.google?.configured === false) return 'Not configured'
+  return cellText(row.google)
+}
+
+async function loadCountries() {
+  const key = `${props.websiteId}|${props.promptId}`
+  countriesFailed.value = false
+  try {
+    const res = await countriesApi.matrix(props.websiteId, { prompt_id: props.promptId })
+    if (key !== `${props.websiteId}|${props.promptId}`) return
+    matrix.value = res.data
+  } catch {
+    if (key === `${props.websiteId}|${props.promptId}`) countriesFailed.value = true
+  }
+}
+
 async function load() {
   loading.value = true
   loadFailed.value = false
@@ -177,7 +352,10 @@ async function load() {
 // Checks run in the background; look again once they have had time to land.
 function refreshSoon() {
   clearTimeout(refreshTimer)
-  refreshTimer = setTimeout(load, 8000)
+  refreshTimer = setTimeout(() => {
+    load()
+    loadHistory()
+  }, 8000)
 }
 
 // The API answers some failures with a bare code ({"error": "code"}) and
@@ -269,7 +447,13 @@ watch(() => [props.websiteId, props.promptId], () => {
   clearTimeout(refreshTimer)
   detail.value = null
   notFound.value = false
+  history.value = null
+  historyFailed.value = false
+  matrix.value = null
+  countriesFailed.value = false
   load()
+  loadHistory()
+  loadCountries()
 }, { immediate: true })
 onBeforeUnmount(() => clearTimeout(refreshTimer))
 </script>
@@ -383,6 +567,10 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
 }
 
 .pp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   margin-top: 6px;
   color: var(--muted-foreground);
   font-size: 13px;
@@ -422,6 +610,79 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
   margin-bottom: 12px;
 }
 
+.pp-section-head.is-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pp-history {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pp-ct-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+}
+
+.pp-ct {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.pp-ct th,
+.pp-ct td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.pp-ct thead th {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.pp-ct tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.pp-ct-country {
+  color: var(--foreground);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pp-ct-value {
+  display: block;
+  color: var(--foreground);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pp-ct-value.is-word {
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+
+.pp-ct-note {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
 .pp-section-title {
   color: var(--foreground);
   font-size: 17px;
@@ -449,7 +710,8 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
 }
 
 @media (max-width: 960px) {
-  .pp-compare {
+  .pp-compare,
+  .pp-history {
     grid-template-columns: minmax(0, 1fr);
   }
 }

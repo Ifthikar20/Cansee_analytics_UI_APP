@@ -105,13 +105,16 @@
             </div>
           </div>
 
-          <!-- Daily usage across the current billing period -->
-          <div v-if="dailySeries.length" class="sp-chart">
-            <h4 class="sp-subhead">Daily usage · {{ periodLabel }}</h4>
-            <div class="h-52">
-              <Bar :data="dailyChartData" :options="usageChartOptions" />
-            </div>
-          </div>
+          <!-- Daily spend across the current billing period; compact, as it
+               sits inside the section's card. -->
+          <VizChart
+            v-if="dailySeries.length"
+            class="sp-chart"
+            :spec="dailyChart"
+            :height="208"
+            :heading-level="4"
+            compact
+          />
 
           <!-- Empty state -->
           <div v-if="!usage.totals.calls" class="sp-empty">
@@ -239,13 +242,6 @@
 
 <script setup>
 import { computed, ref, onMounted } from 'vue'
-import { Bar } from 'vue-chartjs'
-import {
-  Chart as ChartJS, BarElement, CategoryScale, LinearScale, Tooltip as ChartTooltip,
-} from 'chart.js'
-import { CHART_COLORS, barDataset, baseOptions } from '@/lib/chartTheme'
-
-ChartJS.register(BarElement, CategoryScale, LinearScale, ChartTooltip)
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
@@ -255,6 +251,8 @@ import SettingsShell from '@/components/settings/SettingsShell.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import OrgMembersSection from '@/components/org/OrgMembersSection.vue'
 import OrgDomainsSection from '@/components/org/OrgDomainsSection.vue'
+import VizChart from '@/components/charts/VizChart.vue'
+import { aiUsageSpec } from '@/lib/analytics/polishSpecs'
 import { SUPPORT_EMAIL, SUPPORT_SUBJECT } from '@/constants/support'
 import { Button } from '@/components/ui/button'
 
@@ -366,21 +364,8 @@ const periodLabel = computed(() => {
   return `${start} – ${end}`
 })
 
-const dailyChartData = computed(() => ({
-  labels: dailySeries.value.map(d => formatDay(d.day)),
-  datasets: [barDataset('Tokens', dailySeries.value.map(d => d.tokens || 0), CHART_COLORS.blue)],
-}))
-
-const usageChartOptions = (() => {
-  const base = baseOptions()
-  base.plugins.legend.display = false
-  base.plugins.tooltip.callbacks = {
-    label: (ctx) => ` ${formatTokens(ctx.parsed.y)} tokens`,
-  }
-  base.scales.y.ticks.callback = (v) => formatTokens(v)
-  base.scales.x.ticks.maxTicksLimit = 10
-  return base
-})()
+// The estimated AI cost of each day in the billing period.
+const dailyChart = computed(() => aiUsageSpec(dailySeries.value, { subtitle: periodLabel.value }))
 
 function formatNum(n) { return (n || 0).toLocaleString() }
 function formatTokens(n) {
@@ -388,12 +373,6 @@ function formatTokens(n) {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K'
   return n.toLocaleString()
-}
-
-function formatDay(isoDate) {
-  if (!isoDate) return ''
-  const d = new Date(isoDate)
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 async function loadUsage() {
@@ -724,16 +703,6 @@ async function saveProfile() {
 }
 
 .sp-chart { margin-top: 20px; }
-.sp-subhead {
-  margin: 0 0 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted-foreground);
-}
 
 .sp-empty {
   display: flex;

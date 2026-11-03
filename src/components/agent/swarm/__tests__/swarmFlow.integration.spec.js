@@ -576,9 +576,12 @@ describe('research agents end to end: the live run', () => {
     expect(lineOf(block, 'Google page 1').classes()).toContain('is-shimmer')
     expect(lineOf(block, 'ChatGPT').text()).toBe('Asking ChatGPT')
     expect(lineOf(block, 'Claude').text()).toBe('Claude was busy; trying again')
-    // The capture lands in the message research; the pane does not open it.
+    // The capture lands in the message research and opens as a background
+    // tab; the run's first one shows the pane.
     expect(store.messages[SWARM_MESSAGE_ID].research.serp[CAPTURE_ID]).toEqual(SERP_CAPTURE)
-    expect(pane.tabs).toHaveLength(0)
+    expect(pane.tabs.map((t) => [t.id, t.status])).toEqual([[SERP_TAB, 'ready']])
+    expect(pane.activeId).toBe(SERP_TAB)
+    expect(pane.open).toBe(true)
 
     await feed(store, SWARM_RUN_ID, events.slice(googleDone, ended))
     ;[block] = blocks(wrapper)
@@ -589,7 +592,7 @@ describe('research agents end to end: the live run', () => {
     expect(lineOf(block, 'Claude').text()).toBe('Failed: The engine was busy or rate limited.')
     expect(lineOf(block, 'Claude').classes()).toContain('is-bad')
     expect(block.find('.ag-swarm-count').text()).toBe('3/3')
-    expect(pane.tabs).toHaveLength(0)
+    expect(pane.tabs.map((t) => t.id)).toEqual([SERP_TAB])
 
     // Every agent settled: the swarm ends partial.
     await feed(store, SWARM_RUN_ID, events.slice(ended, table))
@@ -738,7 +741,8 @@ describe('research agents end to end: after the run', () => {
     expect(block.findAll('.ag-swarm-cat-sum').map((s) => s.text())).toEqual(['best #4', 'named by 0 of 1 · 1 failed'])
     expect(cellOf(inlineTables(wrapper)[0], 'google').text()).toContain('#4')
 
-    // A row with a capture opens it in the pane from the research store.
+    // The reload rebuilt the agent's Google page as a tab; its row shows it.
+    expect(pane.tabs.map((t) => t.id)).toEqual([SERP_TAB])
     await cats[0].trigger('click')
     await rowOf(block, 'Google page 1').trigger('click')
     await flushPromises()

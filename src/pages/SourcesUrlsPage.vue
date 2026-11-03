@@ -12,12 +12,6 @@
 import { ENGINES, engineMeta } from '@/lib/engines'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Line } from 'vue-chartjs'
-import {
-  Chart as ChartJS,
-  Title, Tooltip as ChartTooltip, Legend, LineElement, PointElement,
-  CategoryScale, LinearScale, Filler,
-} from 'chart.js'
 import {
   Search, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown,
   Check, ChevronDown, CircleX, Loader2,
@@ -26,15 +20,15 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 import { useAppStore } from '@/stores/app'
 import api from '@/api/client'
-import { cssVar } from '@/lib/theme'
+import { stableSlots } from '@/lib/charts/palette'
+import { retrievalsSpec, urlTypesSpec } from '@/lib/analytics/polishSpecs'
 import {
-  Card, CardHeader, CardTitle, CardContent,
+  Card, CardHeader, CardContent,
 } from '@/components/ui/card'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import VizChart from '@/components/charts/VizChart.vue'
 import MetricInfo from '@/components/sources/MetricInfo.vue'
 import OpportunitiesRow from '@/components/sources/OpportunitiesRow.vue'
-
-ChartJS.register(Title, ChartTooltip, Legend, LineElement, PointElement, CategoryScale, LinearScale, Filler)
 
 const appStore = useAppStore()
 const route = useRoute()
@@ -58,75 +52,29 @@ const loading = ref(true)
 const loaded = ref(false)
 const error = ref('')
 
-const DOMAIN_PALETTE = [
-  '#475569', '#8b5cf6', '#5b8def', '#ec4899', '#f59e0b',
-  '#22c55e', '#06b6d4', '#f97316', '#14b8a6', '#eab308',
-]
-
-const domainSeries = ref([])
-const chartLabels = ref([])
+// The five most-used domains per day. Each domain keeps the colour slot it
+// first got for as long as the page is open, so a filter change never
+// repaints a domain that stays on the chart.
+const overview = ref({ labels: [], series: [] })
+const periodStart = ref(null)
+const slotMemory = new Map()
+const domainSlots = ref(new Map())
 const trafficSummary = ref(null)
 const opportunities = ref(null)
 const uniqueUrls = ref(0)
 
-const chartData = computed(() => ({
-  labels: chartLabels.value,
-  datasets: domainSeries.value.map(d => ({
-    label: d.label,
-    data: d.data,
-    borderColor: d.color,
-    backgroundColor: d.color,
-    pointHoverBackgroundColor: d.color,
-    pointHoverBorderColor: cssVar('--card', '#fff'),
-    tension: 0.4,
-    cubicInterpolationMode: 'monotone',
-    pointRadius: 0,
-    pointHoverRadius: 4,
-    pointHoverBorderWidth: 2,
-    borderWidth: 2,
-    fill: false,
-  })),
-}))
-
-const chartOptions = computed(() => {
-  const grid = cssVar('--border', 'rgba(0,0,0,0.08)')
-  const text = cssVar('--muted-foreground', '#64748b')
-  const popover = cssVar('--popover', '#ffffff')
-  const popoverFg = cssVar('--popover-foreground', '#0f172a')
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        usePointStyle: true,
-        backgroundColor: popover,
-        titleColor: popoverFg,
-        bodyColor: popoverFg,
-        borderColor: grid,
-        borderWidth: 1,
-        cornerRadius: 8,
-        padding: 12,
-        boxPadding: 4,
-        callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y}` },
+const retrievalsChart = computed(() =>
+  retrievalsSpec(overview.value, domainSlots.value, { start: periodStart.value }),
+)
+const retrievalsEmpty = computed(() =>
+  overview.value.series.length
+    ? null
+    : {
+        title: 'No retrievals in this period yet',
+        body: 'Retrievals appear as the AI engines answer the prompts you track.',
+        action: { label: 'Add prompts', to: '/dashboard' },
       },
-    },
-    scales: {
-      x: {
-        grid: { display: false },
-        border: { display: false },
-        ticks: { color: text, font: { size: 12 }, padding: 8 },
-      },
-      y: {
-        beginAtZero: true,
-        grid: { color: grid, drawBorder: false },
-        border: { display: false },
-        ticks: { color: text, font: { size: 12 }, padding: 8, precision: 0 },
-      },
-    },
-  }
-})
+)
 
 /* ── URL movers ── */
 const moverTab = ref('Top')
@@ -147,7 +95,15 @@ function moverBarWidth(row) {
 
 const urlTypes = ref([])
 const totalRetrievals = ref(0)
-const urlTypeMaxPct = computed(() => Math.max(1, ...urlTypes.value.map(t => t.pct)))
+const urlTypesChart = computed(() => urlTypesSpec(urlTypes.value))
+const urlTypesEmpty = computed(() =>
+  urlTypes.value.length
+    ? null
+    : {
+        title: 'No retrievals in this period',
+        body: 'URL types break down which content formats AI reaches for once sources are collected.',
+      },
+)
 
 /* ── AI model avatars ── */
 function modelStyle(key) {
@@ -312,20 +268,17 @@ async function load() {
     const res = await api.get(`/citations/websites/${websiteId.value}/urls/`, { params, _silentError: true })
     const data = res.data || {}
     topics.value = data.topics || []
-    chartLabels.value = data.overview?.labels || []
-    domainSeries.value = (data.overview?.series || []).map((s, i) => ({
-      key: s.label,
-      label: s.label,
-      color: s.color || DOMAIN_PALETTE[i % DOMAIN_PALETTE.length],
-      data: s.data || [],
-    }))
+    const series = (data.overview?.series || []).map(s => ({ key: String(s.key ?? s.label), label: s.label, data: s.data || [] }))
+    domainSlots.value = stableSlots(series.map(s => s.key), slotMemory)
+    overview.value = { labels: data.overview?.labels || [], series }
+    periodStart.value = data.period_start || null
     movers.value = {
       Top: data.movers?.Top || [],
       New: data.movers?.New || [],
       Trending: data.movers?.Trending || [],
       Losing: data.movers?.Losing || [],
     }
-    urlTypes.value = (data.url_types || []).map(t => ({ type: t.type, pct: t.pct, color: t.color }))
+    urlTypes.value = (data.url_types || []).map(t => ({ type: t.type, pct: t.pct }))
     totalRetrievals.value = data.total_retrievals || 0
     uniqueUrls.value = data.unique_urls || 0
     trafficSummary.value = data.traffic_summary || null
@@ -529,40 +482,11 @@ const headerFacts = computed(() => {
     </div>
 
     <!-- ── Retrievals chart ── -->
-    <Card>
-      <CardHeader class="flex-row items-start justify-between gap-4 space-y-0">
-        <div>
-          <CardTitle class="flex items-center gap-1.5 text-base">
-            Retrievals over time
-            <MetricInfo :text="HELP.retrievals" />
-          </CardTitle>
-          <p class="mt-0.5 text-xs text-muted-foreground">
-            Daily retrievals for the five most-used domains in this period
-          </p>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <template v-if="domainSeries.length">
-          <div class="h-72">
-            <Line :data="chartData" :options="chartOptions" />
-          </div>
-          <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <span v-for="d in domainSeries" :key="d.key"
-              class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span class="size-2 rounded-full" :style="{ background: d.color }" />
-              {{ d.label }}
-            </span>
-          </div>
-        </template>
-        <EmptyState
-          v-else-if="!loading"
-          title="No retrievals in this period yet"
-          body="Retrievals appear as the AI engines answer the prompts you track."
-          cta-label="Add prompts"
-          cta-to="/dashboard"
-        />
-      </CardContent>
-    </Card>
+    <VizChart :spec="retrievalsChart" :loading="loading" :empty="retrievalsEmpty" :height="288">
+      <template #actions>
+        <MetricInfo :text="HELP.retrievals" />
+      </template>
+    </VizChart>
 
     <!-- ── Movers + URL types ── -->
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -603,32 +527,12 @@ const headerFacts = computed(() => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader class="flex-row items-center justify-between space-y-0">
-          <div class="flex items-center gap-1.5">
-            <CardTitle class="text-base">URL types</CardTitle>
-            <MetricInfo :text="HELP.urlTypes" />
-          </div>
+      <VizChart :spec="urlTypesChart" :loading="loading" :empty="urlTypesEmpty">
+        <template #actions>
+          <MetricInfo :text="HELP.urlTypes" />
           <span class="text-xs text-muted-foreground">Total retrievals: {{ formatCount(totalRetrievals) }}</span>
-        </CardHeader>
-        <CardContent class="space-y-3">
-          <div v-for="t in urlTypes" :key="t.type"
-            class="relative flex items-center justify-between gap-3 overflow-hidden rounded-md px-3 py-2">
-            <div class="absolute inset-y-0 left-0 rounded-md bg-secondary"
-              :style="{ width: (t.pct / urlTypeMaxPct * 100) + '%' }" />
-            <span class="relative z-10 inline-flex items-center gap-2 text-sm text-foreground">
-              <span class="size-2 rounded-full" :style="{ background: t.color }" />
-              {{ t.type }}
-            </span>
-            <span class="relative z-10 text-sm font-semibold tabular-nums text-foreground">{{ t.pct }}%</span>
-          </div>
-          <EmptyState
-            v-if="!loading && !urlTypes.length"
-            title="No retrievals in this period"
-            body="URL types break down which content formats AI reaches for once sources are collected."
-          />
-        </CardContent>
-      </Card>
+        </template>
+      </VizChart>
     </div>
 
     <!-- ── URLs table ── -->

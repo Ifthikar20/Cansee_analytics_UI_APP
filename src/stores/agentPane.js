@@ -4,6 +4,7 @@ import { useAgentStore } from '@/stores/agent'
 import { useAuthStore } from '@/stores/auth'
 import { hostOf, isHttpUrl, normalizeAddress } from '@/lib/agent/url'
 import { taskError } from '@/lib/agent/normalize'
+import { swarmTabOrder } from '@/lib/agent/reducer'
 import { loadPaneState, loadUiPrefs, movePaneState, savePaneState, saveUiPrefs } from '@/lib/agent/storage'
 
 // Browser pane state for the bound chat: the tab list, the active tab and the
@@ -14,11 +15,13 @@ import { loadPaneState, loadUiPrefs, movePaneState, savePaneState, saveUiPrefs }
 // prefs (cs-agent-ui-v1).
 //
 // The research agents (swarm parts) take their captures without browser
-// events: a task row opens its capture with openCapture, and the pane
-// rebuilds those tabs from the research store but never adds them on its
-// own (a swarm takes dozens). A swarm's results table is a `table` tab, one
-// per swarm: {id: 'table:<swarmId>', kind: 'table', swarmId, version, title},
-// where a null version follows the latest.
+// events. Their Google results pages open as background tabs as each one is
+// recorded (openSerp with `background`): ordered by task (prompt, then page),
+// never taking the active tab, revealing the pane at most once per run, and
+// rebuilt from the research store after a reload. Their page captures still
+// open on click (a task row calls openCapture). A swarm's results table is a
+// `table` tab, one per swarm: {id: 'table:<swarmId>', kind: 'table', swarmId,
+// version, title}, where a null version follows the latest.
 //
 // Tab statuses: idle (a URL not fetched yet), loading, ready, error, missing
 // (restored from storage, waiting for the chat's research) and gone (the
@@ -176,8 +179,10 @@ function captureKind(tabId) {
 
 // The tab of a capture a research agent took (task.pane), built from the
 // research store like a step's tab. A task names its capture only once it
-// has finished, so without a capture the tab is `missing`.
-function swarmTaskSpec(task, serps, pages) {
+// has finished, so without a capture the tab is `missing`. A Google page
+// opens by itself (auto) in its place among the swarm's pages (`order`);
+// a page capture waits for a click.
+function swarmTaskSpec(task, serps, pages, order) {
     const tabId = task.pane.tab_id
     const kind = captureKind(tabId)
     if (!kind) return null
@@ -194,8 +199,9 @@ function swarmTaskSpec(task, serps, pages) {
             title: serpTitle(data),
             status: status === 'loading' ? (error ? 'error' : 'missing') : status,
             data,
+            order,
             complete: status !== 'loading',
-            auto: false,
+            auto: true,
         }
     }
     const capture = pages[captureId] || null
@@ -223,8 +229,9 @@ function swarmTaskSpec(task, serps, pages) {
 // passes its checks.
 //
 // includeSwarm also yields the capture of each research agent (the first
-// task naming it), with `auto: false`: the pane rebuilds and reopens those
-// tabs but never adds them by itself.
+// task naming it): Google pages with `auto: true`, so a fresh load rebuilds
+// them as it rebuilds a step's tabs; page captures with `auto: false`, so
+// the pane rebuilds and reopens those but never adds them by itself.
 export function researchTabs(messages, { includeSwarm = false } = {}) {
     const out = []
     const seen = new Set()
@@ -239,14 +246,14 @@ export function researchTabs(messages, { includeSwarm = false } = {}) {
             if (!part) continue
             if (part.type === 'swarm') {
                 if (!includeSwarm || !Array.isArray(part.tasks)) continue
-                for (const task of part.tasks) {
+                part.tasks.forEach((task, index) => {
                     const tabId = task && task.pane && task.pane.tab_id
-                    if (typeof tabId !== 'string' || seen.has(tabId)) continue
-                    const spec = swarmTaskSpec(task, serps, pages)
-                    if (!spec) continue
+                    if (typeof tabId !== 'string' || seen.has(tabId)) return
+                    const spec = swarmTaskSpec(task, serps, pages, swarmTabOrder(part, index))
+                    if (!spec) return
                     seen.add(tabId)
                     out.push(spec)
-                }
+                })
                 continue
             }
             if ((part.type === 'serp' || part.type === 'page_inspect') && typeof part.tab_id === 'string') {
@@ -351,6 +358,8 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
     let closed = new Set()
     // Agent calls whose artifact was opened, so each call opens it once.
     let autoOpened = new Set()
+    // Runs whose background tabs already revealed the pane (or tried to).
+    let revealed = new Set()
     let stash = new Map()
     let restored = false
     let savedLoaded = false
@@ -495,8 +504,26 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         }
     }
 
+    // Where a tab with `order` ({group, index}, kept in memory only) goes:
+    // after the last tab of its group with a smaller index, else before the
+    // first one with a larger index, else last.
+    function orderedIndex(order) {
+        const list = tabs.value
+        if (!order || order.group === undefined || order.group === null) return list.length
+        let after = -1
+        let before = -1
+        list.forEach((t, i) => {
+            if (!t.order || t.order.group !== order.group) return
+            if (t.order.index < order.index) after = i
+            else if (t.order.index > order.index && before === -1) before = i
+        })
+        if (after !== -1) return after + 1
+        return before !== -1 ? before : list.length
+    }
+
     function addTab(tab) {
-        tabs.value.push({
+        const at = orderedIndex(tab.order)
+        tabs.value.splice(at, 0, {
             title: '',
             status: 'ready',
             data: null,
@@ -508,7 +535,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
             version: null,
             ...tab,
         })
-        const added = tabs.value[tabs.value.length - 1]
+        const added = tabs.value[at]
         touch(added)
         evictOverflow(added.id)
         return added
@@ -521,17 +548,42 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         attention.value = false
     }
 
+    // The pane would cover the chat: an overlay (a narrow workspace), a
+    // full-screen dialog, or a phone before the workspace has measured itself.
+    function coversChat() {
+        return layout.value ? layout.value !== 'split' : isPhone()
+    }
+
     // Opens the pane for agent-driven tabs where it sits beside the chat. As
     // an overlay (a narrow workspace) or a full-screen dialog (phones) it
     // would cover the chat the user is typing in, so it stays closed and
     // `attention` marks that there is something to see.
     function reveal() {
         if (open.value) return
-        const covers = layout.value ? layout.value !== 'split' : isPhone()
-        if (covers) {
+        if (coversChat()) {
             attention.value = true
             return
         }
+        open.value = true
+        openedByAgent = true
+        attention.value = false
+    }
+
+    // The first background tab of a run (`key`) shows the pane once: beside
+    // the chat it opens on that tab; where it would cover the chat only
+    // `attention` is set. Later tabs of the run, and an open pane, change
+    // nothing. Focus is never moved.
+    function revealOnce(tab, key) {
+        if (key === undefined || key === null || key === '') return
+        const k = String(key)
+        if (revealed.has(k)) return
+        revealed.add(k)
+        if (open.value) return
+        if (coversChat()) {
+            attention.value = true
+            return
+        }
+        select(tab)
         open.value = true
         openedByAgent = true
         attention.value = false
@@ -630,19 +682,29 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== null && value !== undefined))
     }
 
-    function openSerp(input, { activate = false } = {}) {
+    // options.background: a research agent's page, opened without taking
+    // the active tab (it is selected only when none is) and never reopened
+    // once the user closed it; `order` places it among its swarm's pages
+    // and `revealKey` (the run) lets the run's first one reveal the pane.
+    function openSerp(input, { activate = false, background = false, order = null, revealKey = null } = {}) {
         const spec = serpSpec(input)
         if (!spec) return null
-        closed.delete(spec.id)
+        if (background && closed.has(spec.id)) return null
+        if (!background) closed.delete(spec.id)
         let tab = byId(spec.id)
         if (tab) {
             tab.data = mergeData(tab.data, spec.data)
             if (spec.title) tab.title = spec.title
             if (spec.status) tab.status = spec.status
+            if (background && order && !tab.order) tab.order = order
         } else {
-            tab = addTab({ id: spec.id, kind: 'serp', title: spec.title, status: spec.status, data: spec.data })
+            const fields = { id: spec.id, kind: 'serp', title: spec.title, status: spec.status, data: spec.data }
+            tab = addTab(background && order ? { ...fields, order } : fields)
         }
-        if (activate) {
+        if (background) {
+            if (!activeId.value) select(tab)
+            revealOnce(tab, revealKey)
+        } else if (activate) {
             select(tab)
             reveal()
         }
@@ -931,6 +993,8 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
 
     function hydrate(tab, spec) {
         if (tab.kind !== spec.kind) return
+        // A tab restored from storage learns its place among its swarm's pages.
+        if (spec.order && !tab.order) tab.order = spec.order
         if (spec.kind === 'artifact') {
             if (!tab.title && spec.title) tab.title = spec.title
             return
@@ -1002,6 +1066,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         openedByAgent = false
         closed = new Set()
         autoOpened = new Set()
+        revealed = new Set()
         stash = new Map()
         restored = false
         savedLoaded = false

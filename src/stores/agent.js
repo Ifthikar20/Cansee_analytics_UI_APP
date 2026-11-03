@@ -848,8 +848,16 @@ export const useAgentStore = defineStore('agent', () => {
             switch (fx.type) {
                 case 'pane.open':
                     withPane(run.chatId, (pane) => {
-                        if (fx.tab.kind === 'serp') pane.openSerp(fx.tab, { activate: fx.activate })
-                        else if (fx.tab.kind === 'page') pane.openPage(fx.tab, { activate: fx.activate })
+                        // A research agent's Google page opens in the background;
+                        // the run's first one may reveal the pane, once.
+                        if (fx.tab.kind === 'serp') {
+                            pane.openSerp(fx.tab, {
+                                activate: fx.activate,
+                                background: Boolean(fx.background),
+                                order: fx.order || null,
+                                revealKey: run.id,
+                            })
+                        } else if (fx.tab.kind === 'page') pane.openPage(fx.tab, { activate: fx.activate })
                     })
                     break
                 case 'pane.update':

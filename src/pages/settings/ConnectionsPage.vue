@@ -5,7 +5,8 @@
       title="Google Search Console"
       description="Adds your real Google clicks, impressions and average position to every prompt, next to the live rank check."
     >
-      <p v-if="!websiteId" class="cn-muted">Pick a project in the header first.</p>
+      <p v-if="adopting" class="cn-muted">Checking the connection...</p>
+      <p v-else-if="!websiteId" class="cn-muted">Pick a project in the header first.</p>
       <p v-else-if="loading" class="cn-muted">Checking the connection...</p>
       <div v-else-if="statusFailed" class="cn-failed">
         <p class="cn-muted">We couldn't check the Search Console connection.</p>
@@ -42,6 +43,15 @@
     </SettingsSection>
 
     <SettingsSection
+      label="Traffic"
+      title="Website traffic"
+      description="Where Cansee reads your visitors, their countries and visits from AI assistants. Each source measures something different."
+    >
+      <p v-if="adopting" class="cn-muted">Checking the connection...</p>
+      <TrafficSources v-else :website-id="websiteId" :website-url="activeUrl" :ga4-return="ga4Return" />
+    </SettingsSection>
+
+    <SettingsSection
       label="Reports"
       title="Where reports go"
       description="Send the daily report to the tools your team already uses."
@@ -64,10 +74,12 @@ import { useRoute, useRouter } from 'vue-router'
 import SettingsShell from '@/components/settings/SettingsShell.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import AlertChannels from '@/components/settings/AlertChannels.vue'
+import TrafficSources from '@/components/settings/TrafficSources.vue'
 import PropertyPickerModal from '@/components/search_console/PropertyPickerModal.vue'
 import { Button } from '@/components/ui/button'
 import api from '@/api/client'
 import searchConsoleApi from '@/api/searchConsole'
+import { ensureWebsites } from '@/router/ensureWebsites'
 import { useAppStore } from '@/stores/app'
 import { useToast } from '@/composables/useToast'
 import { timeAgo } from '@/utils/timeAgo'
@@ -77,8 +89,36 @@ const router = useRouter()
 const appStore = useAppStore()
 const toast = useToast()
 
-const websiteId = computed(() => appStore.activeWebsite?.id || '')
+// Back from Google's consent screen for Analytics:
+// ?ga4=<connected|select_property|error>&website=<id>[&reason=<code>]. The
+// project it names becomes active first (when it is one of the user's), so
+// every status on this page is read for it; until the project list has
+// loaded, nothing is read.
+const returnWebsite = String(route.query.website || '')
+const ga4Return = route.query.ga4 ? { outcome: String(route.query.ga4), reason: String(route.query.reason || '') } : null
+const adopting = ref(false)
+
+function adoptReturnProject(list) {
+  const site = list.find((w) => String(w.id) === returnWebsite)
+  if (site && String(appStore.activeWebsite?.id || '') !== returnWebsite) appStore.setActiveWebsite(site)
+}
+
+if (returnWebsite) {
+  if (appStore.websites.length) {
+    adoptReturnProject(appStore.websites)
+  } else {
+    adopting.value = true
+    ensureWebsites()
+      .then(adoptReturnProject)
+      .finally(() => {
+        adopting.value = false
+      })
+  }
+}
+
+const websiteId = computed(() => (adopting.value ? '' : appStore.activeWebsite?.id || ''))
 const activeName = computed(() => appStore.activeWebsite?.name || 'this project')
+const activeUrl = computed(() => appStore.activeWebsite?.url || '')
 
 const gsc = ref(null)
 const loading = ref(false)
@@ -156,13 +196,14 @@ async function disconnect() {
   }
 }
 
-// Coming back from Google's consent screen.
+// Coming back from Google's consent screen. The Analytics outcome was taken
+// above; its query goes with the Search Console one.
 onMounted(() => {
   const outcome = route.query.gsc
-  if (!outcome) return
   if (outcome === 'connected') toast.success('Search Console connected.')
   else if (outcome === 'error') toast.error("Search Console wasn't connected. Please try again.")
-  router.replace({ query: {} })
+  const { gsc, ga4, reason, website, ...rest } = route.query
+  if (gsc || ga4 || reason || website) router.replace({ query: rest })
 })
 
 watch(websiteId, loadStatus, { immediate: true })

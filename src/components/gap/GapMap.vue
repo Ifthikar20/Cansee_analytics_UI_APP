@@ -14,11 +14,11 @@
 // Every checked prompt as a dot: Google position across (best on the
 // left, log scale so page one gets room), AI score up. The dashed guides
 // split page one from the rest and a strong AI score from a weak one, so
-// each corner reads as one gap class.
+// each corner reads as one gap class. The Overview draws it as the "Map"
+// of a VizChart, whose table and legend carry the same facts in words.
 import { computed } from 'vue'
 import { Scatter } from 'vue-chartjs'
 import { Chart as ChartJS, LinearScale, LogarithmicScale, PointElement, Tooltip } from 'chart.js'
-import { baseOptions } from '@/lib/chartTheme'
 import { cssVar } from '@/lib/theme'
 import { gapMeta, googleLabel } from '@/lib/gap'
 
@@ -107,13 +107,13 @@ const quadrants = {
 }
 
 const chartOptions = computed(() => {
-  const base = baseOptions()
-  const muted = cssVar('--muted-foreground', '#71717a')
-  const grid = cssVar('--border', 'rgba(0,0,0,0.08)')
+  const muted = cssVar('--viz-ink-2', cssVar('--muted-foreground', '#71717a'))
+  const grid = cssVar('--viz-grid', cssVar('--border', 'rgba(0,0,0,0.08)'))
   return {
-    ...base,
+    responsive: true,
     maintainAspectRatio: false,
     animation: false,
+    interaction: { mode: 'index', intersect: false },
     layout: { padding: { top: 12, right: 12, left: 4 } },
     onClick: (_evt, elements) => {
       if (elements.length) emit('open', plotted.value[elements[0].index])
@@ -151,10 +151,18 @@ const chartOptions = computed(() => {
       },
     },
     plugins: {
-      ...base.plugins,
       legend: { display: false },
       tooltip: {
-        ...(base.plugins?.tooltip || {}),
+        backgroundColor: cssVar('--popover', '#ffffff'),
+        titleColor: muted,
+        bodyColor: cssVar('--popover-foreground', '#222222'),
+        borderColor: cssVar('--border', '#e5e7eb'),
+        borderWidth: 1,
+        cornerRadius: 10,
+        padding: 10,
+        boxPadding: 5,
+        titleFont: { weight: '600', size: 11 },
+        bodyFont: { weight: '600', size: 12 },
         displayColors: false,
         callbacks: {
           title: (items) => items[0]?.raw?.prompt?.text || '',

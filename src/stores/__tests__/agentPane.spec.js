@@ -499,19 +499,20 @@ describe('agentPane store', () => {
       expect(pane.titleOf(pane.tabs[0])).toBe('Research results')
     })
 
-    it('derives the agents\' captures only when asked: first occurrence, never opened by itself', () => {
+    it('derives the agents\' captures only when asked: first occurrence, Google pages open by themselves', () => {
       seedSwarmChat('c')
       expect(researchTabs(agent.visiblePath('c'))).toEqual([])
       const specs = researchTabs(agent.visiblePath('c'), { includeSwarm: true })
       expect(specs.map((s) => [s.id, s.kind, s.status, s.auto])).toEqual([
-        ['serp:c1', 'serp', 'ready', false],
+        ['serp:c1', 'serp', 'ready', true],
         ['page:pg1', 'page', 'ready', false],
       ])
       expect(specs[0].title).toBe('Google · best note app · p2')
+      expect(specs[0].order).toEqual({ group: 's1:1', index: 0 })
       expect(specs[1].title).toBe('Notely: notes for teams')
     })
 
-    it('never adds an agent capture to the pane on its own, on load or while the swarm runs', async () => {
+    it('never adds a page capture to the pane on its own, on load or while the swarm runs', async () => {
       const running = swarmPart({ status: 'running' })
       running.tasks = running.tasks.map((t) => ({ ...t, status: 'running', pane: null }))
       seedSwarmChat('c', running, { serp: {}, pages: {} })
@@ -519,20 +520,20 @@ describe('agentPane store', () => {
       pane.bindChat('c')
       expect(pane.tabs).toHaveLength(0)
 
-      // The agents finish and name their captures.
+      // The agents finish and name their captures: the Google page joins
+      // the tabs quietly, the page capture waits for a click.
       agent.messages.m2.research = { serp: { c1: serpCapture() }, pages: { pg1: PAGE_CAPTURE } }
       agent.messages.m2.parts = [swarmPart()]
       agent.messages.m2.status = 'complete'
       await nextTick()
-      expect(pane.tabs).toHaveLength(0)
+      expect(pane.tabs.map((t) => t.id)).toEqual(['serp:c1'])
       expect(pane.open).toBe(false)
 
-      // A chat loaded with a finished swarm opens nothing either.
+      // A chat loaded with a finished swarm rebuilds its Google page only.
       pane.bindChat('other')
       seedSwarmChat('d')
       pane.bindChat('d')
-      expect(pane.tabs).toHaveLength(0)
-      expect(pane.open).toBe(false)
+      expect(pane.tabs.map((t) => t.id)).toEqual(['serp:c1'])
     })
 
     it('openCapture opens a capture that only a research agent names', () => {
@@ -632,6 +633,240 @@ describe('agentPane store', () => {
       await nextTick()
       expect(pane.tabs[0]).toMatchObject({ id: 'serp:c1', status: 'ready' })
       expect(pane.tabs[0].data.query).toBe('best note app')
+    })
+  })
+
+  describe('background Google pages of research agents', () => {
+    // A Google page as the agent store opens it from research.recorded.
+    function bg(id, index, { group = 's1:1', run = 'r1', ...data } = {}) {
+      return pane.openSerp(serpSpec(id, 'ready', { results: [], ...data }), {
+        activate: false,
+        background: true,
+        order: index === null ? null : { group, index },
+        revealKey: run,
+      })
+    }
+
+    const ids = () => pane.tabs.map((t) => t.id)
+
+    // Two prompts with two Google pages each, an engine and a competitor
+    // page, in task order; `named` lists the tasks that named their capture.
+    function googleSwarm({ status = 'done', named = ['a1', 'a2', 'b1', 'b2', 'pg1'] } = {}) {
+      const task = (id, tabId, detail) => ({
+        id,
+        status: named.includes(tabId.split(':')[1]) ? 'done' : 'running',
+        pane: named.includes(tabId.split(':')[1]) ? { kind: tabId.split(':')[0], tab_id: tabId } : null,
+        detail,
+      })
+      return {
+        id: 'p4',
+        type: 'swarm',
+        swarm_id: 's1',
+        version: 1,
+        status,
+        tasks: [
+          task('google.p1.page1', 'serp:a1', { query: 'best note app', page: 1 }),
+          task('google.p1.page2', 'serp:a2', { query: 'best note app', page: 2 }),
+          { id: 'engines.p1.chatgpt', status: 'done', pane: null },
+          task('google.p2.page1', 'serp:b1', { query: 'notion alternatives', page: 1 }),
+          task('google.p2.page2', 'serp:b2', { query: 'notion alternatives', page: 2 }),
+          task('competitors.p1.c1', 'page:pg1', { url: 'https://notely.test/' }),
+        ],
+      }
+    }
+
+    function googleResearch() {
+      const capture = (id, query, page) => serpCapture({ capture_id: id, query, page })
+      return {
+        serp: {
+          a1: capture('a1', 'best note app', 1),
+          a2: capture('a2', 'best note app', 2),
+          b1: capture('b1', 'notion alternatives', 1),
+          b2: capture('b2', 'notion alternatives', 2),
+        },
+        pages: { pg1: { capture_id: 'pg1', url: 'https://notely.test/', final_url: 'https://notely.test/', seo: { title: 'Notely' } } },
+      }
+    }
+
+    function seedGoogleChat(chatId, part, messageStatus = 'complete') {
+      agent.messages.m1 = { id: 'm1', role: 'user', parts: [{ id: 'p0', type: 'text', text: 'Research' }] }
+      agent.messages.m2 = { ...assistant('m2', [part], googleResearch()), status: messageStatus }
+      agent.paths[chatId] = ['m1', 'm2']
+      agent.chatState[chatId] = { loaded: true }
+    }
+
+    it('selects the run\'s first page and reveals the pane beside the chat, once', () => {
+      pane.setLayout('split')
+      const button = document.createElement('button')
+      document.body.appendChild(button)
+      button.focus()
+
+      expect(bg('a1', 0)).toBe('serp:a1')
+      expect(pane.activeId).toBe('serp:a1')
+      expect(pane.open).toBe(true)
+      expect(pane.attention).toBe(false)
+
+      // Later pages join without taking the view.
+      expect(bg('a2', 1)).toBe('serp:a2')
+      expect(ids()).toEqual(['serp:a1', 'serp:a2'])
+      expect(pane.activeId).toBe('serp:a1')
+      expect(pane.activeTab.status).toBe('ready')
+      expect(pane.titleOf(pane.tabs[1])).toBe('Google · qa2')
+      // Focus never moves.
+      expect(document.activeElement).toBe(button)
+      button.remove()
+    })
+
+    it('never switches away from the active tab while the pane is open', () => {
+      pane.setLayout('split')
+      pane.openArtifact('42', { activate: true })
+      bg('a1', 0)
+      bg('a2', 1)
+      expect(pane.activeId).toBe('artifact:42')
+      expect(pane.open).toBe(true)
+      expect(ids()).toEqual(['artifact:42', 'serp:a1', 'serp:a2'])
+    })
+
+    it('reveals a closed pane on the run\'s first page; a later page never reopens it', () => {
+      pane.setLayout('split')
+      pane.openArtifact('42', { activate: true })
+      pane.setOpen(false)
+
+      bg('a1', 0)
+      expect(pane.open).toBe(true)
+      expect(pane.activeId).toBe('serp:a1')
+
+      // The user goes back to the artifact and closes the pane.
+      pane.activateTab('artifact:42')
+      pane.setOpen(false)
+      bg('a2', 1)
+      expect(pane.open).toBe(false)
+      expect(pane.attention).toBe(false)
+      expect(pane.activeId).toBe('artifact:42')
+
+      // The next run reveals once more.
+      bg('c1', 0, { run: 'r2', group: 's1:2' })
+      expect(pane.open).toBe(true)
+      expect(pane.activeId).toBe('serp:c1')
+    })
+
+    it('only marks the pane button where the pane would cover the chat', () => {
+      pane.setLayout('overlay')
+      bg('a1', 0)
+      expect(pane.open).toBe(false)
+      expect(pane.attention).toBe(true)
+      // Nothing was active, so the page is the one the pane shows when opened.
+      expect(pane.activeId).toBe('serp:a1')
+
+      pane.setOpen(true)
+      expect(pane.attention).toBe(false)
+      pane.setOpen(false)
+      bg('a2', 1)
+      expect(pane.attention).toBe(false)
+      expect(pane.activeId).toBe('serp:a1')
+    })
+
+    it('only marks the pane button on a phone before the layout is known', () => {
+      const original = window.matchMedia
+      window.matchMedia = (query) => ({ ...original(query), matches: true })
+      try {
+        bg('a1', 0)
+        expect(pane.open).toBe(false)
+        expect(pane.attention).toBe(true)
+        expect(ids()).toEqual(['serp:a1'])
+      } finally {
+        window.matchMedia = original
+      }
+    })
+
+    it('merges a replayed page and never reopens one the user closed', () => {
+      bg('a1', 0)
+      bg('a1', 0, { brand_positions: [4] })
+      expect(ids()).toEqual(['serp:a1'])
+      expect(pane.tabs[0].data.brand_positions).toEqual([4])
+
+      pane.closeTab('serp:a1')
+      expect(bg('a1', 0)).toBe(null)
+      expect(pane.tabs).toHaveLength(0)
+      // Asked for directly (a row or a link), it opens again.
+      expect(pane.openSerp(serpSpec('a1', 'ready'), { activate: true })).toBe('serp:a1')
+      expect(pane.activeId).toBe('serp:a1')
+    })
+
+    it('orders a swarm\'s pages by prompt, then page, whatever order they arrive in', () => {
+      pane.openUrl('https://example.com/')
+      bg('b1', 3)
+      pane.openArtifact('42', { activate: false })
+      bg('a2', 1)
+      bg('b2', 4)
+      bg('a1', 0)
+      // A page recorded before task ids existed goes last.
+      bg('x1', null)
+      expect(ids()).toEqual([
+        expect.stringMatching(/^url:/),
+        'serp:a1',
+        'serp:a2',
+        'serp:b1',
+        'serp:b2',
+        'artifact:42',
+        'serp:x1',
+      ])
+      expect(pane.activeTab.kind).toBe('url')
+    })
+
+    it('lines up a re-run\'s pages after the earlier run\'s', () => {
+      bg('a1', 0)
+      bg('a2', 1)
+      bg('r2', 1, { group: 's1:2', run: 'r2' })
+      bg('r1', 0, { group: 's1:2', run: 'r2' })
+      expect(ids()).toEqual(['serp:a1', 'serp:a2', 'serp:r1', 'serp:r2'])
+    })
+
+    it('rebuilds the Google pages of a finished swarm on reload and opens the pane beside the chat', () => {
+      pane.setLayout('split')
+      seedGoogleChat('c', googleSwarm())
+      pane.bindChat('c')
+      expect(ids()).toEqual(['serp:a1', 'serp:a2', 'serp:b1', 'serp:b2'])
+      expect(pane.tabs.every((t) => t.status === 'ready')).toBe(true)
+      expect(pane.titleOf(pane.tabs[3])).toBe('Google · notion alternatives · p2')
+      expect(pane.open).toBe(true)
+      expect(pane.activeId).toBe('serp:b2')
+
+      // As an overlay the pane stays closed and its button is marked.
+      pane.bindChat('other')
+      pane.setLayout('overlay')
+      pane.bindChat('c')
+      expect(ids()).toEqual(['serp:a1', 'serp:a2', 'serp:b1', 'serp:b2'])
+      expect(pane.open).toBe(false)
+      expect(pane.attention).toBe(true)
+    })
+
+    it('places a page recorded after a reload among the rebuilt ones', () => {
+      seedGoogleChat('c', googleSwarm({ status: 'running', named: ['a1', 'b1'] }), 'streaming')
+      pane.bindChat('c')
+      expect(ids()).toEqual(['serp:a1', 'serp:b1'])
+      bg('a2', 1)
+      expect(ids()).toEqual(['serp:a1', 'serp:a2', 'serp:b1'])
+    })
+
+    it('places a page recorded after a reload among tabs restored from storage', () => {
+      localStorage.setItem(
+        TABS_KEY,
+        JSON.stringify({
+          v: 1,
+          chats: { c: { at: 1, state: { open: false, active: 'serp:b1', tabs: [{ id: 'serp:a1', kind: 'serp' }, { id: 'serp:b1', kind: 'serp' }] } } },
+        })
+      )
+      seedGoogleChat('c', googleSwarm({ status: 'running', named: ['a1', 'b1'] }), 'streaming')
+      pane.bindChat('c')
+      expect(ids()).toEqual(['serp:a1', 'serp:b1'])
+      expect(pane.tabs[0].status).toBe('ready')
+      expect(pane.open).toBe(false)
+      bg('a2', 1)
+      expect(ids()).toEqual(['serp:a1', 'serp:a2', 'serp:b1'])
+      // The run's first page since the reload reveals the closed pane.
+      expect(pane.open).toBe(true)
+      expect(pane.activeId).toBe('serp:a2')
     })
   })
 })

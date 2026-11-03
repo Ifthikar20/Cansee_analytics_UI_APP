@@ -474,8 +474,17 @@ describe('research agents', () => {
         expect(table).toMatchObject({ swarm_id: '5d0c...', version: 1, status: 'partial' })
         expect(out.message.research.serp[CAPTURE_ID]).toEqual(SWARM_SERP_CAPTURE)
         expect(out.run.lastSeq).toBe(142)
-        // research.recorded never opens a tab: a row opens its capture on click.
-        expect(out.effects).toEqual([])
+        // The Google page opens as a background tab; this event predates
+        // task_id, so its place among the swarm's pages is unknown.
+        expect(out.effects).toEqual([
+            {
+                type: 'pane.open',
+                tab: { id: `serp:${CAPTURE_ID}`, kind: 'serp', title: '', status: 'ready', data: SWARM_SERP_CAPTURE },
+                activate: false,
+                background: true,
+                order: null,
+            },
+        ])
     })
 
     it('replays a full run to the part the backend persists', () => {
@@ -487,7 +496,9 @@ describe('research agents', () => {
         expect(out.message.research).toEqual({ serp: { [CAPTURE_ID]: SWARM_SERP_CAPTURE }, pages: {} })
         expect(out.message.status).toBe('complete')
         expect(out.message.parts_seq).toBe(145)
-        expect(types(out.effects)).toEqual(['terminal'])
+        // One background tab for its Google page, then the end of the run.
+        expect(types(out.effects)).toEqual(['pane.open', 'terminal'])
+        expect(out.effects[0]).toMatchObject({ tab: { id: `serp:${CAPTURE_ID}` }, activate: false, background: true })
     })
 
     it('gives the same part when the run arrives in several batches, or again after a resume', () => {
@@ -602,7 +613,7 @@ describe('research agents', () => {
         expect(out.state.message.parts).toEqual([])
     })
 
-    it('merges research.recorded captures into serp and pages, never opening a tab', () => {
+    it('merges research.recorded captures into serp and pages; only a Google page opens a tab', () => {
         const state = queued()
         const page = {
             capture_id: 'a1b2c3d4e5f6',
@@ -613,13 +624,22 @@ describe('research agents', () => {
             error: null,
         }
         const out = reduceEvents(state, [
-            swarmEvent(50, 'research.recorded', { kind: 'page', capture_id: 'a1b2c3d4e5f6', capture: page }),
-            swarmEvent(51, 'research.recorded', { kind: 'serp', capture_id: CAPTURE_ID, capture: SWARM_SERP_CAPTURE }),
+            swarmEvent(50, 'research.recorded', { kind: 'page', capture_id: 'a1b2c3d4e5f6', capture: page, task_id: 'competitors.p1.c1' }),
+            swarmEvent(51, 'research.recorded', { kind: 'serp', capture_id: CAPTURE_ID, capture: SWARM_SERP_CAPTURE, task_id: 'google.p1.page1' }),
         ])
         expect(out.message.research.pages).toEqual({ a1b2c3d4e5f6: page })
         expect(out.message.research.serp[CAPTURE_ID]).toEqual(SWARM_SERP_CAPTURE)
         expect(out.message.parts).toBe(state.message.parts)
-        expect(out.effects).toEqual([])
+        // The page capture waits for a click on its task row.
+        expect(out.effects).toEqual([
+            {
+                type: 'pane.open',
+                tab: { id: `serp:${CAPTURE_ID}`, kind: 'serp', title: '', status: 'ready', data: SWARM_SERP_CAPTURE },
+                activate: false,
+                background: true,
+                order: { group: '5d0c...:1', index: 0 },
+            },
+        ])
 
         // A later copy of the same capture merges over the stored one.
         const again = reduceEvent(
@@ -644,6 +664,78 @@ describe('research agents', () => {
     it('keeps a capture id when the capture omits it', () => {
         const out = reduceEvent(queued(), swarmEvent(50, 'research.recorded', { kind: 'page', capture_id: 'f00', capture: { url: 'https://a.test/' } }))
         expect(out.state.message.research.pages.f00).toEqual({ capture_id: 'f00', url: 'https://a.test/' })
+    })
+
+    describe('Google pages open as background tabs in task order', () => {
+        // A swarm of two prompts and two Google pages each, in task order:
+        // per prompt its pages, then its engines.
+        const TASKS = ['google.p1.page1', 'google.p1.page2', 'engines.p1.chatgpt', 'google.p2.page1', 'google.p2.page2', 'engines.p2.chatgpt']
+
+        function twoPrompts() {
+            const [planning, , running] = swarmRunEvents()
+            const tasks = TASKS.map((id) => ({ ...running.part.tasks[0], id }))
+            return stateAfter([planning, { ...running, part: { ...running.part, tasks } }])
+        }
+
+        const recorded = (seq, captureId, fields) =>
+            swarmEvent(seq, 'research.recorded', {
+                kind: 'serp',
+                capture_id: captureId,
+                capture: { ...SWARM_SERP_CAPTURE, capture_id: captureId },
+                ...fields,
+            })
+
+        it('places each page by the position of the task that took it', () => {
+            const out = reduceEvents(twoPrompts(), [
+                recorded(60, 'c-p2-1', { task_id: 'google.p2.page1' }),
+                recorded(61, 'c-p1-2', { task_id: 'google.p1.page2' }),
+                recorded(62, 'c-p1-1', { task_id: 'google.p1.page1' }),
+            ])
+            expect(out.effects.map((fx) => [fx.tab.id, fx.order])).toEqual([
+                ['serp:c-p2-1', { group: '5d0c...:1', index: 3 }],
+                ['serp:c-p1-2', { group: '5d0c...:1', index: 1 }],
+                ['serp:c-p1-1', { group: '5d0c...:1', index: 0 }],
+            ])
+            expect(out.effects.every((fx) => fx.type === 'pane.open' && fx.activate === false && fx.background === true)).toBe(true)
+        })
+
+        it('gives no order when the task is missing, unknown or not in a swarm part', () => {
+            const state = twoPrompts()
+            for (const fields of [{}, { task_id: null }, { task_id: '' }, { task_id: 'google.p9.page1' }]) {
+                const out = reduceEvent(state, recorded(60, 'c-x', fields))
+                expect(out.effects).toHaveLength(1)
+                expect(out.effects[0].order).toBeNull()
+            }
+            // Before execution starts the swarm part has no tasks.
+            const planning = stateAfter(swarmRunEvents().slice(0, 1))
+            const out = reduceEvent(planning, recorded(60, 'c-x', { task_id: 'google.p1.page1' }))
+            expect(out.effects[0].order).toBeNull()
+        })
+
+        it('takes the order from the newest swarm part naming the task', () => {
+            const state = twoPrompts()
+            const [, , running] = swarmRunEvents()
+            const rerun = { ...running.part, id: 'p9', version: 2, tasks: [{ ...running.part.tasks[0], id: 'google.p2.page1' }] }
+            const next = reduceEvents(state, [swarmEvent(59, 'part.added', { part: rerun })])
+            const out = reduceEvent({ message: next.message, run: next.run, drafts: next.drafts }, recorded(60, 'c-r', { task_id: 'google.p2.page1' }))
+            expect(out.effects[0].order).toEqual({ group: '5d0c...:2', index: 0 })
+        })
+
+        it('opens a failed search as an error tab', () => {
+            const failed = { ...SWARM_SERP_CAPTURE, results: [], error: { code: 'serp_failed', message: 'Google search failed.' } }
+            const out = reduceEvent(twoPrompts(), recorded(60, CAPTURE_ID, { capture: failed, task_id: 'google.p1.page1' }))
+            expect(out.effects[0].tab).toMatchObject({ id: `serp:${CAPTURE_ID}`, status: 'error' })
+            expect(out.effects[0].tab.data.error.code).toBe('serp_failed')
+        })
+
+        it('opens nothing for a replayed event at or below lastSeq', () => {
+            const first = reduceEvents(twoPrompts(), [recorded(60, 'c-p1-1', { task_id: 'google.p1.page1' })])
+            const again = reduceEvents({ message: first.message, run: first.run, drafts: first.drafts }, [
+                recorded(60, 'c-p1-1', { task_id: 'google.p1.page1' }),
+            ])
+            expect(again.effects).toEqual([])
+            expect(again.message).toBe(first.message)
+        })
     })
 })
 

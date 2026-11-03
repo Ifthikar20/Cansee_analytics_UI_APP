@@ -2,24 +2,18 @@
 import { engineMeta } from '@/lib/engines'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Bar } from 'vue-chartjs'
-import {
-  Chart as ChartJS,
-  Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale,
-} from 'chart.js'
 import {
   ChevronRight, Search, Loader2, ExternalLink, CircleX,
 } from '@lucide/vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import api from '@/api/client'
 import ChatDetailModal from '@/components/ChatDetailModal.vue'
-import { cssVar } from '@/lib/theme'
+import VizChart from '@/components/charts/VizChart.vue'
 import MetricInfo from '@/components/sources/MetricInfo.vue'
+import { urlModelsSpec, urlRetrievalsSpec } from '@/lib/analytics/polishSpecs'
 import {
   Card, CardHeader, CardTitle, CardContent,
 } from '@/components/ui/card'
-
-ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
 const route = useRoute()
 const router = useRouter()
@@ -102,47 +96,15 @@ function total(values) {
 
 const overTime = computed(() => detail.value?.retrievals_over_time || { labels: [], current: [], previous: [] })
 const hasOverTime = computed(() => total(overTime.value.current) + total(overTime.value.previous) > 0)
-
-const overTimeData = computed(() => {
-  const rot = overTime.value
-  return {
-    labels: rot.labels || [],
-    datasets: [
-      { label: 'Current Period', data: rot.current || [], backgroundColor: '#5b8def', borderRadius: 4 },
-      { label: 'Previous Period', data: rot.previous || [], backgroundColor: '#f9a8d4', borderRadius: 4 },
-    ],
-  }
-})
+const overTimeChart = computed(() => urlRetrievalsSpec(overTime.value))
 
 /* ── Retrievals by model ── */
 const byModelRows = computed(() => detail.value?.retrievals_by_model || [])
 const hasByModel = computed(() =>
   byModelRows.value.some(r => (Number(r.current) || 0) + (Number(r.previous) || 0) > 0))
+const byModelChart = computed(() => urlModelsSpec(byModelRows.value))
 
-const byModelData = computed(() => {
-  const rows = byModelRows.value
-  return {
-    labels: rows.map(r => modelStyle(r.model).label),
-    datasets: [
-      { label: 'Current Period', data: rows.map(r => r.current), backgroundColor: rows.map(r => modelStyle(r.model).color), borderRadius: 4 },
-      { label: 'Previous Period', data: rows.map(r => r.previous), backgroundColor: '#f9a8d4', borderRadius: 4 },
-    ],
-  }
-})
-
-const barOptions = computed(() => {
-  const grid = cssVar('--border', 'rgba(0,0,0,0.08)')
-  const text = cssVar('--muted-foreground', '#64748b')
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { display: false }, border: { display: false }, ticks: { color: text, font: { size: 12 } } },
-      y: { beginAtZero: true, grid: { color: grid }, border: { display: false }, ticks: { color: text, font: { size: 12 }, precision: 0 } },
-    },
-  }
-})
+const NO_RETRIEVALS = { title: 'No retrievals for this URL in this period.' }
 
 const filteredPrompts = computed(() => {
   const rows = detail.value?.prompts || []
@@ -317,32 +279,16 @@ function fmtTime(iso) {
 
       <!-- charts -->
       <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader class="space-y-0">
-            <CardTitle class="text-base">Retrievals</CardTitle>
-            <p class="text-sm text-muted-foreground">No. of times AI uses this URL as a source</p>
-          </CardHeader>
-          <CardContent>
-            <template v-if="hasOverTime">
-              <div class="h-56"><Bar :data="overTimeData" :options="barOptions" /></div>
-              <div class="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-                <span class="inline-flex items-center gap-1.5"><span class="size-2 rounded-full bg-[#5b8def]" /> Current Period</span>
-                <span class="inline-flex items-center gap-1.5"><span class="size-2 rounded-full bg-[#f9a8d4]" /> Previous Period</span>
-              </div>
-            </template>
-            <p v-else class="py-10 text-center text-sm text-muted-foreground">No retrievals for this URL in this period.</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader class="space-y-0">
-            <CardTitle class="text-base">Retrievals by model</CardTitle>
-            <p class="text-sm text-muted-foreground">No. of times this URL is retrieved in chats</p>
-          </CardHeader>
-          <CardContent>
-            <div v-if="hasByModel" class="h-56"><Bar :data="byModelData" :options="barOptions" /></div>
-            <p v-else class="py-10 text-center text-sm text-muted-foreground">No retrievals for this URL in this period.</p>
-          </CardContent>
-        </Card>
+        <VizChart
+          :spec="overTimeChart"
+          :empty="hasOverTime ? null : NO_RETRIEVALS"
+          :height="224"
+        />
+        <VizChart
+          :spec="byModelChart"
+          :empty="hasByModel ? null : NO_RETRIEVALS"
+          :height="224"
+        />
       </div>
 
       <!-- prompts -->

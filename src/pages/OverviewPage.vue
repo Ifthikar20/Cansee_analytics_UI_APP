@@ -106,45 +106,46 @@
         </GradientCard>
 
         <section class="ov-kpis" aria-label="Key numbers">
-          <KpiTile
-            label="AI visibility"
-            :value="k.ai_visibility_pct === null ? '—' : `${k.ai_visibility_pct}%`"
-            hint="Share of recent AI answers that name you"
-          />
-          <KpiTile
-            label="Avg. Google position"
-            :value="k.avg_google_position === null ? '—' : `#${k.avg_google_position}`"
-            :hint="k.not_in_google ? `${k.not_in_google} not in the top 100` : `${k.google_checked} of ${k.prompts} checked`"
-          />
-          <KpiTile label="AI ahead" :value="k.ai_ahead" :tone="GAP.ai_ahead.color" hint="AI ranks you higher than Google" />
-          <KpiTile label="Google ahead" :value="k.google_ahead" :tone="GAP.google_ahead.color" hint="Google ranks you higher than AI" />
-          <KpiTile label="Invisible in both" :value="k.invisible_both" :tone="GAP.invisible_both.color" hint="Neither surfaces you" />
+          <VizStatTile v-for="t in tiles" :key="t.key" v-bind="t.props" />
         </section>
 
-        <div class="ov-grid">
-          <section class="ov-panel" aria-labelledby="ov-map-title">
-            <header class="ov-panel-head">
-              <h2 id="ov-map-title" class="ov-panel-title">The gap, prompt by prompt</h2>
-              <p class="ov-panel-sub">Left is better on Google, up is better in AI answers.</p>
-            </header>
-            <GapMap :prompts="data.prompts" @open="openPrompt" />
-          </section>
+        <VisibilityTrendPanel
+          :website-id="activeWebsiteId"
+          :payload="trend"
+          :loading="trendLoading"
+          :error="trendFailed"
+          @retry="loadTrend"
+        />
 
-          <section class="ov-panel" aria-labelledby="ov-lb-title">
-            <header class="ov-panel-head">
-              <h2 id="ov-lb-title" class="ov-panel-title">Who AI recommends</h2>
-              <p class="ov-panel-sub">Share of the latest answers that name each brand.</p>
-            </header>
-            <Leaderboard :brands="data.leaderboard" />
-          </section>
+        <div class="ov-grid">
+          <VizChart :spec="gapSpec" :heading-level="2">
+            <template #custom>
+              <GapMap :prompts="data.prompts" @open="openPrompt" />
+              <VizLegend class="ov-gap-legend" :items="gapLegend" />
+            </template>
+          </VizChart>
+
+          <VizChart :spec="leaderboardChart" :selected="yourBrandName" :empty="leaderboardEmpty" :heading-level="2">
+            <template #custom>
+              <Leaderboard :brands="data.leaderboard" />
+            </template>
+          </VizChart>
         </div>
+
+        <EngineHeatmapPanel :prompts="data.prompts" :engines="data.engines" @open="openPrompt" />
 
         <section ref="tableRef" aria-labelledby="ov-table-title">
           <header class="ov-section-head">
             <h2 id="ov-table-title" class="ov-panel-title">Every prompt</h2>
             <p class="ov-panel-sub">Biggest gaps first. Open a prompt to see what to change.</p>
           </header>
-          <GapTable v-model:filter="filter" :rows="data.prompts" :engines="data.engines" @open="openPrompt" />
+          <GapTable
+            v-model:filter="filter"
+            :rows="data.prompts"
+            :engines="data.engines"
+            :order="promptOrder"
+            @open="openPrompt"
+          />
         </section>
       </template>
     </template>
@@ -162,15 +163,21 @@ import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import api from '@/api/client'
 import searchGapApi from '@/api/searchGap'
+import visibilityApi from '@/api/visibility'
 import websitesApi from '@/api/websites'
 import { useToast } from '@/composables/useToast'
-import { GAP } from '@/lib/gap'
+import { gapMeta } from '@/lib/gap'
+import { GAP_MAP_CLASSES, gapMapSpec, leaderboardSpec, overviewTiles, yourBrand } from '@/lib/analytics/polishSpecs'
 import OnboardingFlow from '@/components/onboarding/OnboardingFlow.vue'
 import GradientCard from '@/components/GradientCard.vue'
-import KpiTile from '@/components/gap/KpiTile.vue'
+import VizChart from '@/components/charts/VizChart.vue'
+import VizLegend from '@/components/charts/VizLegend.vue'
+import VizStatTile from '@/components/charts/VizStatTile.vue'
 import GapMap from '@/components/gap/GapMap.vue'
 import GapTable from '@/components/gap/GapTable.vue'
 import Leaderboard from '@/components/gap/Leaderboard.vue'
+import VisibilityTrendPanel from '@/components/gap/VisibilityTrendPanel.vue'
+import EngineHeatmapPanel from '@/components/gap/EngineHeatmapPanel.vue'
 import AddPromptsDialog from '@/components/gap/AddPromptsDialog.vue'
 import AddProjectDialog from '@/components/projects/AddProjectDialog.vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -198,6 +205,25 @@ const filter = ref('all')
 const tableRef = ref(null)
 
 const k = computed(() => data.value?.kpis || {})
+
+// The visibility dashboard's last 30 days: the trend panel, the change on
+// the AI visibility tile and the order prompts were added in (for "Newest").
+// Loaded after the overview, so it never holds the page up.
+const trend = ref(null)
+const trendLoading = ref(false)
+const trendFailed = ref(false)
+
+const tiles = computed(() =>
+  overviewTiles(k.value, trend.value?.headline).map(({ key, ...props }) => ({ key, props })),
+)
+const gapSpec = computed(() => gapMapSpec(data.value?.prompts))
+const gapLegend = GAP_MAP_CLASSES.map((cls) => ({ key: cls, label: gapMeta(cls).label, color: gapMeta(cls).color, shape: 'dot' }))
+const leaderboardChart = computed(() => leaderboardSpec(data.value?.leaderboard))
+const leaderboardEmpty = computed(() =>
+  data.value?.leaderboard?.length ? null : { title: 'Brands appear here once the engines have answered your prompts.' },
+)
+const yourBrandName = computed(() => yourBrand(data.value?.leaderboard))
+const promptOrder = computed(() => (trend.value?.prompts || []).map((p) => String(p.prompt_id)))
 
 // loading | ready | failed. On a cold load the shell fetches the project
 // list too; until a list is known, the page shows a skeleton rather than
@@ -248,10 +274,27 @@ async function load() {
     // A late answer for a project the user has switched away from.
     if (websiteId !== activeWebsiteId.value) return
     data.value = res.data
+    if (res.data?.prompts?.length) loadTrend()
   } catch {
     if (websiteId === activeWebsiteId.value) loadFailed.value = true
   } finally {
     if (websiteId === activeWebsiteId.value) loading.value = false
+  }
+}
+
+async function loadTrend() {
+  const websiteId = activeWebsiteId.value
+  if (!websiteId) return
+  trendLoading.value = true
+  trendFailed.value = false
+  try {
+    const res = await visibilityApi.dashboard(websiteId, { period: '30d' })
+    if (websiteId !== activeWebsiteId.value) return
+    trend.value = res.data
+  } catch {
+    if (websiteId === activeWebsiteId.value) trendFailed.value = true
+  } finally {
+    if (websiteId === activeWebsiteId.value) trendLoading.value = false
   }
 }
 
@@ -314,6 +357,9 @@ watch(showOnboarding, (now, before) => {
 watch(activeWebsiteId, (next, prev) => {
   if (next && next !== prev) {
     data.value = null
+    trend.value = null
+    trendLoading.value = false
+    trendFailed.value = false
     filter.value = 'all'
     load()
   }
@@ -486,14 +532,10 @@ watch(activeWebsiteId, (next, prev) => {
   gap: 16px;
 }
 
-.ov-panel {
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: var(--card);
+.ov-gap-legend {
+  margin-top: 12px;
 }
 
-.ov-panel-head,
 .ov-section-head {
   margin-bottom: 14px;
 }

@@ -15,15 +15,19 @@
 // after artifact.started, e.g. a reload mid-draft): `content` then holds
 // only the text streamed since, not the document.
 //
-// Effects: {type:'pane.open', tab, activate} | {type:'pane.update', tabId, patch}
+// Effects: {type:'pane.open', tab, activate, background?, order?} | {type:'pane.update', tabId, patch}
 //          {type:'chat.updated', chatId, title} | {type:'artifact.started'|'artifact.completed'|
 //          'artifact.failed'|'artifact.reset', artifactId, ...} | {type:'resync', reason}
 //          {type:'terminal', phase, status}
 //
-// Research agents (design/swarm_contract.md 4c): task.* events patch one
-// task of a `swarm` part, guarded by the task's `rev`, exactly as the
-// backend's runtime/parts.py does; research.recorded adds a capture to the
-// message research and has no effect (a task row opens it on click).
+// Research agents (design/swarm_contract.md 4c, pages_contract.md 7):
+// task.* events patch one task of a `swarm` part, guarded by the task's
+// `rev`, exactly as the backend's runtime/parts.py does. research.recorded
+// adds a capture to the message research; a Google results page also opens
+// as a background tab (`background: true`), placed by `order` (the swarm
+// execution and the position of the task that took it, see swarmTabOrder)
+// so a swarm's pages line up by prompt, then page. A page capture opens on
+// click (its task row).
 import { toEpochMs } from './normalize'
 import { ACTIVE_PART_STATUSES, EVENT, MESSAGE_STATUS, PART_TYPES, RUN_PHASE, TAB_STATUSES, isTerminalPhase } from './types'
 
@@ -248,6 +252,32 @@ function applyTaskPatch(state, e) {
     const tasks = part.tasks.slice()
     tasks[ti] = { ...tasks[ti], ...patch, id: tasks[ti].id, rev }
     return { state: clearRetrying(replacePart(state, index, { ...part, tasks })) }
+}
+
+/**
+ * The place of the capture of task `index` of a swarm part among the pane's
+ * tabs: {group, index}. A group is one execution of the swarm (its id and
+ * version), so a re-run's pages line up after the earlier run's instead of
+ * between them; `index` follows task order (prompt, then page).
+ */
+export function swarmTabOrder(part, index) {
+    return { group: `${part.swarm_id ?? part.id}:${part.version ?? ''}`, index }
+}
+
+// The order of the capture task `taskId` took: the newest swarm part naming
+// the task wins; null without a task id (an event recorded before task_id
+// existed) or when no swarm part names it.
+function taskOrder(state, taskId) {
+    if (taskId === undefined || taskId === null || taskId === '') return null
+    const key = String(taskId)
+    const parts = partsOf(state)
+    for (let i = parts.length - 1; i >= 0; i -= 1) {
+        const part = parts[i]
+        if (!part || part.type !== PART_TYPES.SWARM || !Array.isArray(part.tasks)) continue
+        const index = part.tasks.findIndex((t) => t && String(t.id) === key)
+        if (index !== -1) return swarmTabOrder(part, index)
+    }
+    return null
 }
 
 function terminal(state, event, phase, messagePatch, runPatch) {
@@ -519,9 +549,15 @@ const HANDLERS = {
         if (e.capture_id === undefined || e.capture_id === null || e.capture_id === '') return { state }
         if (e.kind !== 'serp' && e.kind !== 'page') return { state }
         const capture = e.capture && typeof e.capture === 'object' ? e.capture : {}
-        const { state: next } = mergeResearch(state, e.kind, String(e.capture_id), capture)
-        // No pane effect: the task row that took the capture opens it on click.
-        return { state: next }
+        const captureId = String(e.capture_id)
+        const { state: next, data } = mergeResearch(state, e.kind, captureId, capture)
+        // A page capture has no pane effect: the task row that took it opens it on click.
+        if (e.kind !== 'serp') return { state: next }
+        const tab = { id: `serp:${captureId}`, kind: 'serp', title: '', status: inferTabStatus('serp', data), data }
+        return {
+            state: next,
+            effects: [{ type: 'pane.open', tab, activate: false, background: true, order: taskOrder(next, e.task_id) }],
+        }
     },
 }
 

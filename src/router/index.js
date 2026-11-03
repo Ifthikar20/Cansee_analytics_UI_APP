@@ -175,6 +175,13 @@ const routes = [
     protect('/projects/:websiteId/prompts/:promptId', 'prompt', () => import('@/pages/PromptPage.vue'), true),
     protect('/projects/:websiteId/sources', 'sources-urls', () => import('@/pages/SourcesUrlsPage.vue'), true),
     protect('/projects/:websiteId/sources/detail', 'sources-url-detail', () => import('@/pages/SourcesUrlDetailPage.vue'), true),
+    // The rest of Analytics (lib/analyticsNav.js): AI visibility over time,
+    // rankings by country (?prompt=<id>&check=1 opens the run dialog),
+    // website traffic and AI traffic.
+    protect('/projects/:websiteId/visibility', 'visibility', () => import('@/pages/analytics/VisibilityPage.vue'), true),
+    protect('/projects/:websiteId/countries', 'countries', () => import('@/pages/analytics/CountriesPage.vue'), true),
+    protect('/projects/:websiteId/traffic', 'traffic', () => import('@/pages/analytics/TrafficPage.vue'), true),
+    protect('/projects/:websiteId/ai-traffic', 'ai-traffic', () => import('@/pages/analytics/AiTrafficPage.vue'), true),
     protect('/settings', 'settings', () => import('@/pages/SettingsPage.vue')),
     protect('/settings/project', 'settings-project', () => import('@/pages/settings/ProjectSettings.vue')),
     protect('/settings/connections', 'settings-connections', () => import('@/pages/settings/ConnectionsPage.vue')),
@@ -194,7 +201,15 @@ const routes = [
     /* ── Old addresses (bookmarks, emails, OAuth returns) ──
        Every page the redesign removed lands somewhere sensible. */
     { path: '/websites', redirect: { name: 'dashboard' } },
-    { path: '/websites/:id', redirect: { name: 'settings-project' } },
+    // Google Analytics' OAuth return used to land here (?ga4=...); links
+    // issued before it moved to Connections still arrive this way.
+    {
+        path: '/websites/:id',
+        redirect: (to) =>
+            to.query.ga4
+                ? { name: 'settings-connections', query: { ...to.query, website: to.params.id } }
+                : { name: 'settings-project' },
+    },
     { path: '/analytics/:websiteId', redirect: { name: 'dashboard' } },
     // The old Ask Cansee chat is now the agent workspace.
     { path: '/ask/:conversationId?', redirect: { name: 'agent', params: {} } },

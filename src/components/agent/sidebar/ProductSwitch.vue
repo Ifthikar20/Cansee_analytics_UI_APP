@@ -1,7 +1,9 @@
 <script setup>
 // "Agent | Analytics": two links drawn as the segmented control. The agent
-// workspace is always the current product here.
+// workspace is always the current product here. Analytics returns to the
+// section last used for this project (lib/analyticsNav.js), else the Overview.
 import { computed } from 'vue'
+import { analyticsHomeRoute } from '@/lib/analyticsNav'
 
 const props = defineProps({
   websiteId: { type: String, default: null },
@@ -10,12 +12,14 @@ const props = defineProps({
 const agentTo = computed(() =>
   props.websiteId ? { name: 'agent-home', params: { websiteId: props.websiteId } } : { name: 'agent' },
 )
+// Read when the sidebar renders; the memory changes only on Analytics pages.
+const analyticsTo = computed(() => analyticsHomeRoute(props.websiteId))
 </script>
 
 <template>
   <div class="ag-ps" role="group" aria-label="Product">
     <router-link :to="agentTo" class="ag-ps-item is-active" aria-current="true">Agent</router-link>
-    <router-link :to="{ name: 'dashboard' }" class="ag-ps-item">Analytics</router-link>
+    <router-link :to="analyticsTo" class="ag-ps-item">Analytics</router-link>
   </div>
 </template>
 
