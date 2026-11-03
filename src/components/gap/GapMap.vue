@@ -20,7 +20,7 @@ import { computed } from 'vue'
 import { Scatter } from 'vue-chartjs'
 import { Chart as ChartJS, LinearScale, LogarithmicScale, PointElement, Tooltip } from 'chart.js'
 import { cssVar } from '@/lib/theme'
-import { gapMeta, googleLabel } from '@/lib/gap'
+import { gapDisplay, gapMeta, googleLabel } from '@/lib/gap'
 
 ChartJS.register(LinearScale, LogarithmicScale, PointElement, Tooltip)
 
@@ -41,6 +41,13 @@ const plotted = computed(() =>
   props.prompts.filter((p) => p.google.status === 'ok' && p.gap.ai_score !== null),
 )
 const unplotted = computed(() => props.prompts.length - plotted.value.length)
+
+// The column for prompts Google did not rank names the depth it was read
+// to ("Not in top 10" with ScraperAPI); mixed depths read "Not ranked".
+const missLabel = computed(() => {
+  const depths = new Set(plotted.value.filter((p) => !p.google.position).map((p) => p.google.depth))
+  return depths.size === 1 ? `Not in top ${[...depths][0]}` : 'Not ranked'
+})
 
 function tokenColor(cls, fallback = '#888888') {
   const token = gapMeta(cls).color.match(/var\((--[^)]+)\)/)?.[1]
@@ -131,7 +138,7 @@ const chartOptions = computed(() => {
         },
         ticks: {
           color: muted,
-          callback: (value) => (value === NOT_RANKED_X ? 'Not in top 100' : `#${value}`),
+          callback: (value) => (value === NOT_RANKED_X ? missLabel.value : `#${value}`),
         },
         grid: { color: grid, drawTicks: false },
         border: { display: false },
@@ -171,7 +178,7 @@ const chartOptions = computed(() => {
             return [
               `Google: ${googleLabel(p.google)}`,
               `AI score: ${item.raw.y}`,
-              gapMeta(p.gap.class).label,
+              gapDisplay(p.gap).label,
             ]
           },
         },

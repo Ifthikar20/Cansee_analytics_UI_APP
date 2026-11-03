@@ -259,8 +259,17 @@ const headline = computed(() => {
 })
 
 const subline = computed(() => {
-  const { strong_both: strong = 0, invisible_both: invisible = 0, prompts = 0 } = k.value
-  return `${strong} strong in both, ${invisible} invisible in both, out of ${plural(prompts, 'tracked prompt', 'tracked prompts')}.`
+  const { strong_both: strong = 0, invisible_both: invisible = 0, not_definite: unsure = 0, prompts = 0 } = k.value
+  const parts = [`${strong} strong in both`, `${invisible} invisible in both`]
+  // Google read only to the top {depth}: where you rank past it decides the class.
+  if (unsure) parts.push(`${unsure} not definite (Google was read to the top ${googleDepth.value})`)
+  return `${parts.join(', ')}, out of ${plural(prompts, 'tracked prompt', 'tracked prompts')}.`
+})
+
+// The depth Google was read to for the prompts it did not rank you in.
+const googleDepth = computed(() => {
+  const miss = (data.value?.prompts || []).find((r) => r.google?.status === 'ok' && !r.google.position)
+  return miss?.google?.depth ?? 10
 })
 
 async function load() {

@@ -88,7 +88,7 @@
               </span>
               <span v-else class="gt-muted" :title="cell(row, e.key).configured ? 'No answers yet' : 'Not available yet'">—</span>
             </td>
-            <td><GapBadge :cls="row.gap.class" :value="row.gap.value" show-value /></td>
+            <td><GapBadge :gap="row.gap" show-value /></td>
             <td class="gt-fix" :title="row.top_action?.title || ''">
               <span class="gt-fix-inner">
                 <span class="gt-fix-text">{{ fixLabel(row.top_action) }}</span>
@@ -112,7 +112,7 @@ import { ChevronDown, ChevronRight, Search } from '@lucide/vue'
 import GapBadge from '@/components/gap/GapBadge.vue'
 import { countryName } from '@/lib/charts/format'
 import { engineMeta } from '@/lib/engines'
-import { ACTION_LABELS, GAP_ORDER, gapMeta, googleLabel } from '@/lib/gap'
+import { ACTION_LABELS, GAP_ORDER, gapKey, gapMeta, googleLabel } from '@/lib/gap'
 
 const props = defineProps({
   rows: { type: Array, required: true },
@@ -148,13 +148,19 @@ const countries = computed(() => {
 })
 
 function matches(row) {
-  if (filter.value !== 'all' && row.gap.class !== filter.value) return false
+  if (filter.value !== 'all' && gapKey(row.gap) !== filter.value) return false
   if (country.value) {
     const loc = String(row.location || '').toLowerCase()
     if (country.value === GLOBAL ? loc !== '' : loc !== country.value) return false
   }
   const q = search.value.trim().toLowerCase()
   return !q || String(row.text || '').toLowerCase().includes(q)
+}
+
+// The gap's size for sorting: its value, else the lower bound of a range.
+function gapSize(gap) {
+  if (gap.value !== null && gap.value !== undefined) return gap.value
+  return gap.value_min ?? null
 }
 
 // Sort keys: smaller first; rows without the measure go last.
@@ -177,7 +183,7 @@ function sortKey(row) {
       return at === -1 ? LAST : -at
     }
     default:
-      return row.gap.value === null || row.gap.value === undefined ? LAST : -Math.abs(row.gap.value)
+      return gapSize(row.gap) === null ? LAST : -Math.abs(gapSize(row.gap))
   }
 }
 
@@ -191,7 +197,7 @@ const engineColumns = computed(() => props.engines.map((e) => ({ ...engineMeta(e
 
 const chips = computed(() => {
   const counts = {}
-  for (const row of props.rows) counts[row.gap.class] = (counts[row.gap.class] || 0) + 1
+  for (const row of props.rows) counts[gapKey(row.gap)] = (counts[gapKey(row.gap)] || 0) + 1
   return [
     { key: 'all', label: 'All', count: props.rows.length },
     ...GAP_ORDER.filter((cls) => counts[cls]).map((cls) => ({

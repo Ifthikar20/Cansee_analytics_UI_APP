@@ -7,7 +7,7 @@
 // A value that was not measured is null with a state word, never 0. Counts
 // of things that were measured (prompts in a gap class, retrievals) may be 0.
 import { engineMeta } from '@/lib/engines'
-import { GAP } from '@/lib/gap'
+import { GAP, NOT_DEFINITE, gapKey, gapValueText } from '@/lib/gap'
 
 const DAY_MS = 86400000
 const SHORT_MONTH = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' })
@@ -159,11 +159,12 @@ export function gapMapSpec(prompts) {
 }
 
 function gapText(gap) {
-    const meta = GAP[gap?.class]
+    if (!gap) return null
+    if (gapKey(gap) === 'not_definite') return NOT_DEFINITE.label
+    const meta = GAP[gap.class]
     if (!meta || gap.class === 'no_data') return null
-    const value = num(gap.value)
-    if (value === null) return meta.label
-    return `${meta.label} (${value > 0 ? '+' : ''}${value})`
+    const value = gapValueText(gap)
+    return value ? `${meta.label} (${value})` : meta.label
 }
 
 /** The five gap classes the map colours, for the legend under it. */

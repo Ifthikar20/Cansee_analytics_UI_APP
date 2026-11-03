@@ -34,9 +34,40 @@ export const GAP = {
   },
 }
 
-export const GAP_ORDER = ['ai_ahead', 'google_ahead', 'strong_both', 'invisible_both', 'even', 'no_data']
+export const GAP_ORDER = ['ai_ahead', 'google_ahead', 'strong_both', 'invisible_both', 'even', 'not_definite', 'no_data']
+
+// Google was read only to some depth (ScraperAPI: the top 10) without
+// finding you, so your search score is a range and the gap could fall in
+// either of two classes. The API sends class no_data with definite false.
+export const NOT_DEFINITE = Object.freeze({
+  label: 'Not definite',
+  color: 'var(--muted-foreground)',
+  blurb: 'Google was read only to the top results and you were not in them, so the gap could fall in either of two classes.',
+})
+
+/** The class key to show and filter by: 'not_definite' for a range that spans two classes. */
+export function gapKey(gap) {
+  if (gap && gap.definite === false && gap.search_score_max && gap.ai_score !== null && gap.ai_score !== undefined) {
+    return 'not_definite'
+  }
+  return gap?.class || 'no_data'
+}
+
+/** Label, color and blurb for a gap object, including the not-definite case. */
+export function gapDisplay(gap) {
+  return gapKey(gap) === 'not_definite' ? NOT_DEFINITE : gapMeta(gap?.class)
+}
+
+/** "+40", or "≥ +45" when only a lower bound is known, or '' when neither is. */
+export function gapValueText(gap) {
+  if (!gap) return ''
+  if (gap.value !== null && gap.value !== undefined) return gapValue(gap.value)
+  if (gap.value_min !== null && gap.value_min !== undefined) return `≥ ${gapValue(gap.value_min)}`
+  return ''
+}
 
 export function gapMeta(cls) {
+  if (cls === 'not_definite') return NOT_DEFINITE
   return GAP[cls] || GAP.no_data
 }
 

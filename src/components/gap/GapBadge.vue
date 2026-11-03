@@ -8,16 +8,19 @@
 
 <script setup>
 import { computed } from 'vue'
-import { gapMeta, gapValue } from '@/lib/gap'
+import { gapDisplay, gapMeta, gapValue, gapValueText } from '@/lib/gap'
 
 const props = defineProps({
   cls: { type: String, default: 'no_data' },
   value: { type: Number, default: null },
   showValue: { type: Boolean, default: false },
+  // The API's gap object. When given it wins over cls and value, so a gap
+  // whose Google side is a range shows "Not definite" or "≥ +45".
+  gap: { type: Object, default: null },
 })
 
-const meta = computed(() => gapMeta(props.cls))
-const valueText = computed(() => gapValue(props.value))
+const meta = computed(() => (props.gap ? gapDisplay(props.gap) : gapMeta(props.cls)))
+const valueText = computed(() => (props.gap ? gapValueText(props.gap) : gapValue(props.value)))
 </script>
 
 <style scoped>
