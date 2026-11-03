@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import websitesApi from '@/api/websites'
+import { agentRoutes } from './agentRoutes'
 
 /* ── Helper: wrap a signed-in route in the app shell ── */
 const protect = (path, name, component, props = false) => ({
@@ -187,12 +188,16 @@ const routes = [
         meta: { requiresAuth: true, layout: 'auth' }
     },
 
+    /* ── Agent workspace (its own shell; see agentRoutes.js) ── */
+    ...agentRoutes,
+
     /* ── Old addresses (bookmarks, emails, OAuth returns) ──
        Every page the redesign removed lands somewhere sensible. */
     { path: '/websites', redirect: { name: 'dashboard' } },
     { path: '/websites/:id', redirect: { name: 'settings-project' } },
     { path: '/analytics/:websiteId', redirect: { name: 'dashboard' } },
-    { path: '/ask/:conversationId?', redirect: { name: 'dashboard' } },
+    // The old Ask Cansee chat is now the agent workspace.
+    { path: '/ask/:conversationId?', redirect: { name: 'agent', params: {} } },
     { path: '/app-onboarding', redirect: { name: 'dashboard' } },
     // Search Console's OAuth return used to land here; keep its ?gsc= query.
     { path: '/app/integrations', redirect: to => ({ name: 'settings-connections', query: to.query }) },
@@ -231,7 +236,12 @@ const router = createRouter({
         // them. vue-router ignores scroll-margin-top, so read it off the
         // target and pass it as the offset — that keeps the clearance
         // owned by the page's CSS rather than hard-coded here.
-        const target = to.hash && document.querySelector(to.hash)
+        let target = null
+        try {
+            target = to.hash ? document.querySelector(to.hash) : null
+        } catch {
+            // Not a valid selector (say, an id starting with a digit): no anchor.
+        }
         if (target) {
             const offset = parseFloat(getComputedStyle(target).scrollMarginTop) || 0
             return { el: to.hash, top: offset, behavior: 'smooth' }

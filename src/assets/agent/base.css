@@ -1,0 +1,126 @@
+/* Agent workspace base layer. Unscoped on purpose: it covers .ag-root (the
+   shell) and .ag-portal (menus, popovers, dialogs and drawers teleported to
+   <body>). Selectors wrapped in :where() keep specificity at the level of the
+   app-wide base.css rules they replace, so any scoped or prose rule wins. */
+
+.ag-root,
+.ag-portal {
+  font-family: var(--ag-font);
+  font-feature-settings: var(--ag-font-features);
+  color: var(--ag-fg-1);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.ag-tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.ag-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* base.css gives every link the app's ink, weight 500 and a fading hover. */
+:where(.ag-root, .ag-portal) a {
+  color: inherit;
+  font-weight: inherit;
+}
+
+:where(.ag-root, .ag-portal) a:hover {
+  opacity: 1;
+}
+
+/* Same specificity as base.css's *:focus-visible, loaded later: recolours the
+   ring without touching controls that set their own. */
+:where(.ag-root, .ag-portal) :focus-visible {
+  outline-color: var(--ag-ring);
+}
+
+:where(.ag-root, .ag-portal) ::selection {
+  background: color-mix(in srgb, var(--ag-accent) 26%, transparent);
+}
+
+:where(.ag-root, .ag-portal) button,
+:where(.ag-root, .ag-portal) input,
+:where(.ag-root, .ag-portal) textarea,
+:where(.ag-root, .ag-portal) select {
+  font-family: inherit;
+  font-feature-settings: inherit;
+}
+
+/* Thin scrollbars that follow the theme. */
+:where(.ag-root, .ag-portal) * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ag-scroll-thumb) transparent;
+}
+
+:where(.ag-root, .ag-portal) ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:where(.ag-root, .ag-portal) ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:where(.ag-root, .ag-portal) ::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--ag-scroll-thumb);
+  background-clip: padding-box;
+}
+
+:where(.ag-root, .ag-portal) ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ag-fg-4);
+}
+
+/* Keyboard key caps (tooltips, menus, the shortcuts dialog). */
+.ag-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--ag-divider);
+  border-radius: 5px;
+  background: var(--ag-pane-bg);
+  color: var(--ag-fg-2);
+  font-family: var(--ag-font);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+@keyframes ag-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ag-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.ag-root, .ag-portal) *,
+  :where(.ag-root, .ag-portal) *::before,
+  :where(.ag-root, .ag-portal) *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

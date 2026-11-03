@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import api from '@/api/client'
 import { describeSubscription } from '@/lib/plan'
+import { clearUserData as clearAgentUserData } from '@/lib/agent/storage'
 import { useAppStore } from '@/stores/app'
 
 // localStorage key for the access token. We persist it here so a
@@ -153,12 +154,27 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
+    // Run after clearAuth (logout, expired session) so stores holding
+    // per-user data can drop it. Returns an unsubscribe function.
+    const clearAuthHooks = new Set()
+    function onClearAuth(fn) {
+        clearAuthHooks.add(fn)
+        return () => clearAuthHooks.delete(fn)
+    }
+
     function clearAuth() {
+        const uid = user.value?.id ?? null
         accessToken.value = null  // watcher above clears the localStorage copy
         user.value = null
         session.value = null
         localStorage.removeItem('cs-session')
         localStorage.removeItem(ACCESS_TOKEN_KEY)
+        // Agent workspace keys (last chat, drafts, pane tabs) of every user
+        // of this browser; the signed-in user may be unknown by now.
+        clearAgentUserData()
+        clearAuthHooks.forEach((fn) => {
+            try { fn(uid) } catch { /* a hook must not block sign-out */ }
+        })
     }
 
     return {
@@ -182,5 +198,6 @@ export const useAuthStore = defineStore('auth', () => {
         fetchSession,
         refreshToken,
         clearAuth,
+        onClearAuth,
     }
 })

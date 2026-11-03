@@ -13,23 +13,15 @@ const api = axios.create({
 })
 
 /* ── Request Interceptor ── */
-let isRefreshing = false
-let failedQueue = []
+// One refresh in flight at a time; every caller awaits the same promise.
+let refreshPromise = null
 // Set when a refresh attempt itself returns 401/403. Stops the storm of
 // follow-up requests from each kicking off their own refresh; cleared the
 // next time we see a fresh access token (i.e. after a successful login).
 let sessionDead = false
 let lastSeenToken = null
 
-const processQueue = (error, token = null) => {
-    failedQueue.forEach(({ resolve, reject }) => {
-        if (error) reject(error)
-        else resolve(token)
-    })
-    failedQueue = []
-}
-
-api.interceptors.request.use((config) => {
+function currentAccessToken() {
     const auth = useAuthStore()
     if (auth.accessToken && auth.accessToken !== lastSeenToken) {
         // A new access token means the user logged back in; re-arm the
@@ -37,17 +29,76 @@ api.interceptors.request.use((config) => {
         sessionDead = false
         lastSeenToken = auth.accessToken
     }
-    if (auth.accessToken) {
-        config.headers.Authorization = `Bearer ${auth.accessToken}`
+    return auth.accessToken
+}
+
+/**
+ * Headers every API request carries: the bearer token, plus request
+ * tracing (a fresh id per request and the stable per-session client id
+ * the backend writes into every log line). Used by the axios instance and
+ * by fetch-based callers (the agent run stream).
+ */
+export function authHeaders() {
+    const token = currentAccessToken()
+    const headers = {
+        'X-Request-ID': crypto.randomUUID
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        'X-Client-Id': getClientId(),
     }
+    if (token) headers.Authorization = `Bearer ${token}`
+    return headers
+}
 
-    // Add request tracing: a fresh id per request, plus the stable
-    // per-session client id the backend writes into every log line.
-    config.headers['X-Request-ID'] = crypto.randomUUID
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    config.headers['X-Client-Id'] = getClientId()
+/**
+ * Exchange the refresh cookie for a new access token. Single-flight:
+ * concurrent callers share one request. Resolves with the new token. On a
+ * 401/403 the session is over: auth is cleared and the user is sent to
+ * login. Other failures (network, 5xx) reject without signing anyone out.
+ */
+export function refreshAccessToken() {
+    if (refreshPromise) return refreshPromise
+    currentAccessToken()
+    if (sessionDead) return Promise.reject(new Error('Session expired'))
+    refreshPromise = (async () => {
+        try {
+            const { data } = await axios.post('/api/v1/auth/refresh/', {}, { withCredentials: true })
+            const newToken = data.data?.access || data.access
+            const auth = useAuthStore()
+            auth.accessToken = newToken
+            lastSeenToken = newToken
+            sessionDead = false
+            return newToken
+        } catch (refreshError) {
+            // Only kick the user to /login if the refresh itself was
+            // rejected as unauthorized. Any other failure (network
+            // blip, 5xx from the backend, browser blocking the cookie
+            // briefly) should NOT silently log them out — the original
+            // request will simply fail and the user can retry.
+            const refreshStatus = refreshError?.response?.status
+            if (refreshStatus === 401 || refreshStatus === 403) {
+                sessionDead = true
+                const auth = useAuthStore()
+                auth.clearAuth()
+                // Don't pile up duplicate navigations if we're already
+                // on /login (other in-flight requests may also 401).
+                if (router.currentRoute.value?.name !== 'login') {
+                    router.push({ name: 'login' })
+                }
+            }
+            throw refreshError
+        } finally {
+            refreshPromise = null
+        }
+    })()
+    return refreshPromise
+}
 
+api.interceptors.request.use((config) => {
+    const headers = authHeaders()
+    for (const [name, value] of Object.entries(headers)) {
+        config.headers[name] = value
+    }
     return config
 })
 
@@ -90,56 +141,22 @@ api.interceptors.response.use(
             if (sessionDead) {
                 return Promise.reject(error)
             }
-            if (isRefreshing) {
-                return new Promise((resolve, reject) => {
-                    failedQueue.push({ resolve, reject })
-                }).then((token) => {
-                    originalRequest.headers.Authorization = `Bearer ${token}`
-                    return api(originalRequest)
-                })
-            }
 
             originalRequest._retry = true
-            isRefreshing = true
-
             try {
-                const { data } = await axios.post('/api/v1/auth/refresh/', {}, { withCredentials: true })
-                const newToken = data.data?.access || data.access
-                const auth = useAuthStore()
-                auth.accessToken = newToken
-                lastSeenToken = newToken
-                sessionDead = false
-
-                processQueue(null, newToken)
+                const newToken = await refreshAccessToken()
                 originalRequest.headers.Authorization = `Bearer ${newToken}`
                 return api(originalRequest)
             } catch (refreshError) {
-                processQueue(refreshError, null)
-                // Only kick the user to /login if the refresh itself was
-                // rejected as unauthorized. Any other failure (network
-                // blip, 5xx from the backend, browser blocking the cookie
-                // briefly) should NOT silently log them out — the original
-                // request will simply fail and the user can retry.
-                const refreshStatus = refreshError?.response?.status
-                if (refreshStatus === 401 || refreshStatus === 403) {
-                    sessionDead = true
-                    const auth = useAuthStore()
-                    auth.clearAuth()
-                    // Don't pile up duplicate navigations if we're already
-                    // on /login (other in-flight requests may also 401).
-                    if (router.currentRoute.value?.name !== 'login') {
-                        router.push({ name: 'login' })
-                    }
-                }
                 return Promise.reject(refreshError)
-            } finally {
-                isRefreshing = false
             }
         }
 
         // ── 429 Rate Limited — auto-retry with exponential backoff ──
+        // Requests that start an agent run opt out with _noRetry429: a
+        // re-sent POST would start a second run.
         const status = error.response?.status || 0
-        if (status === 429) {
+        if (status === 429 && !originalRequest?._noRetry429) {
             if (!originalRequest._retryCount) originalRequest._retryCount = 0
             if (originalRequest._retryCount < 2) {
                 originalRequest._retryCount++

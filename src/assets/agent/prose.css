@@ -1,0 +1,306 @@
+/* Agent Markdown prose (chat replies, thinking, documents and reports).
+   Unscoped on purpose: the HTML arrives through v-html, and every rule sits
+   under .ag-prose so nothing leaks into the rest of the app. Chat prose is
+   15/24 with a 16px paragraph gap; .ag-doc is the 16/26 reading variant. */
+
+.ag-prose {
+  color: var(--ag-fg-1);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 24px;
+  overflow-wrap: break-word;
+}
+
+.ag-prose :where(p, ul, ol, blockquote, pre, h1, h2, h3, h4, h5, h6, hr, table, .ag-code, .ag-table) {
+  margin: 0;
+}
+
+/* Siblings in plain output and block wrappers in streamed output. */
+.ag-prose > * + *,
+.ag-prose .ag-md-block > * + * {
+  margin-top: 16px;
+}
+
+.ag-prose > * + :is(h1, h2, h3),
+.ag-prose > .ag-md-block + .ag-md-block:has(> :is(h1, h2, h3)) {
+  margin-top: 28px;
+}
+
+.ag-prose > * + :is(h4, h5, h6),
+.ag-prose > .ag-md-block + .ag-md-block:has(> :is(h4, h5, h6)) {
+  margin-top: 20px;
+}
+
+.ag-prose :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--ag-fg-1);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.ag-prose h1 {
+  font-size: 20px;
+  line-height: 28px;
+}
+
+.ag-prose h2 {
+  font-size: 17px;
+  line-height: 26px;
+}
+
+.ag-prose :is(h3, h4, h5, h6) {
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.ag-prose strong {
+  font-weight: 600;
+}
+
+.ag-prose em {
+  font-style: italic;
+}
+
+.ag-prose :is(s, del) {
+  color: var(--ag-fg-3);
+}
+
+/* base.css styles every <a> (weight 500, fade on hover); undo it here. */
+.ag-prose a {
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 0.15s ease;
+}
+
+.ag-prose a:hover {
+  opacity: 1;
+  text-decoration-color: currentColor;
+}
+
+.ag-prose a:not([href]) {
+  text-decoration: none;
+}
+
+.ag-prose a:focus-visible {
+  outline: 2px solid var(--ag-ring);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.ag-prose :is(ul, ol) {
+  padding-left: 22px;
+}
+
+.ag-prose ul {
+  list-style: disc;
+}
+
+.ag-prose ol {
+  list-style: decimal;
+}
+
+.ag-prose ul ul {
+  list-style: circle;
+}
+
+.ag-prose li {
+  padding-left: 2px;
+}
+
+.ag-prose li + li,
+.ag-prose li > :is(ul, ol) {
+  margin-top: 4px;
+}
+
+.ag-prose li > p {
+  margin: 0;
+}
+
+.ag-prose li > p + p {
+  margin-top: 8px;
+}
+
+.ag-prose li::marker {
+  color: var(--ag-fg-3);
+}
+
+.ag-prose blockquote {
+  padding-left: 14px;
+  border-left: 2px solid var(--ag-divider);
+  color: var(--ag-fg-2);
+}
+
+.ag-prose blockquote > * + * {
+  margin-top: 8px;
+}
+
+.ag-prose hr {
+  height: 0;
+  border: 0;
+  border-top: 1px solid var(--ag-divider);
+}
+
+.ag-prose :not(pre) > code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--ag-inline-code-bg);
+  font-family: var(--ag-font-mono);
+  font-size: 0.867em;
+  font-feature-settings: normal;
+}
+
+/* Fenced code: language label and Copy above the block. */
+.ag-prose .ag-code {
+  overflow: hidden;
+  border: 1px solid var(--ag-code-border);
+  border-radius: 10px;
+  background: var(--ag-code-bg);
+}
+
+.ag-prose .ag-code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 32px;
+  padding: 0 6px 0 12px;
+  border-bottom: 1px solid var(--ag-code-border);
+}
+
+.ag-prose .ag-code-lang {
+  overflow: hidden;
+  color: var(--ag-fg-3);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ag-prose .ag-code-copy {
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ag-fg-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ag-prose .ag-code-copy:hover {
+  background: var(--ag-ghost-hover);
+  color: var(--ag-fg-1);
+}
+
+.ag-prose .ag-code-copy:focus-visible {
+  outline: 2px solid var(--ag-ring);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+.ag-prose .ag-code pre {
+  overflow-x: auto;
+  padding: 12px 14px;
+  font-family: var(--ag-font-mono);
+  font-size: 13px;
+  font-feature-settings: normal;
+  line-height: 20px;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.ag-prose .ag-code code {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* Tables scroll inside their own box on narrow columns. */
+.ag-prose .ag-table {
+  overflow-x: auto;
+  border: 1px solid var(--ag-card-border);
+  border-radius: 10px;
+}
+
+.ag-prose .ag-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.ag-prose .ag-table :is(th, td) {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ag-divider-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+
+.ag-prose .ag-table th {
+  background: var(--ag-code-bg);
+  color: var(--ag-fg-2);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.ag-prose .ag-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.ag-prose .ag-table tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Thinking text inside the step list. */
+.ag-prose.ag-prose-quiet {
+  color: var(--ag-fg-2);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.ag-prose.ag-prose-quiet > * + *,
+.ag-prose.ag-prose-quiet .ag-md-block > * + * {
+  margin-top: 10px;
+}
+
+.ag-prose.ag-prose-quiet :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--ag-fg-2);
+  font-size: 14px;
+  line-height: 22px;
+}
+
+/* Documents and reports in the browser pane. */
+.ag-prose.ag-doc {
+  max-width: 720px;
+  font-size: 16px;
+  line-height: 26px;
+}
+
+.ag-prose.ag-doc h1 {
+  font-size: 26px;
+  line-height: 34px;
+}
+
+.ag-prose.ag-doc h2 {
+  font-size: 20px;
+  line-height: 28px;
+}
+
+.ag-prose.ag-doc h3 {
+  font-size: 17px;
+  line-height: 26px;
+}
+
+@media print {
+  .ag-prose .ag-code-copy {
+    display: none;
+  }
+}

@@ -153,7 +153,7 @@
 // The signed-in app frame: one top bar, three destinations. Replaces the
 // old sidebar layout and its eleven entries; everything else now lives
 // inside Overview, a prompt's page, Sources, or Settings.
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Check, ChevronsUpDown, CreditCard, LogOut, Menu, Moon, Plus, ShieldCheck,
@@ -161,8 +161,7 @@ import {
 } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
-import websitesApi from '@/api/websites'
-import billingApi from '@/api/billing'
+import { useShellBootstrap } from '@/composables/useShellBootstrap'
 import HelpButton from '@/components/HelpButton.vue'
 import FeedbackWidget from '@/components/feedback/FeedbackWidget.vue'
 import { FEEDBACK_ENABLED } from '@/api/feedbackClient'
@@ -198,6 +197,12 @@ const navItems = computed(() => {
       active: name.startsWith('sources'),
     },
     {
+      // The workspace has its own shell; /agent picks a project when none is active.
+      label: 'Agent',
+      to: wid ? { name: 'agent-home', params: { websiteId: wid } } : { name: 'agent' },
+      active: name.startsWith('agent'),
+    },
+    {
       label: 'Settings',
       to: { path: '/settings' },
       active: route.path.startsWith('/settings') || route.path.startsWith('/billing'),
@@ -228,21 +233,8 @@ async function handleLogout() {
 
 watch(() => route.fullPath, () => { navOpen.value = false })
 
-onMounted(async () => {
-  if (!authStore.user) {
-    try { await authStore.fetchMe() } catch { /* the guard handles auth */ }
-  }
-  try {
-    const { data } = await websitesApi.list({ _silentError: true })
-    appStore.setWebsites(data || [])
-  } catch { /* keep whatever the guard loaded */ }
-  // Plan limits for "Add project". The backend resolves the allowance
-  // (trial-aware); never re-derive it from the plan name here.
-  try {
-    const { data } = await billingApi.getCurrent({ _silentError: true })
-    appStore.setProjectLimit(data?.limits?.projects ?? -1)
-  } catch { /* plan info is optional */ }
-})
+// User, website list and plan limits (shared with AgentShell).
+useShellBootstrap()
 </script>
 
 <style scoped>
