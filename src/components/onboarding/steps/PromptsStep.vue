@@ -4,8 +4,8 @@
       <span class="ob-eyebrow">Step 4 of 5 &middot; Prompts</span>
       <h1 class="ob-title" tabindex="-1">What would a buyer ask?</h1>
       <p class="ob-sub">
-        We'll track these questions on Google and in ChatGPT, Claude, Gemini,
-        Grok and Perplexity. Choose up to 5.
+        We'll track these questions on Google and in each AI engine your account
+        has connected. Choose up to 5.
       </p>
 
       <div class="ob-card">
