@@ -35,7 +35,7 @@ describe('ResearchAppendix', () => {
       engines: [],
       pages: [],
       serp: [
-        serpCapture({ capture_id: 's1', ai_overview: { shown: true, captured: false, mentions_you: null, cites_you: null, references: [] } }),
+        serpCapture({ capture_id: 's1', ai_overview: { shown: true, content_captured: false, mentions_you: null, cites_you: null, references: [] } }),
         serpCapture({ capture_id: 's2', ai_overview: { shown: true, mentions_you: true, cites_you: null, references: [] } }),
         serpCapture({ capture_id: 's3', ai_overview: { shown: true, mentions_you: false, cites_you: true, references: [] } }),
       ],

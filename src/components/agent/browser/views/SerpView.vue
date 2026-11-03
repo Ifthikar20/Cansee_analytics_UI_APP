@@ -19,7 +19,7 @@
         </span>
         <span v-if="pageLabel" class="ag-tnum">{{ pageLabel }}</span>
         <span v-if="capturedLabel" class="ag-serp-captured">
-          <time :datetime="capture.captured_at">Captured {{ capturedLabel }}</time> via SerpAPI
+          <time :datetime="capture.captured_at">Captured {{ capturedLabel }}</time> via {{ providerLabel }}
         </span>
       </p>
     </header>
@@ -237,6 +237,9 @@ const pageLabel = computed(() => {
 
 const locationLabel = computed(() => regionName(capture.value.location))
 const capturedLabel = computed(() => formatCapturedAt(capture.value.captured_at))
+// The service that fetched the page. Captures saved before ScraperAPI
+// support carry no provider; they all came from SerpAPI.
+const providerLabel = computed(() => (capture.value.provider === 'scraperapi' ? 'ScraperAPI' : 'SerpAPI'))
 
 const brandLine = computed(() => {
   const brand = capture.value.brand

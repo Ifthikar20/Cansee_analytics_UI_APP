@@ -63,13 +63,14 @@ export function googleLabel(google) {
 
 /**
  * True when Google showed an AI Overview whose content was never read: Google
- * loaded it separately and SerpAPI returned only a token (`captured` false),
+ * loaded it separately or the provider sent only a marker for it
+ * (`content_captured` false),
  * or neither mention nor citation was measured (both null). Whether it names
  * or cites the brand is then unknown, not "no".
  */
 export function aiOverviewUnread(overview) {
   if (!overview || !overview.shown) return false
-  if (overview.captured === false) return true
+  if (overview.content_captured === false) return true
   return overview.mentions_you == null && overview.cites_you == null
 }
 

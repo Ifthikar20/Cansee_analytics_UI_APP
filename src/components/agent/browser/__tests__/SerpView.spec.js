@@ -34,6 +34,13 @@ describe('SerpView', () => {
     expect(meta).toContain('via SerpAPI')
   })
 
+  it('names ScraperAPI when it fetched the page', () => {
+    const wrapper = render({ data: { ...serpCapture(), provider: 'scraperapi' } })
+    const meta = wrapper.find('.ag-serp-meta').text()
+    expect(meta).toContain('via ScraperAPI')
+    expect(meta).not.toContain('SerpAPI')
+  })
+
   it('marks your result and competitors', () => {
     const wrapper = render({ data: serpCapture() })
     const rows = wrapper.findAll('.ag-serp-row')
@@ -109,7 +116,7 @@ describe('SerpView', () => {
     // Google loaded the overview later; SerpAPI sent only a token for it.
     const deferred = render({
       data: serpCapture({
-        ai_overview: { shown: true, captured: false, mentions_you: null, cites_you: null, references: [] },
+        ai_overview: { shown: true, content_captured: false, mentions_you: null, cites_you: null, references: [] },
       }),
     })
     expect(deferred.find('.ag-serp-aio').text()).toContain(

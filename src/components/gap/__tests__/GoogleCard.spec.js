@@ -16,7 +16,7 @@ function overviewLine(wrapper) {
 
 describe('GoogleCard AI Overview', () => {
   it('says an overview Google loaded separately was not captured, instead of no', () => {
-    const wrapper = render({ shown: true, captured: false, mentions_you: null, cites_you: null, references: [] })
+    const wrapper = render({ shown: true, content_captured: false, mentions_you: null, cites_you: null, references: [] })
     expect(overviewLine(wrapper)).toBe(
       'Google showed an AI Overview for this query, but its content was not captured, so mentions and citations were not measured.'
     )
