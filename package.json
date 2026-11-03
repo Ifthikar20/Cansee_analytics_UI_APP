@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "format": "prettier --write src/"
   },
   "dependencies": {
