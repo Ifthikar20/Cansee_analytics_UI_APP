@@ -11,7 +11,7 @@ vi.mock('@/stores/auth', async () => {
   return { useAuthStore: m.useAuthStore }
 })
 
-import { MAX_TABS, researchTabs, useAgentPaneStore } from '../agentPane'
+import { MAX_TABS, researchTabs, serpPageKey, useAgentPaneStore } from '../agentPane'
 import { useAgentStore } from '@/stores/agent'
 import { serpCapture } from '@/components/agent/browser/__tests__/__fixtures__/stores.js'
 
@@ -867,6 +867,127 @@ describe('agentPane store', () => {
       // The run's first page since the reload reveals the closed pane.
       expect(pane.open).toBe(true)
       expect(pane.activeId).toBe('serp:a2')
+    })
+
+    describe('re-runs', () => {
+      const page = (query, n = 1, location = 'us') => ({ query, page: n, location })
+
+      // A swarm that captured two Google pages (version 1), then a re-run
+      // (version 2, a later message) that captured the same two pages again.
+      function seedRerunChat(chatId) {
+        const task = (id, tabId, detail) => ({ id, status: 'done', pane: { kind: 'serp', tab_id: tabId }, detail })
+        const part = (version, a, b) => ({
+          id: `p${version}`,
+          type: 'swarm',
+          swarm_id: 's1',
+          version,
+          status: 'done',
+          tasks: [
+            task('google.p1.page1', `serp:${a}`, page('best note app')),
+            task('google.p2.page1', `serp:${b}`, page('notion alternatives')),
+          ],
+        })
+        const research = (a, b) => ({
+          serp: {
+            [a]: serpCapture({ capture_id: a, ...page('best note app') }),
+            [b]: serpCapture({ capture_id: b, ...page('notion alternatives') }),
+          },
+          pages: {},
+        })
+        agent.messages.m1 = { id: 'm1', role: 'user', parts: [{ id: 'u1', type: 'text', text: 'Research' }] }
+        agent.messages.m2 = { ...assistant('m2', [part(1, 'a1', 'b1')], research('a1', 'b1')), status: 'complete' }
+        agent.messages.m3 = { id: 'm3', role: 'user', parts: [{ id: 'u2', type: 'text', text: 'Re-run all 2 research agents' }] }
+        agent.messages.m4 = { ...assistant('m4', [part(2, 'a2', 'b2')], research('a2', 'b2')), status: 'complete' }
+        agent.paths[chatId] = ['m1', 'm2', 'm3', 'm4']
+        agent.chatState[chatId] = { loaded: true }
+      }
+
+      function saveTabs(state) {
+        localStorage.setItem(TABS_KEY, JSON.stringify({ v: 1, chats: { c: { at: 1, state } } }))
+      }
+
+      const serpTab = (id) => ({ id: `serp:${id}`, kind: 'serp' })
+
+      it('names a Google page by its query, results page and location', () => {
+        expect(serpPageKey(page('Best note app'))).toBe(serpPageKey({ query: ' best  note app ', page: '1', location: 'US' }))
+        expect(serpPageKey(page('best note app'))).not.toBe(serpPageKey(page('best note app', 2)))
+        expect(serpPageKey(page('best note app'))).not.toBe(serpPageKey(page('best note app', 1, '')))
+        expect(serpPageKey({ query: 'best note app' })).toBe(serpPageKey({ query: 'best note app', page: 1, location: null }))
+        expect(serpPageKey({ page: 1 })).toBe('')
+        expect(serpPageKey(null)).toBe('')
+      })
+
+      it('puts a re-run\'s capture of a Google page in the earlier capture\'s tab, live', () => {
+        pane.setLayout('split')
+        bg('a1', 0, page('best note app'))
+        bg('b1', 1, page('notion alternatives'))
+        expect(pane.activeId).toBe('serp:a1')
+
+        // The re-run's pages arrive in any order; the query is matched loosely.
+        bg('b2', 1, { group: 's1:2', run: 'r2', ...page('notion alternatives') })
+        bg('a2', 0, { group: 's1:2', run: 'r2', ...page(' Best  note app', 1, 'US') })
+        expect(ids()).toEqual(['serp:a2', 'serp:b2'])
+        expect(pane.tabs.map((t) => t.data.query)).toEqual([' Best  note app', 'notion alternatives'])
+        // The active tab still shows the same page, now the newer capture.
+        expect(pane.activeId).toBe('serp:a2')
+        // A replayed event of an earlier capture does not bring it back.
+        expect(bg('a1', 0, page('best note app'))).toBe(null)
+        expect(ids()).toEqual(['serp:a2', 'serp:b2'])
+
+        // Another results page or another country is another Google page.
+        bg('c2', 2, { group: 's1:2', run: 'r2', ...page('best note app', 2) })
+        bg('d2', 3, { group: 's1:2', run: 'r2', ...page('best note app', 1, 'gb') })
+        expect(ids()).toEqual(['serp:a2', 'serp:b2', 'serp:c2', 'serp:d2'])
+      })
+
+      it('keeps step tabs of the same query apart from the agents\' pages', () => {
+        pane.openSerp(serpSpec('s1', 'ready', page('best note app')), { activate: true })
+        bg('a1', 0, page('best note app'))
+        expect(ids()).toEqual(['serp:s1', 'serp:a1'])
+      })
+
+      it('marks the earlier captures of a page as superseded in the rebuilt tab specs', () => {
+        seedRerunChat('c')
+        const specs = researchTabs(['m1', 'm2', 'm3', 'm4'].map((id) => agent.messages[id]), { includeSwarm: true })
+        const byId = Object.fromEntries(specs.map((s) => [s.id, s]))
+        expect(byId['serp:a1']).toMatchObject({ auto: false, supersededBy: 'serp:a2' })
+        expect(byId['serp:b1']).toMatchObject({ auto: false, supersededBy: 'serp:b2' })
+        expect(byId['serp:a2']).toMatchObject({ auto: true })
+        expect(byId['serp:a2'].supersededBy).toBeUndefined()
+        // Without the agents' captures nothing changes.
+        expect(researchTabs(['m2', 'm4'].map((id) => agent.messages[id]))).toEqual([])
+      })
+
+      it('rebuilds one tab per Google page after a re-run, the newest capture', () => {
+        pane.setLayout('split')
+        seedRerunChat('c')
+        pane.bindChat('c')
+        expect(ids()).toEqual(['serp:a2', 'serp:b2'])
+        expect(pane.tabs.every((t) => t.status === 'ready')).toBe(true)
+
+        // A click on the earlier run's task row shows that capture in the page's tab.
+        expect(pane.openCapture('serp:a1')).toBe('serp:a1')
+        expect(ids()).toEqual(['serp:a1', 'serp:b2'])
+        expect(pane.activeId).toBe('serp:a1')
+      })
+
+      it('drops the earlier capture from a tab list saved before or during the re-run', () => {
+        saveTabs({ open: true, active: 'serp:a1', tabs: ['a1', 'b1', 'a2', 'b2'].map(serpTab) })
+        pane.setLayout('split')
+        seedRerunChat('c')
+        pane.bindChat('c')
+        expect(ids()).toEqual(['serp:a2', 'serp:b2'])
+        expect(pane.activeId).toBe('serp:a2')
+      })
+
+      it('replaces the earlier captures of a tab list saved before the re-run ran elsewhere', () => {
+        saveTabs({ open: true, active: 'serp:b1', tabs: ['a1', 'b1'].map(serpTab) })
+        pane.setLayout('split')
+        seedRerunChat('c')
+        pane.bindChat('c')
+        expect(ids()).toEqual(['serp:a2', 'serp:b2'])
+        expect(pane.activeId).toBe('serp:b2')
+      })
     })
   })
 })

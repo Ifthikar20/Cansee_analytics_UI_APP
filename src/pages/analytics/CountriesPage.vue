@@ -182,7 +182,7 @@
         :action="{ label: 'Try again' }"
         @action="reloadRuns"
       />
-      <RecentRuns v-else :runs="runs" />
+      <RecentRuns v-else :runs="runsShown" />
     </section>
 
     <CountryRunDialog
@@ -310,6 +310,15 @@ watch(
   },
 )
 
+// The list was read when the page opened; the run this view polls is
+// fresher, so its entry shows the live progress and cost.
+const runsShown = computed(() => {
+  const list = runs.value
+  const live = run.value
+  if (!Array.isArray(list) || !live?.id) return list
+  return list.map((r) => (r.id === live.id ? { ...r, ...live } : r))
+})
+
 function onStarted(started) {
   track(started)
   runsQuery.reload()
@@ -385,7 +394,9 @@ const engineOptions = computed(() => matrix.value?.engines || options.value?.eng
 
 const mapSpec = computed(() => countriesMapSpec(matrix.value, { engine: engine.value }))
 const promptsSpec = computed(() => promptsByCountry(matrix.value, { engine: engine.value }))
-const localization = computed(() => localizationRows(options.value))
+const localization = computed(() =>
+  localizationRows(options.value, { countries: (matrix.value?.countries || []).map((c) => c.country) }),
+)
 
 // A tile picked on the map: its row in the table comes into view.
 const highlight = ref('')
@@ -448,9 +459,12 @@ const visitorsSpec = computed(() => {
   gap: 16px;
 }
 
-/* Non-chart sections share the chart frame's look (VizChart's .viz). */
+/* Non-chart sections share the chart frame's look (VizChart's .viz). Their
+   one column may shrink below its content's width, so a wide table scrolls
+   inside its own frame instead of widening the page on phones. */
 .an-card {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   min-width: 0;
   padding: 20px;
@@ -461,6 +475,7 @@ const visitorsSpec = computed(() => {
 
 .an-section {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
 }

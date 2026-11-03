@@ -439,6 +439,9 @@ const detailPrompt = computed(() => {
 
 <style scoped>
 .ct-scroll {
+  /* The containing block of the visually hidden header text, so the text
+     stays inside the scrolled table instead of widening the page. */
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: 16px;

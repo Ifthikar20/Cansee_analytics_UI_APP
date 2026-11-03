@@ -35,6 +35,38 @@ const switchLabels = (wrapper) => wrapper.findAll('[role="radio"]').map((r) => r
 const visibleTable = (wrapper) => wrapper.find('table.viz-table')
 
 describe('VizChart', () => {
+  it('measures its outer width, so its own narrow padding never flips it back', async () => {
+    const original = globalThis.ResizeObserver
+    let report = null
+    let options = null
+    globalThis.ResizeObserver = class {
+      constructor(callback) {
+        report = callback
+      }
+      observe(_el, opts) {
+        options = opts
+      }
+      disconnect() {}
+    }
+    try {
+      const wrapper = render()
+      expect(options).toEqual({ box: 'border-box' })
+      // 590px wide frame: its content box (548px) is under the 560px threshold.
+      report([{ contentRect: { width: 548 }, borderBoxSize: [{ inlineSize: 590 }] }])
+      await nextTick()
+      expect(wrapper.find('figure').classes()).not.toContain('is-narrow')
+      report([{ contentRect: { width: 520 }, borderBoxSize: [{ inlineSize: 552 }] }])
+      await nextTick()
+      expect(wrapper.find('figure').classes()).toContain('is-narrow')
+      // Its narrower padding widens the content box; the frame stays narrow.
+      report([{ contentRect: { width: 528 }, borderBoxSize: [{ inlineSize: 552 }] }])
+      await nextTick()
+      expect(wrapper.find('figure').classes()).toContain('is-narrow')
+    } finally {
+      globalThis.ResizeObserver = original
+    }
+  })
+
   it('renders the title at the requested level and the subtitle', () => {
     const wrapper = render({ headingLevel: 2 })
     expect(wrapper.find('h2').text()).toBe('Visibility over time')

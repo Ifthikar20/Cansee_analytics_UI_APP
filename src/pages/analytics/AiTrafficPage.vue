@@ -272,6 +272,9 @@ function shareText(value) {
 
 .an-section {
   display: grid;
+  /* One column that may shrink below its content, so the crawled-pages
+     table scrolls inside its frame on phones. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
 }

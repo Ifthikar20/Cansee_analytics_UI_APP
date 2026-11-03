@@ -103,6 +103,37 @@ describe('buildChartConfig: bars and donuts', () => {
     expect(wide.options.scales.y.ticks.callback(0)).toHaveLength(28)
   })
 
+  it('names every vertical category bar, wrapping long names; dates may skip', () => {
+    const types = normalizeVizSpec({
+      title: 'URL types',
+      value: 'percent',
+      labels: ['Listicle', 'Other', 'Article', 'Comparison', 'Homepage', 'How-To Guide', 'Product Page', 'Category Page'],
+      datasets: [{ key: 'share', label: 'Share', data: [36, 27, 21, 5, 4, 3, 2, 1] }],
+    })
+    const cfg = buildChartConfig(types, 'bar', { width: 606 })
+    const ticks = cfg.options.scales.x.ticks
+    expect(ticks.autoSkip).toBe(false)
+    expect(ticks.callback(0)).toBe('Listicle')
+    expect(ticks.callback(3)).toBe('Comparison')
+    expect(ticks.callback(6)).toEqual(['Product', 'Page'])
+    // Past two lines a name is clipped.
+    const prompts = normalizeVizSpec({
+      title: 'By prompt',
+      labels: ['best software for teams to think and work together', 'x'],
+      datasets: [
+        { key: 'a', label: 'A', data: [1, 2] },
+        { key: 'b', label: 'B', data: [2, 1] },
+      ],
+    })
+    expect(buildChartConfig(prompts, 'bar', { width: 400 }).options.scales.x.ticks.callback(0)).toEqual([
+      'best software for teams',
+      'to think and work toget…',
+    ])
+    // Too thin a slot for a word, and dates, skip labels as before.
+    expect(buildChartConfig(types, 'bar', { width: 200 }).options.scales.x.ticks.autoSkip).toBe(true)
+    expect(buildChartConfig(time(), 'bar', { width: 606 }).options.scales.x.ticks.autoSkip).toBe(true)
+  })
+
   it('keeps the selected bar in the series colour and mutes the others', () => {
     const cfg = buildChartConfig(brands, 'hbar', { selected: 'notion' })
     expect(cfg.data.datasets[0].backgroundColor).toEqual(['#2a78d6', '#a5a5a0', '#a5a5a0'])

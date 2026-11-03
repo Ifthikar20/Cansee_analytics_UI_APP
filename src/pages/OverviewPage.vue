@@ -214,7 +214,7 @@ const trendLoading = ref(false)
 const trendFailed = ref(false)
 
 const tiles = computed(() =>
-  overviewTiles(k.value, trend.value?.headline).map(({ key, ...props }) => ({ key, props })),
+  overviewTiles(k.value, trend.value?.headline, data.value?.prompts).map(({ key, ...props }) => ({ key, props })),
 )
 const gapSpec = computed(() => gapMapSpec(data.value?.prompts))
 const gapLegend = GAP_MAP_CLASSES.map((cls) => ({ key: cls, label: gapMeta(cls).label, color: gapMeta(cls).color, shape: 'dot' }))

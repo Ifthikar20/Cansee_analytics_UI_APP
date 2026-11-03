@@ -102,4 +102,19 @@ const icon = computed(() => ICONS[props.kind] || Inbox)
   margin-top: 8px;
   border-radius: 999px;
 }
+
+/* A link styled as a button: the global `a` rule (base.css) is unlayered,
+   so it beats the button's layered text utilities and would paint the
+   label in the button's own fill colour. */
+a.viz-state-btn {
+  color: var(--primary-foreground);
+}
+
+a.viz-state-btn:hover {
+  opacity: 1;
+}
+
+.is-error a.viz-state-btn {
+  color: var(--foreground);
+}
 </style>

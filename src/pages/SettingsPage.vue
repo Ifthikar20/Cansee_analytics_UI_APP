@@ -75,7 +75,7 @@
             </div>
             <p class="sp-allowance-note">
               {{ formatTokens(usage.allowance.used_tokens) }} tokens used this period.
-              Allowance renews {{ new Date(usage.allowance.resets_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric' }) }}.
+              Allowance renews {{ new Date(usage.allowance.resets_at).toLocaleDateString(undefined, { month: 'long', day: 'numeric', timeZone: 'UTC' }) }}.
             </p>
             <p v-if="usage.allowance.exceeded" class="sp-allowance-flag is-exceeded">
               Allowance reached. AI features resume at the renewal date.
@@ -358,7 +358,9 @@ const dailySeries = computed(() => usage.value?.daily || [])
 const periodLabel = computed(() => {
   const p = usage.value?.period
   if (!p?.start) return ''
-  const opts = { month: 'short', day: 'numeric' }
+  // The allowance runs by UTC calendar month; local time would shift the
+  // edges a day (Oct 31 - Nov 30 in the Americas).
+  const opts = { month: 'short', day: 'numeric', timeZone: 'UTC' }
   const start = new Date(p.start).toLocaleDateString('en-US', opts)
   const end = new Date(p.end).toLocaleDateString('en-US', opts)
   return `${start} – ${end}`

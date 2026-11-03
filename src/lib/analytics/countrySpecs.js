@@ -298,18 +298,35 @@ export function gapBadges(counts) {
         .map((b) => ({ cls: b.cls, count: counts[b.cls], text: `${counts[b.cls]} ${b.text}` }))
 }
 
+// Up to this many countries are named in a method label ("Searched from
+// AU / CA / DE"); more read as "each country". Slashes, because some labels
+// already hold a comma ("Google set to GB, US connection").
+const MAX_NAMED_COUNTRIES = 6
+
+function namedMethodLabel(countries) {
+    const first = countries[0]
+    const codes = countries.map((c) => String(c.country).toUpperCase()).sort()
+    return String(first.google_method_label).replace(String(first.country).toUpperCase(), codes.join(' / '))
+}
+
 /** Rows of "How each result was localized": Google per method, then each configured engine. */
-export function localizationRows(options) {
+export function localizationRows(options, { countries: checked = [] } = {}) {
     const rows = []
     const google = options?.google
+    // Once countries are checked, describe how those were searched; before
+    // that, how every country in the catalog would be.
+    const only = new Set((checked || []).map((c) => String(c).toLowerCase()))
+    const catalog = (options?.countries || []).filter((c) => !only.size || only.has(c.country))
     if (google?.configured) {
         for (const method of ['proxy', 'google_setting']) {
-            const countries = (options.countries || []).filter((c) => c.google_method === method)
+            const countries = catalog.filter((c) => c.google_method === method)
             if (!countries.length) continue
             const label =
                 countries.length === 1
                     ? countries[0].google_method_label
-                    : genericMethodLabel(countries[0].google_method_label, countries[0].country)
+                    : countries.length <= MAX_NAMED_COUNTRIES
+                      ? namedMethodLabel(countries)
+                      : genericMethodLabel(countries[0].google_method_label, countries[0].country)
             rows.push({
                 key: `google:${method}`,
                 name: `Google (${google.provider_label || 'Google'})`,

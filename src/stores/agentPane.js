@@ -18,10 +18,13 @@ import { loadPaneState, loadUiPrefs, movePaneState, savePaneState, saveUiPrefs }
 // events. Their Google results pages open as background tabs as each one is
 // recorded (openSerp with `background`): ordered by task (prompt, then page),
 // never taking the active tab, revealing the pane at most once per run, and
-// rebuilt from the research store after a reload. Their page captures still
-// open on click (a task row calls openCapture). A swarm's results table is a
-// `table` tab, one per swarm: {id: 'table:<swarmId>', kind: 'table', swarmId,
-// version, title}, where a null version follows the latest.
+// rebuilt from the research store after a reload. The strip holds one such
+// tab per Google page (query, page and location): a re-run's newer capture
+// takes the place of the earlier run's tab, live and on a rebuild. Their page
+// captures still open on click (a task row calls openCapture). A swarm's
+// results table is a `table` tab, one per swarm: {id: 'table:<swarmId>',
+// kind: 'table', swarmId, version, title}, where a null version follows the
+// latest.
 //
 // Tab statuses: idle (a URL not fetched yet), loading, ready, error, missing
 // (restored from storage, waiting for the chat's research) and gone (the
@@ -76,6 +79,17 @@ function tokenUserId(token) {
     } catch {
         return null
     }
+}
+
+// Which Google page a capture shows: its query, results page and location
+// ('' when the capture does not say its query). Two captures with the same
+// key show the same page, taken at different times.
+export function serpPageKey(capture) {
+    const query = capture && typeof capture.query === 'string' ? capture.query.trim().replace(/\s+/g, ' ').toLowerCase() : ''
+    if (!query) return ''
+    const page = Number(capture.page)
+    const location = typeof capture.location === 'string' ? capture.location.trim().toLowerCase() : ''
+    return `${query}\n${Number.isInteger(page) && page > 0 ? page : 1}\n${location}`
 }
 
 // The same title the server gives a results tab, page number included.
@@ -181,7 +195,8 @@ function captureKind(tabId) {
 // research store like a step's tab. A task names its capture only once it
 // has finished, so without a capture the tab is `missing`. A Google page
 // opens by itself (auto) in its place among the swarm's pages (`order`);
-// a page capture waits for a click.
+// a page capture waits for a click. `swarm` marks a research agent's Google
+// page, which a newer capture of the same page supersedes.
 function swarmTaskSpec(task, serps, pages, order) {
     const tabId = task.pane.tab_id
     const kind = captureKind(tabId)
@@ -200,6 +215,7 @@ function swarmTaskSpec(task, serps, pages, order) {
             status: status === 'loading' ? (error ? 'error' : 'missing') : status,
             data,
             order,
+            swarm: true,
             complete: status !== 'loading',
             auto: true,
         }
@@ -231,7 +247,10 @@ function swarmTaskSpec(task, serps, pages, order) {
 // includeSwarm also yields the capture of each research agent (the first
 // task naming it): Google pages with `auto: true`, so a fresh load rebuilds
 // them as it rebuilds a step's tabs; page captures with `auto: false`, so
-// the pane rebuilds and reopens those but never adds them by itself.
+// the pane rebuilds and reopens those but never adds them by itself. A
+// Google page that a later research agent captured again (a re-run: same
+// query, page and location) is superseded: `auto: false` and `supersededBy`
+// the newest capture's tab id, so only the newest opens by itself.
 export function researchTabs(messages, { includeSwarm = false } = {}) {
     const out = []
     const seen = new Set()
@@ -330,7 +349,24 @@ export function researchTabs(messages, { includeSwarm = false } = {}) {
         }
     }
     for (const spec of artifacts.values()) spec.unsaved = !spec.saved && !ACTIVE_AGENT_STATUSES.has(spec.agentStatus)
+    if (includeSwarm) markSuperseded(out)
     return out
+}
+
+// Specs come oldest first, so the last research-agent capture of a Google
+// page is the newest; every earlier capture of that page is superseded.
+function markSuperseded(specs) {
+    const newest = new Map()
+    for (const spec of specs) {
+        const key = spec.swarm ? serpPageKey(spec.data) : ''
+        if (key) newest.set(key, spec.id)
+    }
+    for (const spec of specs) {
+        const latest = spec.swarm ? newest.get(serpPageKey(spec.data)) : null
+        if (!latest || latest === spec.id) continue
+        spec.auto = false
+        spec.supersededBy = latest
+    }
 }
 
 export const useAgentPaneStore = defineStore('agentPane', () => {
@@ -521,9 +557,8 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         return before !== -1 ? before : list.length
     }
 
-    function addTab(tab) {
-        const at = orderedIndex(tab.order)
-        tabs.value.splice(at, 0, {
+    function newTab(tab) {
+        return {
             title: '',
             status: 'ready',
             data: null,
@@ -534,11 +569,61 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
             artifactId: null,
             version: null,
             ...tab,
-        })
+        }
+    }
+
+    function addTab(tab) {
+        const at = orderedIndex(tab.order)
+        tabs.value.splice(at, 0, newTab(tab))
         const added = tabs.value[at]
         touch(added)
         evictOverflow(added.id)
         return added
+    }
+
+    // The other research-agent tabs showing the same Google page as `tab`
+    // (query, page and location) under another capture.
+    function samePageTabs(tab) {
+        const key = tab.kind === 'serp' && tab.swarm ? serpPageKey(tab.data) : ''
+        if (!key) return []
+        return tabs.value.filter((t) => t.id !== tab.id && t.kind === 'serp' && t.swarm && serpPageKey(t.data) === key)
+    }
+
+    // Drops `others` for `tab` (in the strip or not yet): it takes the
+    // earliest place among them and, when one of them was active, the active
+    // tab. The dropped tabs count as closed, so neither a rebuild nor a
+    // background open brings them back; a click on their task row still does.
+    function supersede(tab, others) {
+        const wasActive = others.some((t) => t.id === activeId.value)
+        const dropped = new Set(others.map((t) => t.id))
+        const list = []
+        let placed = false
+        for (const t of tabs.value) {
+            if (t.id === tab.id || dropped.has(t.id)) {
+                if (!placed) list.push(tab)
+                placed = true
+                continue
+            }
+            list.push(t)
+        }
+        if (!placed) list.push(tab)
+        tabs.value = list
+        for (const other of others) rememberClosed(other)
+        const kept = byId(tab.id)
+        if (wasActive && kept) select(kept)
+        return kept
+    }
+
+    // Adds a tab. A research agent's Google page takes the place of the
+    // agents' tabs that show the same page, so the strip keeps one tab per
+    // Google page: the newest capture, or the one the user opened last.
+    function placeTab(tab) {
+        const fields = newTab(tab)
+        const others = samePageTabs(fields)
+        if (!others.length) return addTab(tab)
+        const kept = supersede(fields, others)
+        touch(kept)
+        return kept
     }
 
     // Opens the pane for the user: a click, a key, a link.
@@ -610,7 +695,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         if (spec.kind === 'artifact') {
             return { id: spec.id, kind: 'artifact', artifactId: spec.artifactId, title: spec.title, status: spec.status }
         }
-        const { complete: _c, auto: _a, ...fields } = spec
+        const { complete: _c, auto: _a, supersededBy: _s, ...fields } = spec
         if (spec.kind === 'page') Object.assign(fields, pageFields(spec.data))
         const kept = stash.get(spec.id)
         if (kept && !spec.complete) Object.assign(fields, kept)
@@ -623,7 +708,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         const spec = researchTabs(messageList(key), { includeSwarm: true }).find((s) => s.id === id)
         if (!spec || spec.unsaved) return null
         closed.delete(id)
-        return addTab(specFields(spec))
+        return placeTab(specFields(spec))
     }
 
     // A capture of the bound chat that no step or agent names (a results
@@ -685,7 +770,9 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
     // options.background: a research agent's page, opened without taking
     // the active tab (it is selected only when none is) and never reopened
     // once the user closed it; `order` places it among its swarm's pages
-    // and `revealKey` (the run) lets the run's first one reveal the pane.
+    // and `revealKey` (the run) lets the run's first one reveal the pane. A
+    // re-run's capture of a page the strip already shows takes that tab's
+    // place (placeTab).
     function openSerp(input, { activate = false, background = false, order = null, revealKey = null } = {}) {
         const spec = serpSpec(input)
         if (!spec) return null
@@ -697,9 +784,11 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
             if (spec.title) tab.title = spec.title
             if (spec.status) tab.status = spec.status
             if (background && order && !tab.order) tab.order = order
+            if (background) tab.swarm = true
         } else {
             const fields = { id: spec.id, kind: 'serp', title: spec.title, status: spec.status, data: spec.data }
-            tab = addTab(background && order ? { ...fields, order } : fields)
+            if (background) Object.assign(fields, { swarm: true }, order ? { order } : {})
+            tab = placeTab(fields)
         }
         if (background) {
             if (!activeId.value) select(tab)
@@ -830,7 +919,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
                 researchTabs(messageList(key), { includeSwarm: true }).find((s) => s.id === id) || storedCaptureSpec(id)
             if (!spec) return null
             closed.delete(id)
-            tab = addTab(specFields(spec))
+            tab = placeTab(specFields(spec))
         }
         if (activate) {
             select(tab)
@@ -993,8 +1082,10 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
 
     function hydrate(tab, spec) {
         if (tab.kind !== spec.kind) return
-        // A tab restored from storage learns its place among its swarm's pages.
+        // A tab restored from storage learns its place among its swarm's
+        // pages, and that it is a research agent's page.
         if (spec.order && !tab.order) tab.order = spec.order
+        if (spec.swarm) tab.swarm = true
         if (spec.kind === 'artifact') {
             if (!tab.title && spec.title) tab.title = spec.title
             return
@@ -1021,6 +1112,27 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         }
     }
 
+    // Research-agent tabs that show the same Google page, such as a tab list
+    // saved before a re-run captured the page again: the newest capture
+    // stays, in the earliest place. A tab the chat's research does not name
+    // yet came from a live event, so it is the newest.
+    function dropSupersededTabs(specs) {
+        const rank = new Map(specs.map((s, i) => [s.id, i]))
+        const age = (tab) => rank.get(tab.id) ?? Infinity
+        const groups = new Map()
+        for (const tab of tabs.value) {
+            const page = tab.kind === 'serp' && tab.swarm ? serpPageKey(tab.data) : ''
+            if (!page) continue
+            if (!groups.has(page)) groups.set(page, [])
+            groups.get(page).push(tab)
+        }
+        for (const group of groups.values()) {
+            if (group.length < 2) continue
+            const newest = group.reduce((a, b) => (age(b) >= age(a) ? b : a))
+            supersede(newest, group.filter((t) => t !== newest))
+        }
+    }
+
     function reconcile() {
         const key = chatKey.value
         if (!key || key === 'new') return
@@ -1035,7 +1147,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         for (const spec of specs) {
             const tab = byId(spec.id)
             if (tab) hydrate(tab, spec)
-            else if (candidates.has(spec.id) && !closed.has(spec.id) && !spec.unsaved) lastAdded = addTab(specFields(spec))
+            else if (candidates.has(spec.id) && !closed.has(spec.id) && !spec.unsaved) lastAdded = placeTab(specFields(spec))
             if (!candidates.has(spec.id)) continue
             const call = `${spec.id}|${spec.callId ?? ''}`
             if (spec.kind === 'artifact' && ACTIVE_AGENT_STATUSES.has(spec.agentStatus) && !autoOpened.has(call)) {
@@ -1044,6 +1156,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
                 reveal()
             }
         }
+        dropSupersededTabs(specs)
         if (chatLoaded(key)) {
             const available = new Set(specs.filter((s) => s.complete || s.status !== 'missing').map((s) => s.id))
             for (const tab of tabs.value) {

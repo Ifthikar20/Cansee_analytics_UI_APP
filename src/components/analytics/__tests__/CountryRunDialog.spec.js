@@ -59,6 +59,15 @@ afterEach(() => {
 })
 
 describe('CountryRunDialog', () => {
+  it('drops a queued estimate when it unmounts', async () => {
+    const wrapper = await openDialog()
+    await pick('United Kingdom')
+    mounted.splice(mounted.indexOf(wrapper), 1)
+    wrapper.unmount()
+    await settle()
+    expect(countriesApi.estimate).not.toHaveBeenCalled()
+  })
+
   it('opens with the defaults and asks for a country before estimating', async () => {
     await openDialog()
     expect(body().text()).toContain('Check rankings in other countries')

@@ -52,6 +52,38 @@ function clipText(text, max) {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value
 }
 
+// Room for a vertical bar's label: its slot of the plot (less the value
+// axis), in characters. Under 4 there is no room for a word.
+const VALUE_AXIS_WIDTH = 48
+function slotChars(width, count) {
+  if (!width || !count) return 0
+  return Math.floor((width - VALUE_AXIS_WIDTH) / count / CHAR_WIDTH)
+}
+
+// A label in at most two lines of `max` characters, broken between words;
+// what does not fit is clipped with an ellipsis.
+function wrapLabel(text, max) {
+  const words = String(text ?? '').trim().split(/\s+/).filter(Boolean)
+  const lines = []
+  let line = ''
+  for (let i = 0; i < words.length; i++) {
+    const joined = line ? `${line} ${words[i]}` : words[i]
+    if (!line || joined.length <= max) {
+      line = joined
+      continue
+    }
+    if (lines.length === 1) {
+      line = [line, ...words.slice(i)].join(' ')
+      break
+    }
+    lines.push(line)
+    line = words[i]
+  }
+  lines.push(line)
+  const out = lines.map((l) => clipText(l, max))
+  return out.length === 1 ? out[0] : out
+}
+
 function isValue(v) {
   return v !== null && v !== undefined
 }
@@ -398,6 +430,10 @@ export function buildChartConfig(
       },
     }
     const chars = horizontal ? labelBudget(width, padding.left + padding.right) : 24
+    // Dates may skip labels (the next one dates the bar); categories may
+    // not, or bars go unnamed: each label wraps onto two lines in its slot.
+    const perSlot = slotChars(width, order.length)
+    const nameEvery = !horizontal && s.x !== 'time' && perSlot >= 4
     const labelAxis = {
       type: 'category',
       stacked: rep === 'stacked_bar',
@@ -409,9 +445,9 @@ export function buildChartConfig(
         font: tickFont,
         padding: 6,
         maxRotation: 0,
-        autoSkip: true,
+        autoSkip: !nameEvery,
         autoSkipPadding: 12,
-        callback: (value) => clipText(labels[value], chars),
+        callback: (value) => (nameEvery ? wrapLabel(labels[value], Math.min(chars, perSlot)) : clipText(labels[value], chars)),
       },
     }
     if (horizontal) {

@@ -265,6 +265,34 @@ describe('defaultRepresentation', () => {
   it('falls back to the table for nothing to draw', () => {
     expect(defaultRepresentation(null)).toBe('table')
   })
+
+  it('starts as the table when every point of the plot is a state word', () => {
+    // Google checks of one prompt that all missed: an empty line plot otherwise.
+    const missed = {
+      title: 'Google position',
+      x: 'time',
+      value: 'rank',
+      labels: ['2026-11-03T15:04:19Z', '2026-11-04T15:04:19Z'],
+      state_labels: { not_found: 'Not in top 30' },
+      datasets: [series('google', [null, null], { states: ['not_found', 'failed'] })],
+    }
+    expect(representationsFor(missed)).toEqual(['line', 'table'])
+    expect(defaultRepresentation(missed)).toBe('table')
+    expect(defaultRepresentation({ ...missed, datasets: [series('google', [null, 4], { states: ['not_found', null] })] })).toBe('line')
+
+    // pick_one: decided by the drawn measure; maps and heatmaps show states as they are.
+    const picked = {
+      title: 'By engine',
+      labels: ['chatgpt', 'claude'],
+      pick_one: true,
+      datasets: [series('vis', [null, null], { value: 'percent', states: ['not_checked', 'not_checked'] }), series('n', [0, 3], { value: 'count' })],
+    }
+    expect(defaultRepresentation(picked)).toBe('table')
+    expect(defaultRepresentation(picked, { picked: 'n' })).toBe('bar')
+    const map = { title: 'T', x: 'country', labels: ['gb'], datasets: [series('a', [null], { states: ['not_checked'] })] }
+    expect(defaultRepresentation(map)).toBe('map')
+    expect(defaultRepresentation(map, { narrow: true })).toBe('table')
+  })
 })
 
 describe('pointText and tableModel', () => {

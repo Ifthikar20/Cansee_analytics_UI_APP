@@ -5,7 +5,7 @@
 // The run is created with the estimate's own `confirm`; if the cost moved
 // meanwhile (409 estimate_changed) the new estimate replaces the old one
 // and the user confirms again.
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Check, ChevronDown, CircleAlert, Info, X } from '@lucide/vue'
 import {
   ComboboxAnchor, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxItemIndicator,
@@ -235,6 +235,12 @@ if (open.value) {
   reset()
   queueEstimate()
 }
+
+// Leaving the page with an estimate queued or on its way: drop both.
+onBeforeUnmount(() => {
+  clearTimeout(timer)
+  token += 1
+})
 </script>
 
 <template>

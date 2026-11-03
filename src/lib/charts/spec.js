@@ -304,13 +304,22 @@ export function representationsFor(spec, { picked = null } = {}) {
   return [...new Set([...reps, 'table'])]
 }
 
-/** `spec.type` when offered, else the first offered; a narrow map starts as bars. */
+// Representations drawn on a canvas, which cannot show a state word.
+const PLOTS = ['line', 'area', 'bar', 'hbar', 'stacked_bar', 'doughnut']
+
+/**
+ * `spec.type` when offered, else the first offered; a narrow map starts as
+ * bars. A plot with no value to draw (every point a state word, such as
+ * Google checks that all missed) starts as the table, which says them.
+ */
 export function defaultRepresentation(spec, { narrow = false, picked = null } = {}) {
   const s = ensure(spec)
   if (!s) return 'table'
   const offered = representationsFor(s, { picked })
   let rep = s.type && offered.includes(s.type) ? s.type : offered[0]
   if (narrow && rep === 'map' && offered.includes('hbar')) rep = 'hbar'
+  const drawn = s.pick_one ? [pickedDataset(s, picked)] : s.datasets
+  if (PLOTS.includes(rep) && !drawn.some((d) => d.data.some((v) => v !== null))) rep = 'table'
   return rep
 }
 

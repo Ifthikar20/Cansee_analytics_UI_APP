@@ -2,11 +2,17 @@
 // Recent country checks (contract 2f RunSummary, newest first): when, which
 // countries, how each ended, and what it used.
 import { CircleCheck, CircleMinus, CirclePause, CircleStop, CircleX, LoaderCircle } from '@lucide/vue'
-import { RUN_STATUS_TEXT, costLine } from '@/lib/analytics/countrySpecs'
+import { RUN_STATUS_TEXT, costLine, finishedChecks, isActiveRun } from '@/lib/analytics/countrySpecs'
 
 defineProps({
   runs: { type: Array, default: () => [] },
 })
+
+// A check still going counts every check that has finished, as its progress
+// panel does; one that ended counts the checks that were done.
+function checksDone(run) {
+  return isActiveRun(run) ? finishedChecks(run.progress) : run.progress?.done || 0
+}
 
 const ICONS = {
   queued: LoaderCircle,
@@ -47,7 +53,7 @@ function dateText(iso) {
         <li v-for="c in run.countries || []" :key="c.country" class="rr-chip">{{ c.name }}</li>
       </ul>
       <p class="rr-line">
-        {{ run.progress?.done || 0 }} of {{ run.progress?.total || 0 }} checks
+        {{ checksDone(run) }} of {{ run.progress?.total || 0 }} checks
         <span class="rr-sep" aria-hidden="true">·</span>
         <span class="rr-cost">{{ costLine(run) }}</span>
       </p>

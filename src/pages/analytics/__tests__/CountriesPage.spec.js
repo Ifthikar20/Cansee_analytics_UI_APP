@@ -116,7 +116,8 @@ describe('CountriesPage', () => {
     expect(de).toContain('1 not definite')
 
     const methods = wrapper.findAll('.an-table tbody tr').map((r) => r.find('th').text())
-    expect(methods).toEqual(['Google (ScraperAPI)', 'Google (ScraperAPI)', 'ChatGPT', 'Claude'])
+    // Only the checked countries (GB and DE, both through Google's setting) are described.
+    expect(methods).toEqual(['Google (ScraperAPI)', 'ChatGPT', 'Claude'])
     expect(wrapper.text()).toContain(
       'Plain chat engines answer from training data. Asking them to answer for a country steers the answer; it does not move them there.',
     )
@@ -258,6 +259,26 @@ describe('CountriesPage', () => {
 
     await panel().find('button').trigger('click')
     expect(wrapper.find('.crp').exists()).toBe(false)
+  })
+
+  it('keeps the running check in Recent checks as fresh as the progress panel', async () => {
+    const running = countryRun()
+    countriesApi.options.mockResolvedValue(ok(countryOptions({ active_run: running })))
+    countriesApi.listRuns.mockResolvedValue(ok([countryRun(), finishedRun({ id: 'run-0' })]))
+    countriesApi.getRun.mockResolvedValue(ok(countryRun({ progress: { ...running.progress, done: 9 } })))
+    const { wrapper } = await mountPage()
+    const lines = () => wrapper.findAll('.rr-line').map((l) => l.text())
+    // Both count every finished check (3 done, 1 failed).
+    expect(wrapper.find('.crp').text()).toContain('4 of 12 checks')
+    expect(lines()[0]).toContain('4 of 12 checks')
+
+    await vi.advanceTimersByTimeAsync(3000)
+    await flushPromises()
+    expect(wrapper.find('.crp').text()).toContain('10 of 12 checks')
+    expect(lines()[0]).toContain('10 of 12 checks')
+    // Other checks keep what the list said.
+    expect(lines()[1]).toContain('12 of 12 checks')
+    expect(countriesApi.listRuns).toHaveBeenCalledTimes(1)
   })
 
   it('pauses polling while the tab is hidden', async () => {

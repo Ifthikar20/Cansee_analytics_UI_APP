@@ -75,8 +75,16 @@ describe('overviewTiles', () => {
         expect(unchecked[0]).toMatchObject({ value: null, stateText: 'No answers yet' })
         expect(unchecked[1]).toMatchObject({ value: null, stateText: 'Not checked', hint: '0 of 12 checked' })
         // Checked, and every check missed you: measured, not "Not checked".
-        const missed = overviewTiles({ ...kpis, avg_google_position: null, not_in_google: 4 })
-        expect(missed[1]).toMatchObject({ value: null, stateText: 'Not found', hint: '4 not in the top 100' })
+        // The hint claims only the depth Google was searched to.
+        const missedRows = [
+            row('a', { google: { status: 'ok', position: null, depth: 30 } }),
+            row('b', { google: { status: 'ok', position: null, depth: 50 } }),
+            row('c', { google: { status: 'error', position: null, depth: 10 } }),
+            row('d'),
+        ]
+        const missed = overviewTiles({ ...kpis, avg_google_position: null, not_in_google: 2 }, null, missedRows)
+        expect(missed[1]).toMatchObject({ value: null, stateText: 'Not found', hint: '2 not in the top 30' })
+        expect(overviewTiles({ ...kpis, not_in_google: 4 })[1].hint).toBe('4 not found on Google')
         // A count the payload does not carry is not measured, not zero.
         expect(overviewTiles({})[2].value).toBeNull()
     })

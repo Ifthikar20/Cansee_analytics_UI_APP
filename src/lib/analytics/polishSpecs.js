@@ -22,12 +22,23 @@ function round1(value) {
 
 /* ── Overview ── */
 
+// "4 not in the top 30": how many prompts Google did not rank, within the
+// smallest depth any of those searches covered (true for each of them).
+function notRankedHint(count, prompts) {
+    const depths = (Array.isArray(prompts) ? prompts : [])
+        .map((p) => p?.google)
+        .filter((g) => g && g.status === 'ok' && !g.position && typeof g.depth === 'number' && g.depth > 0)
+        .map((g) => g.depth)
+    return depths.length ? `${count} not in the top ${Math.min(...depths)}` : `${count} not found on Google`
+}
+
 /**
  * The Overview's five KPI tiles (VizStatTile props plus a key). AI
  * visibility gains a change against the previous 30 days from the
  * visibility dashboard's `headline`, only when both windows have a value.
+ * `prompts` (the overview rows) give the depth Google was searched to.
  */
-export function overviewTiles(kpis, headline = null) {
+export function overviewTiles(kpis, headline = null, prompts = []) {
     const k = kpis || {}
     const now = num(headline?.visibility_pct)
     const before = num(headline?.visibility_prev_pct)
@@ -54,7 +65,7 @@ export function overviewTiles(kpis, headline = null) {
             // No average: nothing was checked, or every check missed you.
             stateText: count(k.google_checked) > 0 ? 'Not found' : 'Not checked',
             hint: k.not_in_google
-                ? `${k.not_in_google} not in the top 100`
+                ? notRankedHint(k.not_in_google, prompts)
                 : `${count(k.google_checked)} of ${count(k.prompts)} checked`,
         },
         {

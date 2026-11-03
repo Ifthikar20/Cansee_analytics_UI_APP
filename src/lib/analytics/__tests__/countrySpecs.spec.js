@@ -174,7 +174,7 @@ describe('localizationRows', () => {
         const rows = localizationRows(countryOptions())
         expect(rows.map((r) => [r.name, r.label])).toEqual([
             ['Google (ScraperAPI)', 'Searched from US'],
-            ['Google (ScraperAPI)', 'Google set to each country, US connection'],
+            ['Google (ScraperAPI)', 'Google set to DE / FR / GB, US connection'],
             ['ChatGPT', 'Asked to answer for each country'],
             ['Claude', 'Asked to answer for each country'],
         ])
@@ -184,6 +184,19 @@ describe('localizationRows', () => {
             'ChatGPT',
             'Claude',
         ])
+    })
+
+    it('describes only the checked countries once there are results, naming a few', () => {
+        const options = countryOptions({
+            countries: [
+                { country: 'gb', name: 'United Kingdom', google_method: 'proxy', google_method_label: 'Searched from GB' },
+                { country: 'de', name: 'Germany', google_method: 'proxy', google_method_label: 'Searched from DE' },
+                { country: 'kz', name: 'Kazakhstan', google_method: 'google_setting', google_method_label: 'Google set to KZ, US connection' },
+            ],
+        })
+        const google = (rows) => rows.filter((r) => r.key.startsWith('google:')).map((r) => r.label)
+        expect(google(localizationRows(options, { countries: ['gb', 'de'] }))).toEqual(['Searched from DE / GB'])
+        expect(google(localizationRows(options))).toEqual(['Searched from DE / GB', 'Google set to KZ, US connection'])
     })
 })
 

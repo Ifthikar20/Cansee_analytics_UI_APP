@@ -189,18 +189,27 @@ const headingTag = computed(() => `h${Math.min(6, Math.max(1, Math.round(props.h
 const surfaceCss = computed(() => props.surface || 'var(--viz-surface)')
 
 // ── Width (narrow under 560px) ──
+// The frame's outer (border-box) width: its padding shrinks when narrow, so
+// measuring the content box would flip `narrow` back and forth every frame
+// for frames a few pixels either side of the threshold.
 const rootEl = ref(null)
 const width = ref(0)
 const narrow = computed(() => width.value > 0 && width.value < 560)
 let observer = null
 
+function outerWidth(entry) {
+  const box = Array.isArray(entry?.borderBoxSize) ? entry.borderBoxSize[0] : entry?.borderBoxSize
+  if (typeof box?.inlineSize === 'number') return box.inlineSize
+  return rootEl.value?.getBoundingClientRect().width || 0
+}
+
 onMounted(() => {
   width.value = Math.round(rootEl.value?.getBoundingClientRect().width || 0)
   if (typeof ResizeObserver !== 'function' || !rootEl.value) return
   observer = new ResizeObserver(([entry]) => {
-    width.value = Math.round(entry?.contentRect?.width || 0)
+    width.value = Math.round(outerWidth(entry))
   })
-  observer.observe(rootEl.value)
+  observer.observe(rootEl.value, { box: 'border-box' })
 })
 
 onBeforeUnmount(() => observer?.disconnect())
