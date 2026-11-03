@@ -218,7 +218,7 @@ export function provideOnboardingFlow({ onComplete } = {}) {
     saving.value = true
     try {
       // Silent: the one toast below reports the failure.
-      await api.post('/onboarding/save/', {
+      const { data: saved } = await api.post('/onboarding/save/', {
         url: form.value.url,
         business_name: form.value.business_name,
         industry: form.value.industry,
@@ -228,6 +228,22 @@ export function provideOnboardingFlow({ onComplete } = {}) {
           .filter(c => c.selected)
           .map(c => ({ name: c.name, domain: c.domain })),
       }, { _silentError: true })
+      // The starter prompts the user confirmed become tracked prompts, the
+      // same way Add prompts on the Overview adds them (which also starts
+      // their first AI engine check). The project is already saved, so a
+      // failure here only asks the user to add them again.
+      const starters = form.value.keywords.map(k => k.trim()).filter(Boolean)
+      if (saved?.website_id && starters.length) {
+        try {
+          await api.post(
+            `/prompt-library/websites/${saved.website_id}/prompts/`,
+            { text: starters.join('\n') },
+            { _silentError: true },
+          )
+        } catch (_) {
+          toast.warning("Your project is saved, but we couldn't add its starter prompts. Add them from the Overview.")
+        }
+      }
       // Hand the paywall its personalization line ("{domain} is set up
       // with N competitors") — the session payload carries no
       // domains, and /paywall renders outside the app store's website
