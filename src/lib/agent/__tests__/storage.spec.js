@@ -9,6 +9,7 @@ import {
     getLastProject,
     loadActivitySeen,
     loadDraft,
+    loadFindingsPrefs,
     loadPaneState,
     loadUiPrefs,
     moveDraft,
@@ -18,6 +19,7 @@ import {
     removePaneState,
     saveActivitySeen,
     saveDraft,
+    saveFindingsPrefs,
     savePaneState,
     saveUiPrefs,
     setLastChat,
@@ -41,6 +43,31 @@ describe('keys', () => {
         expect(storageKeys.tabs(7, 3)).toBe('cs-agent-tabs-v1:7:3')
         expect(storageKeys.draft(7, 3, 'c1')).toBe('cs-agent-draft-v1:7:3:c1')
         expect(storageKeys.draft(7, 3, null)).toBe('cs-agent-draft-v1:7:3:new')
+        expect(storageKeys.findings(7, 3)).toBe('cs-agent-findings-v1:7:3')
+    })
+})
+
+describe('findings filters', () => {
+    it('round-trip per user and project, keeping only the three filter strings', () => {
+        expect(loadFindingsPrefs(7, 3)).toEqual({})
+        expect(saveFindingsPrefs(7, 3, { status: 'done', category: 'engines', severity: '', q: 'not stored', extra: 1 })).toBe(true)
+        expect(loadFindingsPrefs(7, 3)).toEqual({ status: 'done', category: 'engines', severity: '' })
+        expect(loadFindingsPrefs(7, 4)).toEqual({})
+        expect(loadFindingsPrefs(8, 3)).toEqual({})
+        expect(JSON.parse(localStorage.getItem(storageKeys.findings(7, 3)))).not.toHaveProperty('q')
+    })
+
+    it('need a user and a project, and survive corrupt values', () => {
+        expect(saveFindingsPrefs(null, 3, { status: 'done' })).toBe(false)
+        expect(saveFindingsPrefs(7, '', { status: 'done' })).toBe(false)
+        expect(saveFindingsPrefs(7, 3, 'done')).toBe(false)
+        expect(loadFindingsPrefs(null, 3)).toEqual({})
+        localStorage.setItem(storageKeys.findings(7, 3), '{oops')
+        expect(loadFindingsPrefs(7, 3)).toEqual({})
+        localStorage.setItem(storageKeys.findings(7, 3), JSON.stringify({ status: 3, category: ['x'], severity: 'high' }))
+        expect(loadFindingsPrefs(7, 3)).toEqual({ severity: 'high' })
+        localStorage.setItem(storageKeys.findings(7, 3), JSON.stringify(['done']))
+        expect(loadFindingsPrefs(7, 3)).toEqual({})
     })
 })
 
@@ -124,6 +151,21 @@ describe('pane state', () => {
         expect(ids).toContain('c5')
     })
 
+    it('stores research table tabs by swarm id and version', () => {
+        savePaneState(7, 3, 'c1', {
+            open: true,
+            active: 'table:5d0c',
+            tabs: [
+                { id: 'table:5d0c', kind: 'table', swarm_id: '5d0c', version: 2 },
+                { id: 'table:77aa', kind: 'table', swarm_id: '77aa', version: null },
+            ],
+        })
+        expect(loadPaneState(7, 3, 'c1').tabs).toEqual([
+            { id: 'table:5d0c', kind: 'table', swarm_id: '5d0c', version: 2 },
+            { id: 'table:77aa', kind: 'table', swarm_id: '77aa', version: null },
+        ])
+    })
+
     it('moves and removes a chat entry', () => {
         savePaneState(7, 3, 'new', { tabs: [{ id: 'serp:a', kind: 'serp' }] })
         movePaneState(7, 3, 'new', 'c9')
@@ -192,6 +234,16 @@ describe('clearUserData', () => {
         expect(localStorage.getItem('cs-access')).toBe('token')
     })
 
+    it('removes the findings filters with the rest of a user\'s keys', () => {
+        saveFindingsPrefs(7, 3, { status: 'done', category: '', severity: 'high' })
+        saveFindingsPrefs(8, 3, { status: 'all', category: '', severity: '' })
+        expect(clearUserData(7)).toBe(1)
+        expect(loadFindingsPrefs(7, 3)).toEqual({})
+        expect(loadFindingsPrefs(8, 3)).toEqual({ status: 'all', category: '', severity: '' })
+        expect(clearUserData()).toBe(1)
+        expect(loadFindingsPrefs(8, 3)).toEqual({})
+    })
+
     it('treats activity read state as per user', () => {
         saveActivitySeen(7, { 12: '2026-11-02T15:00:00Z' })
         saveActivitySeen(8, { 12: '2026-11-01T09:00:00Z' })
@@ -220,5 +272,7 @@ describe('failure handling', () => {
         expect(readJSON('anything', 'fallback')).toBe('fallback')
         expect(() => saveDraft(7, 3, 'c1', 'x')).not.toThrow()
         expect(loadDraft(7, 3, 'c1')).toBe('')
+        expect(saveFindingsPrefs(7, 3, { status: 'done' })).toBe(false)
+        expect(loadFindingsPrefs(7, 3)).toEqual({})
     })
 })

@@ -1,135 +1,139 @@
 <template>
   <section class="ob-step ob-step--competitors">
-    <div class="ob-stagger">
-      <span class="ob-eyebrow">Competitors</span>
-      <h1 class="ob-title" tabindex="-1">Who should we benchmark you against?</h1>
+    <form class="ob-stagger" novalidate @submit.prevent="next">
+      <span class="ob-eyebrow">Step 3 of 5 &middot; Competitors</span>
+      <h1 class="ob-title" tabindex="-1">Who do you compete with?</h1>
       <p class="ob-sub">
-        We found these from your space. Uncheck any that aren't real
-        competitors, or add your own below — they shape which brands
-        your prompt runs track.
+        We check whether Google and the AI engines put them above you. Keep up to 5.
       </p>
 
       <div class="ob-card">
-        <!-- TransitionGroup: custom competitors pop in, removals shrink
-             away, and the grid reflows with a FLIP glide. Rows are keyed
-             by domain-or-name, which the add path dedupes on. -->
+        <p v-if="showCapNote" id="ob-competitor-cap" class="ob-note">Unselect one to add another.</p>
+
+        <!-- Rows are keyed by domain-or-name, which the add path dedupes on.
+             A monogram, never a third-party logo request. -->
         <TransitionGroup
           v-if="form.competitors.length"
           name="ob-list"
-          tag="div"
+          tag="ul"
           class="ob-competitors"
+          aria-label="Competitors"
         >
-          <div
+          <li
             v-for="(c, i) in form.competitors"
             :key="c.domain || c.name"
             class="ob-competitor"
-            :class="{ 'is-selected': c.selected, 'is-custom': c.custom }"
+            :class="{ 'is-selected': c.selected, 'is-custom': c.custom, 'is-locked': locked(c) }"
           >
             <label class="ob-competitor-label">
               <input
                 type="checkbox"
-                v-model="c.selected"
-                class="ob-competitor-check"
+                class="ob-check"
+                :checked="c.selected"
+                :disabled="locked(c)"
+                :aria-describedby="locked(c) ? 'ob-competitor-cap' : undefined"
+                @change="onToggle(i, $event)"
               />
-              <!-- Logo lookup: Clearbit returns the brand mark for
-                   most known companies; on 404 the @error handler
-                   swaps to Google's favicon service; if that also
-                   fails we fall back to a circled initial. -->
-              <span class="ob-competitor-logo" v-if="c.domain || c.name">
-                <img
-                  v-if="c.domain && !c._logoErr"
-                  :src="`https://logo.clearbit.com/${c.domain}`"
-                  :alt="`${c.name} logo`"
-                  loading="lazy"
-                  width="24"
-                  height="24"
-                  @error="onLogoError(c)"
-                />
-                <img
-                  v-else-if="c.domain && c._logoErr === 'clearbit'"
-                  :src="`https://www.google.com/s2/favicons?domain=${c.domain}&sz=64`"
-                  :alt="`${c.name} favicon`"
-                  loading="lazy"
-                  width="24"
-                  height="24"
-                  @error="onLogoError(c)"
-                />
-                <span v-else class="ob-competitor-logo-fallback">
-                  {{ (c.name || '?').trim().charAt(0).toUpperCase() }}
-                </span>
+              <span class="ob-monogram" aria-hidden="true">{{ initial(c) }}</span>
+              <span class="ob-competitor-body">
+                <span class="ob-competitor-name">{{ c.name }}</span>
+                <span v-if="c.domain" class="ob-competitor-domain">{{ c.domain }}</span>
               </span>
-              <div class="ob-competitor-body">
-                <div class="ob-competitor-name">{{ c.name }}</div>
-                <div v-if="c.domain" class="ob-competitor-domain">{{ c.domain }}</div>
-              </div>
             </label>
             <button
               v-if="c.custom"
               type="button"
-              class="ob-competitor-remove"
+              class="ob-row-remove"
+              :aria-label="`Remove ${c.name}`"
               @click="removeCompetitor(i)"
-              aria-label="Remove competitor"
-            >×</button>
-          </div>
+            >&times;</button>
+          </li>
         </TransitionGroup>
-        <p v-else class="ob-sub" style="margin: 0;">
-          We didn't find any competitors automatically. Add your own below.
+        <p v-else class="ob-label-hint ob-empty-note">
+          We couldn't find competitors automatically. Add the companies you lose deals to.
         </p>
 
-        <!-- Add-your-own row -->
-        <div class="ob-add-competitor">
-          <input
-            v-model="newCompetitorName"
-            placeholder="Competitor name"
-            class="ob-text-input ob-add-input"
-            @keydown.enter.prevent="addCustomCompetitor"
-          />
-          <input
-            v-model="newCompetitorDomain"
-            placeholder="domain.com (optional)"
-            class="ob-text-input ob-add-input ob-add-input--narrow"
-            @keydown.enter.prevent="addCustomCompetitor"
-          />
-          <button
-            type="button"
-            class="ob-add-btn"
-            :disabled="!newCompetitorName.trim()"
-            @click="addCustomCompetitor"
-          >Add</button>
+        <div class="ob-field">
+          <span id="ob-competitor-add-label" class="ob-label">Add a competitor</span>
+          <div class="ob-add-row" role="group" aria-labelledby="ob-competitor-add-label">
+            <input
+              v-model="newCompetitorName"
+              class="ob-text-input ob-add-input"
+              type="text"
+              placeholder="Competitor name"
+              aria-label="Competitor name"
+              :maxlength="LIMITS.competitorName"
+              @keydown.enter.prevent="addCompetitor"
+            />
+            <input
+              v-model="newCompetitorDomain"
+              class="ob-text-input ob-add-input ob-add-input--narrow"
+              type="text"
+              inputmode="url"
+              spellcheck="false"
+              placeholder="domain.com (optional)"
+              aria-label="Competitor domain (optional)"
+              :maxlength="LIMITS.competitorDomain"
+              @keydown.enter.prevent="addCompetitor"
+            />
+            <button type="button" class="ob-add-btn" :disabled="!newCompetitorName.trim()" @click="addCompetitor">
+              Add
+            </button>
+          </div>
         </div>
       </div>
 
       <div class="ob-step-actions">
-        <button class="ob-link-btn" @click="back">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+        <button type="button" class="ob-link-btn" @click="back">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M13 8H3M7 4L3 8l4 4"/>
           </svg>
           <span>Back</span>
         </button>
-        <button class="ob-cta" :disabled="saving" @click="finish">
-          <span v-if="!saving">Finish setup</span>
-          <span v-else class="ob-spinner" aria-hidden="true"></span>
-          <svg v-if="!saving" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+        <button type="submit" class="ob-cta">
+          <span>{{ selectedCompetitors.length ? 'Continue' : 'Skip competitors' }}</span>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
             <path d="M3 8h10M9 4l4 4-4 4"/>
           </svg>
         </button>
       </div>
-    </div>
+    </form>
   </section>
 </template>
 
 <script setup>
-import { useOnboardingFlow } from '../useOnboardingFlow'
+import { computed } from 'vue'
+
+import { LIMITS, useOnboardingFlow } from '../useOnboardingFlow'
 
 const {
   form,
-  saving,
   newCompetitorName,
   newCompetitorDomain,
-  addCustomCompetitor,
+  selectedCompetitors,
+  competitorCapReached,
+  setCompetitorSelected,
+  addCompetitor,
   removeCompetitor,
-  onLogoError,
+  next,
   back,
-  finish,
 } = useOnboardingFlow()
+
+const showCapNote = computed(
+  () => competitorCapReached.value && form.value.competitors.some((c) => !c.selected),
+)
+
+function locked(c) {
+  return !c.selected && competitorCapReached.value
+}
+
+function initial(c) {
+  return (String(c.name || c.domain || '').trim().charAt(0) || '?').toUpperCase()
+}
+
+function onToggle(index, event) {
+  const ok = setCompetitorSelected(index, event.target.checked)
+  // Refused at the cap: put the box back the way the row says.
+  if (!ok) event.target.checked = Boolean(form.value.competitors[index]?.selected)
+}
 </script>

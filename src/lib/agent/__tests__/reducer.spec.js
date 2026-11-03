@@ -8,6 +8,18 @@ import {
     eventFactory,
     researchRunEvents,
 } from './__fixtures__/runEvents'
+import {
+    CAPTURE_ID,
+    SERP_CAPTURE as SWARM_SERP_CAPTURE,
+    SWARM_MESSAGE_ID,
+    SWARM_PART_ID,
+    SWARM_RUN_ID,
+    contractEvents,
+    expectedSwarmPart,
+    swarmAssistant,
+    swarmRunEvents,
+    swarmTable,
+} from './__fixtures__/swarmEvents'
 
 function snapshot(overrides = {}) {
     return {
@@ -410,6 +422,228 @@ describe('browser events', () => {
         const e = eventFactory()
         const out = reduceEvents(snapshot(), [e('browser.open', { tab: { kind: 'serp' }, activate: true })])
         expect(out.effects).toEqual([])
+    })
+})
+
+describe('research agents', () => {
+    // The swarm events start at seq 41 of their run (contract 4b).
+    function swarmSnapshot(message = {}) {
+        return { message: swarmAssistant(message), run: initialRunState({ lastSeq: 40, phase: 'running' }), drafts: {} }
+    }
+
+    function stateAfter(events) {
+        const out = reduceEvents(swarmSnapshot(), events)
+        return { message: out.message, run: out.run, drafts: out.drafts }
+    }
+
+    const swarmEvent = (seq, type, payload) => ({
+        v: 1,
+        seq,
+        type,
+        run_id: SWARM_RUN_ID,
+        message_id: SWARM_MESSAGE_ID,
+        ts: '2026-11-04T10:16:00.000Z',
+        ...payload,
+    })
+    const taskEvent = (seq, type, taskId, rev, patch) =>
+        swarmEvent(seq, type, { part_id: SWARM_PART_ID, task_id: taskId, rev, patch })
+
+    // The full run up to its three queued agents.
+    const queued = () => stateAfter(swarmRunEvents().slice(0, 3))
+
+    it('replays the contract examples', () => {
+        const out = reduceEvents(swarmSnapshot(), contractEvents())
+        expect(out.message.parts.map((p) => [p.id, p.type])).toEqual([
+            ['p4', 'swarm'],
+            ['p5', 'swarm_table'],
+        ])
+        const [swarm, table] = out.message.parts
+        expect(swarm).toMatchObject({ status: 'partial', ended_at: '2026-11-04T10:17:18.510Z', duration_ms: 134201, table_version: 1 })
+        expect(swarm.tasks).toHaveLength(1)
+        expect(swarm.tasks[0]).toMatchObject({
+            id: 'google.p1.page1',
+            status: 'done',
+            step: '',
+            attempt: 1,
+            started_at: '2026-11-04T10:15:04.401Z',
+            result: "You're #4 · AI Overview shown",
+            tone: 'good',
+            pane: { kind: 'serp', tab_id: 'serp:3f2a9c1d0e7b' },
+            rev: 4,
+        })
+        expect(table).toMatchObject({ swarm_id: '5d0c...', version: 1, status: 'partial' })
+        expect(out.message.research.serp[CAPTURE_ID]).toEqual(SWARM_SERP_CAPTURE)
+        expect(out.run.lastSeq).toBe(142)
+        // research.recorded never opens a tab: a row opens its capture on click.
+        expect(out.effects).toEqual([])
+    })
+
+    it('replays a full run to the part the backend persists', () => {
+        const out = reduceEvents(swarmSnapshot(), swarmRunEvents())
+        expect(out.message.parts.map((p) => p.id)).toEqual(['p4', 'p5', 'p6'])
+        expect(out.message.parts[0]).toEqual(expectedSwarmPart())
+        expect(out.message.parts[1].table).toEqual(swarmTable(1))
+        expect(out.message.parts[2].text).toBe('# Notion on Google and AI')
+        expect(out.message.research).toEqual({ serp: { [CAPTURE_ID]: SWARM_SERP_CAPTURE }, pages: {} })
+        expect(out.message.status).toBe('complete')
+        expect(out.message.parts_seq).toBe(145)
+        expect(types(out.effects)).toEqual(['terminal'])
+    })
+
+    it('gives the same part when the run arrives in several batches, or again after a resume', () => {
+        const events = swarmRunEvents()
+        let state = swarmSnapshot()
+        for (const chunk of [events.slice(0, 4), events.slice(4, 9), events.slice(9)]) {
+            const step = reduceEvents(state, chunk)
+            state = { message: step.message, run: step.run, drafts: step.drafts }
+        }
+        expect(state.message.parts[0]).toEqual(expectedSwarmPart())
+
+        // A resumed stream replays task events the checkpoint already holds.
+        const resumed = reduceEvents({ ...state, run: { ...state.run, lastSeq: 50 } }, events.slice(6, 14))
+        expect(resumed.message.parts[0]).toEqual(expectedSwarmPart())
+    })
+
+    it('never mutates its inputs', () => {
+        const input = deepFreeze(swarmSnapshot())
+        const events = deepFreeze(swarmRunEvents())
+        expect(() => reduceEvents(input, events)).not.toThrow()
+        expect(input.message.parts).toEqual([])
+        expect(input.message.research).toEqual({ serp: {}, pages: {} })
+    })
+
+    it('applies task events in rev order and ignores a stale or repeated rev', () => {
+        const state = queued()
+        const progress = taskEvent(50, 'task.progress', 'engines.p1.claude', 3, { step: 'Claude was busy; trying again', attempt: 2 })
+        const late = taskEvent(51, 'task.started', 'engines.p1.claude', 2, { status: 'running', step: 'Asking Claude', attempt: 1 })
+        const out = reduceEvents(state, [progress, late])
+        expect(out.message.parts[0].tasks[2]).toMatchObject({ status: 'queued', step: 'Claude was busy; trying again', attempt: 2, rev: 3 })
+        expect(out.run.lastSeq).toBe(51)
+
+        const again = reduceEvent(
+            { message: out.message, run: out.run, drafts: out.drafts },
+            taskEvent(52, 'task.progress', 'engines.p1.claude', 3, { step: 'Something else' })
+        )
+        expect(again.state.message).toBe(out.message)
+        expect(again.state.run.lastSeq).toBe(52)
+    })
+
+    it('ignores task events for an unknown part, a part that is not a swarm, or an unknown task', () => {
+        const state = queued()
+        const text = reduceEvents(state, [
+            swarmEvent(50, 'part.added', { part: { id: 'p9', type: 'text', request: 2, text: 'Hello', tasks: [{ id: 'x', rev: 1 }] } }),
+        ])
+        const base = { message: text.message, run: text.run, drafts: text.drafts }
+        for (const event of [
+            swarmEvent(51, 'task.started', { part_id: 'nope', task_id: 'google.p1.page1', rev: 2, patch: { status: 'running' } }),
+            swarmEvent(52, 'task.started', { part_id: 'p9', task_id: 'x', rev: 2, patch: { status: 'running' } }),
+            taskEvent(53, 'task.started', 'sources.p1.cited', 2, { status: 'running' }),
+            swarmEvent(54, 'task.started', { part_id: SWARM_PART_ID, rev: 2, patch: { status: 'running' } }),
+            taskEvent(55, 'task.started', 'google.p1.page1', 'not a number', { status: 'running' }),
+        ]) {
+            const out = reduceEvent(base, event)
+            expect(out.state.message).toBe(base.message)
+            expect(out.effects).toEqual([])
+        }
+    })
+
+    it('ignores task events while the swarm is still planning', () => {
+        const planning = stateAfter(swarmRunEvents().slice(0, 1))
+        const out = reduceEvent(planning, taskEvent(50, 'task.started', 'google.p1.page1', 2, { status: 'running' }))
+        expect(out.state.message).toBe(planning.message)
+    })
+
+    it('keeps untouched parts, tasks and research by identity', () => {
+        const before = reduceEvents(queued(), [swarmEvent(50, 'part.added', { part: { id: 'p9', type: 'text', request: 2, text: '' } })])
+        const state = { message: before.message, run: before.run, drafts: before.drafts }
+        const out = reduceEvent(state, taskEvent(51, 'task.started', 'engines.p1.chatgpt', 2, { status: 'running', step: 'Asking ChatGPT' }))
+        const [swarmBefore, textBefore] = state.message.parts
+        const [swarmAfter, textAfter] = out.state.message.parts
+        expect(swarmAfter).not.toBe(swarmBefore)
+        expect(textAfter).toBe(textBefore)
+        expect(swarmAfter.tasks[0]).toBe(swarmBefore.tasks[0])
+        expect(swarmAfter.tasks[2]).toBe(swarmBefore.tasks[2])
+        expect(swarmAfter.tasks[1]).toMatchObject({ status: 'running', step: 'Asking ChatGPT', rev: 2 })
+        expect(swarmAfter.categories).toBe(swarmBefore.categories)
+        expect(out.state.message.research).toBe(state.message.research)
+    })
+
+    it('never lets a patch change the task id or its rev', () => {
+        const out = reduceEvent(
+            queued(),
+            taskEvent(50, 'task.progress', 'google.p1.page1', 2, { step: 'Fetching', id: 'other', rev: 99 })
+        )
+        expect(out.state.message.parts[0].tasks[0]).toMatchObject({ id: 'google.p1.page1', step: 'Fetching', rev: 2 })
+    })
+
+    it('clears a retry notice when a task moves', () => {
+        const state = queued()
+        const retrying = { ...state, run: { ...state.run, retrying: { attempt: 1, reason: 'overloaded', delayMs: 0, at: null } } }
+        const out = reduceEvent(retrying, taskEvent(50, 'task.started', 'google.p1.page1', 2, { status: 'running' }))
+        expect(out.state.run.retrying).toBeNull()
+    })
+
+    it('keeps the planning part through part.updated and replaces it when execution starts', () => {
+        const titled = stateAfter(swarmRunEvents().slice(0, 2))
+        expect(titled.message.parts[0]).toMatchObject({ id: 'p4', status: 'planning', title: 'Research Notion', tasks: [] })
+        const running = reduceEvent(titled, swarmRunEvents()[2])
+        expect(running.state.message.parts).toHaveLength(1)
+        expect(running.state.message.parts[0]).toMatchObject({ status: 'running', version: 1, swarm_id: '5d0c...' })
+        expect(running.state.message.parts[0].tasks.map((t) => t.id)).toEqual([
+            'google.p1.page1',
+            'engines.p1.chatgpt',
+            'engines.p1.claude',
+        ])
+    })
+
+    it('drops the planning part with its request on turn.reset', () => {
+        const planning = stateAfter(swarmRunEvents().slice(0, 2))
+        const out = reduceEvent(planning, swarmEvent(43, 'turn.reset', { request: 1 }))
+        expect(out.state.message.parts).toEqual([])
+    })
+
+    it('merges research.recorded captures into serp and pages, never opening a tab', () => {
+        const state = queued()
+        const page = {
+            capture_id: 'a1b2c3d4e5f6',
+            url: 'https://evernote.com/',
+            final_url: 'https://evernote.com/',
+            status_code: 200,
+            seo: { title: 'Evernote', title_length: 8 },
+            error: null,
+        }
+        const out = reduceEvents(state, [
+            swarmEvent(50, 'research.recorded', { kind: 'page', capture_id: 'a1b2c3d4e5f6', capture: page }),
+            swarmEvent(51, 'research.recorded', { kind: 'serp', capture_id: CAPTURE_ID, capture: SWARM_SERP_CAPTURE }),
+        ])
+        expect(out.message.research.pages).toEqual({ a1b2c3d4e5f6: page })
+        expect(out.message.research.serp[CAPTURE_ID]).toEqual(SWARM_SERP_CAPTURE)
+        expect(out.message.parts).toBe(state.message.parts)
+        expect(out.effects).toEqual([])
+
+        // A later copy of the same capture merges over the stored one.
+        const again = reduceEvent(
+            { message: out.message, run: out.run, drafts: out.drafts },
+            swarmEvent(52, 'research.recorded', { kind: 'page', capture_id: 'a1b2c3d4e5f6', capture: { status_code: 301 } })
+        )
+        expect(again.state.message.research.pages.a1b2c3d4e5f6).toEqual({ ...page, status_code: 301 })
+    })
+
+    it('ignores research.recorded without a capture id or with another kind', () => {
+        const state = queued()
+        for (const payload of [
+            { kind: 'serp', capture: SWARM_SERP_CAPTURE },
+            { kind: 'artifact', capture_id: 'x1', capture: {} },
+            { kind: 'serp', capture_id: '', capture: SWARM_SERP_CAPTURE },
+        ]) {
+            const out = reduceEvent(state, swarmEvent(50, 'research.recorded', payload))
+            expect(out.state.message).toBe(state.message)
+        }
+    })
+
+    it('keeps a capture id when the capture omits it', () => {
+        const out = reduceEvent(queued(), swarmEvent(50, 'research.recorded', { kind: 'page', capture_id: 'f00', capture: { url: 'https://a.test/' } }))
+        expect(out.state.message.research.pages.f00).toEqual({ capture_id: 'f00', url: 'https://a.test/' })
     })
 })
 

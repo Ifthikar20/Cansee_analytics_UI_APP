@@ -49,6 +49,42 @@
  * @property {Object} data    SerpCapture | PageCapture
  */
 
+/**
+ * One research agent inside a `swarm` part (design/swarm_contract.md 5c).
+ * task.* events shallow-merge a patch into it when their `rev` is newer.
+ * @typedef {Object} SwarmTask
+ * @property {string} id        `<category>.p<i>.<slot>`, stable across versions
+ * @property {string} category  one of SWARM_CATEGORY_LIST
+ * @property {string} subcategory  `p1`..`p5`
+ * @property {string} worker
+ * @property {string} label
+ * @property {string} target
+ * @property {string} status    one of TASK_STATUS
+ * @property {string} step      live sub-step, '' when not running
+ * @property {string} result    one line, '' until terminal
+ * @property {'good'|'warn'|'bad'|'muted'|null} tone
+ * @property {string[]} depends_on
+ * @property {{code: string, message: string}|null} error
+ * @property {{kind: 'serp'|'page', tab_id: string}|null} pane
+ * @property {Object|null} detail  per worker
+ * @property {number} rev
+ */
+
+/**
+ * A project finding (swarm_contract.md 6d), as normalizeFinding returns it.
+ * @typedef {Object} Finding
+ * @property {string} id
+ * @property {string} title
+ * @property {string} detail
+ * @property {string} category        one of FINDING_CATEGORY_LIST
+ * @property {string} category_label
+ * @property {string} severity        one of FINDING_SEVERITY_LIST
+ * @property {string} status          one of FINDING_STATUS
+ * @property {string} prompt_text
+ * @property {Object[]} evidence      [{kind, label, tab_id, url}]
+ * @property {Object|null} source     {swarm_id, swarm_title, version, sheet, row_key, task_ids, chat_id, message_id}
+ */
+
 export const EVENT = Object.freeze({
     RUN_STARTED: 'run.started',
     RUN_RETRYING: 'run.retrying',
@@ -71,6 +107,12 @@ export const EVENT = Object.freeze({
     ARTIFACT_FAILED: 'artifact.failed',
     BROWSER_OPEN: 'browser.open',
     BROWSER_UPDATE: 'browser.update',
+    // Research agents (swarm_contract.md 4a): task events patch one task of a
+    // swarm part; research.recorded adds a capture to the message research.
+    TASK_STARTED: 'task.started',
+    TASK_PROGRESS: 'task.progress',
+    TASK_FINISHED: 'task.finished',
+    RESEARCH_RECORDED: 'research.recorded',
 })
 
 export const TERMINAL_EVENT_TYPES = new Set([
@@ -93,6 +135,8 @@ export const PART_TYPES = Object.freeze({
     CHART: 'chart',
     BROWSER_OPEN: 'browser_open',
     NOTICE: 'notice',
+    SWARM: 'swarm',
+    SWARM_TABLE: 'swarm_table',
 })
 
 // Part statuses that mean "still working" while the message streams. Once
@@ -194,6 +238,51 @@ export const TRANSPORT_STATE = Object.freeze({
     ERROR: 'error',
 })
 
+/* ── Research agents (swarm_contract.md 1e, 1b, 2c) ── */
+
+export const TASK_STATUS = Object.freeze({
+    QUEUED: 'queued',
+    RUNNING: 'running',
+    DONE: 'done',
+    FAILED: 'failed',
+    SKIPPED: 'skipped',
+    STOPPED: 'stopped',
+})
+
+// A terminal task never changes again within its part.
+export const TERMINAL_TASK_STATUSES = new Set(['done', 'failed', 'skipped', 'stopped'])
+
+export const SWARM_STATUS = Object.freeze({
+    PLANNING: 'planning',
+    RUNNING: 'running',
+    DONE: 'done',
+    PARTIAL: 'partial',
+    ERROR: 'error',
+    CANCELLED: 'cancelled',
+    INTERRUPTED: 'interrupted',
+})
+
+export const LIVE_SWARM_STATUSES = new Set(['planning', 'running'])
+
+// Fixed order: the tree, the re-run menu and the findings filters follow it.
+export const SWARM_CATEGORY_LIST = Object.freeze(['google', 'engines', 'competitors', 'site', 'sources'])
+
+// `other` is for findings only (a manual finding outside the five categories).
+export const SWARM_CATEGORY_LABELS = Object.freeze({
+    google: 'Google (SEO)',
+    engines: 'AI engines (GEO)',
+    competitors: 'Competitor pages',
+    site: 'Your site and content gaps',
+    sources: 'Sources and citations',
+    other: 'Other',
+})
+
+export const FINDING_STATUS = Object.freeze({ OPEN: 'open', DONE: 'done', DISMISSED: 'dismissed' })
+
+export const FINDING_SEVERITY_LIST = Object.freeze(['high', 'medium', 'low'])
+
+export const FINDING_CATEGORY_LIST = Object.freeze([...SWARM_CATEGORY_LIST, 'other'])
+
 export const TAB_STATUSES = new Set(['loading', 'ready', 'error'])
 
 export const ARTIFACT_KIND_LIST = Object.freeze(['page', 'document', 'sheet', 'report'])
@@ -221,4 +310,9 @@ export const ERROR_CODE = Object.freeze({
     INTERRUPTED: 'interrupted',
     // 503 from nginx's maintenance switch, with Retry-After.
     MAINTENANCE: 'maintenance',
+    // Research agents and findings (swarm_contract.md 6f).
+    SWARM_DISABLED: 'swarm_disabled',
+    INSUFFICIENT_ALLOWANCE: 'insufficient_allowance',
+    VERSION_LIMIT: 'version_limit',
+    NO_FINDING: 'no_finding',
 })

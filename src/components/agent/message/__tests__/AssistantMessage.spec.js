@@ -10,12 +10,15 @@ vi.mock('@/stores/agent', () => ({ useAgentStore: () => fakeAgent }))
 vi.mock('@/stores/agentPane', () => ({ useAgentPaneStore: () => fakePane }))
 
 const { default: AssistantMessage } = await import('@/components/agent/message/AssistantMessage.vue')
+const { default: SwarmBlock } = await import('@/components/agent/swarm/SwarmBlock.vue')
+const { default: SwarmTable } = await import('@/components/agent/swarm/SwarmTable.vue')
+const { finishedPart, tablePart } = await import('@/components/agent/swarm/__tests__/__fixtures__/swarmParts.js')
 
 enableAutoUnmount(afterEach)
 
 const Blank = defineComponent({ render: () => h('div') })
 
-function mountReply(props) {
+function mountReply(props, extraStubs = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const router = createRouter({
@@ -30,7 +33,7 @@ function mountReply(props) {
     props: { websiteId: 'w1', ...props },
     global: {
       plugins: [pinia, router],
-      stubs: { WorkedLabel: true, MessageActions: true, MarkdownBlock: true, ChartBlock: true },
+      stubs: { WorkedLabel: true, MessageActions: true, MarkdownBlock: true, ChartBlock: true, ...extraStubs },
     },
   })
 }
@@ -112,5 +115,42 @@ describe('AssistantMessage Retry', () => {
     })
     await w.find('.ag-msg-error-btn').trigger('click')
     expect(fakeAgent.regenerate).toHaveBeenCalledWith('m1')
+  })
+})
+
+describe('AssistantMessage research agents', () => {
+  const stubs = { SwarmBlock: true, SwarmTable: true }
+  const toolPart = { id: 'p1', type: 'tool', name: 'list_tracked_prompts', label: 'Listed tracked prompts', status: 'done', summary: '' }
+
+  it('shows the research agents between the steps and the reply, and the table in body order', () => {
+    const swarm = finishedPart()
+    const table = tablePart()
+    const text = { id: 'p6', type: 'text', text: '# Research Notion' }
+    const message = reply({ parts: [toolPart, swarm, table, text] })
+    const w = mountReply({ message, busy: true }, stubs)
+
+    const children = [...w.find('article').element.children].map((el) => el.className)
+    const steps = children.findIndex((c) => c.includes('ag-steps'))
+    const swarms = children.findIndex((c) => c.includes('ag-assistant-swarms'))
+    const body = children.findIndex((c) => c.includes('ag-assistant-body'))
+    expect(steps).toBeGreaterThanOrEqual(0)
+    expect(swarms).toBeGreaterThan(steps)
+    expect(body).toBeGreaterThan(swarms)
+
+    const block = w.findComponent(SwarmBlock)
+    expect(block.props()).toMatchObject({ part: swarm, message, live: false, websiteId: 'w1', busy: true })
+
+    const bodyKids = [...w.find('.ag-assistant-body').element.children].map((el) => el.tagName.toLowerCase())
+    expect(bodyKids).toEqual(['swarm-table-stub', 'markdown-block-stub'])
+    expect(w.findComponent(SwarmTable).props()).toMatchObject({ part: table, message, mode: 'inline', busy: true })
+  })
+
+  it('renders one block per swarm part and none without one', () => {
+    const rerun = finishedPart({ id: 'p7', version: 2, scope: 'category', scope_label: 'Google (SEO)' })
+    const w = mountReply({ message: reply({ parts: [finishedPart(), rerun] }) }, stubs)
+    expect(w.findAllComponents(SwarmBlock)).toHaveLength(2)
+
+    const plain = mountReply({ message: reply({ parts: [{ id: 'p1', type: 'text', text: 'Hi' }] }) }, stubs)
+    expect(plain.find('.ag-assistant-swarms').exists()).toBe(false)
   })
 })

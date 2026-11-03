@@ -1,11 +1,15 @@
 // Normalisation of agent API payloads and errors into the shapes the store
 // keeps. Unknown fields pass through untouched (the contract allows extra
 // fields); missing ones get explicit empty values, never invented data.
-import { ERROR_CODE } from './types'
+import { ERROR_CODE, FINDING_STATUS, SWARM_CATEGORY_LABELS } from './types'
 
 /* ── Errors ── */
 
 const FALLBACK_COPY = {
+    [ERROR_CODE.SWARM_DISABLED]: 'The research agents are turned off on this server.',
+    [ERROR_CODE.INSUFFICIENT_ALLOWANCE]: 'Not enough AI allowance is left for this re-run.',
+    [ERROR_CODE.VERSION_LIMIT]: 'This research has reached its version limit. Start a new research.',
+    [ERROR_CODE.NO_FINDING]: 'Some of these rows have no finding to add.',
     [ERROR_CODE.AGENT_DISABLED]: 'The agent is turned off for this workspace.',
     [ERROR_CODE.AGENT_UNAVAILABLE]: 'The agent is temporarily unavailable. Try again in a moment.',
     [ERROR_CODE.MAINTENANCE]: 'CanSee is down for maintenance. Try again in a few minutes.',
@@ -209,6 +213,135 @@ export function normalizeArtifact(raw) {
         id: String(raw.id),
         warnings: Array.isArray(raw.warnings) ? raw.warnings : raw.warnings ? [raw.warnings] : [],
         source_chat_id: str(raw.source_chat_id),
+    }
+}
+
+/* ── Research agents and findings ── */
+
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
+const text = (v) => (typeof v === 'string' ? v : '')
+const positiveInt = (v) => {
+    const n = Number(v)
+    return Number.isInteger(n) && n > 0 ? n : null
+}
+const numberOrNull = (v) => {
+    if (v === null || v === undefined || v === '') return null
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+}
+
+/**
+ * A task's or a swarm part's `error` as {code, message}, or null. The swarm
+ * code writes an object; a part the runner closed carries a plain string.
+ */
+export function taskError(error) {
+    if (typeof error === 'string') return error ? { code: '', message: error } : null
+    if (!isObject(error)) return null
+    const code = text(error.code)
+    const message = text(error.message)
+    return code || message ? { code, message } : null
+}
+
+function normalizeFindingSource(source) {
+    if (!isObject(source)) return null
+    return {
+        ...source,
+        swarm_id: str(source.swarm_id),
+        swarm_title: text(source.swarm_title),
+        version: positiveInt(source.version),
+        sheet: text(source.sheet),
+        row_key: text(source.row_key),
+        task_ids: arr(source.task_ids).map(String),
+        // Null unless the caller owns that chat (chats are private).
+        chat_id: str(source.chat_id),
+        message_id: str(source.message_id),
+    }
+}
+
+export function normalizeFinding(raw) {
+    if (!isObject(raw) || raw.id === undefined || raw.id === null || raw.id === '') return null
+    const category = text(raw.category)
+    return {
+        ...raw,
+        id: String(raw.id),
+        title: text(raw.title),
+        detail: text(raw.detail),
+        category,
+        category_label: text(raw.category_label) || SWARM_CATEGORY_LABELS[category] || '',
+        severity: text(raw.severity),
+        status: text(raw.status) || FINDING_STATUS.OPEN,
+        prompt_text: text(raw.prompt_text),
+        evidence: arr(raw.evidence).filter(isObject),
+        source: normalizeFindingSource(raw.source),
+        created_at: raw.created_at || null,
+        updated_at: raw.updated_at || null,
+        created_by_name: text(raw.created_by_name),
+        status_changed_at: raw.status_changed_at || null,
+        status_changed_by_name: text(raw.status_changed_by_name),
+    }
+}
+
+function normalizeVersionSummary(raw) {
+    const version = positiveInt(raw.version)
+    if (version === null) return null
+    return {
+        ...raw,
+        version,
+        scope: text(raw.scope),
+        scope_label: text(raw.scope_label),
+        status: text(raw.status),
+        counts: isObject(raw.counts) ? raw.counts : {},
+        started_at: raw.started_at || null,
+        finished_at: raw.finished_at || null,
+        duration_ms: numberOrNull(raw.duration_ms),
+        message_id: str(raw.message_id),
+        run_id: str(raw.run_id),
+        has_table: Boolean(raw.has_table),
+    }
+}
+
+/** SwarmDetail (swarm_contract.md 6d); `versions` newest first. */
+export function normalizeSwarmDetail(raw) {
+    if (!isObject(raw) || raw.id === undefined || raw.id === null || raw.id === '') return null
+    const versions = arr(raw.versions)
+        .filter(isObject)
+        .map(normalizeVersionSummary)
+        .filter(Boolean)
+        .sort((a, b) => b.version - a.version)
+    return {
+        ...raw,
+        id: String(raw.id),
+        title: text(raw.title),
+        chat_id: str(raw.chat_id),
+        message_id: str(raw.message_id),
+        latest_version: positiveInt(raw.latest_version) || 0,
+        prompts: arr(raw.prompts).filter(isObject),
+        categories: arr(raw.categories)
+            .filter(isObject)
+            .map((c) => ({ ...c, key: text(c.key), label: text(c.label), task_ids: arr(c.task_ids).map(String) })),
+        tasks: arr(raw.tasks).filter(isObject),
+        versions,
+    }
+}
+
+/** SwarmVersion (swarm_contract.md 6d): one execution and its table, null until it has one. */
+export function normalizeSwarmVersion(raw) {
+    if (!isObject(raw)) return null
+    const version = positiveInt(raw.version)
+    if (version === null) return null
+    return {
+        ...raw,
+        swarm_id: str(raw.swarm_id),
+        version,
+        scope: text(raw.scope),
+        scope_label: text(raw.scope_label),
+        status: text(raw.status),
+        counts: isObject(raw.counts) ? raw.counts : {},
+        started_at: raw.started_at || null,
+        finished_at: raw.finished_at || null,
+        duration_ms: numberOrNull(raw.duration_ms),
+        message_id: str(raw.message_id),
+        table: isObject(raw.table) ? raw.table : null,
     }
 }
 

@@ -19,8 +19,13 @@
 //          {type:'chat.updated', chatId, title} | {type:'artifact.started'|'artifact.completed'|
 //          'artifact.failed'|'artifact.reset', artifactId, ...} | {type:'resync', reason}
 //          {type:'terminal', phase, status}
+//
+// Research agents (design/swarm_contract.md 4c): task.* events patch one
+// task of a `swarm` part, guarded by the task's `rev`, exactly as the
+// backend's runtime/parts.py does; research.recorded adds a capture to the
+// message research and has no effect (a task row opens it on click).
 import { toEpochMs } from './normalize'
-import { ACTIVE_PART_STATUSES, EVENT, MESSAGE_STATUS, RUN_PHASE, TAB_STATUSES, isTerminalPhase } from './types'
+import { ACTIVE_PART_STATUSES, EVENT, MESSAGE_STATUS, PART_TYPES, RUN_PHASE, TAB_STATUSES, isTerminalPhase } from './types'
 
 export function initialRunState(overrides = {}) {
     return {
@@ -221,6 +226,28 @@ function parseSnapshot(content) {
     } catch {
         return content
     }
+}
+
+/**
+ * task.started / task.progress / task.finished: shallow-merge `patch` into
+ * the task `task_id` of the swarm part `part_id` when `rev` is newer than the
+ * task's. Unknown parts, non-swarm parts, unknown tasks and stale or
+ * repeated revs change nothing. Only the touched part and task are new.
+ */
+function applyTaskPatch(state, e) {
+    if (e.task_id === undefined || e.task_id === null) return { state }
+    const index = findPart(state, e.part_id)
+    if (index === -1) return { state }
+    const part = partsOf(state)[index]
+    if (!part || part.type !== PART_TYPES.SWARM || !Array.isArray(part.tasks)) return { state }
+    const key = String(e.task_id)
+    const ti = part.tasks.findIndex((t) => t && String(t.id) === key)
+    const rev = Number(e.rev)
+    if (ti === -1 || !Number.isFinite(rev) || rev <= Number(part.tasks[ti].rev || 0)) return { state }
+    const patch = e.patch && typeof e.patch === 'object' ? e.patch : {}
+    const tasks = part.tasks.slice()
+    tasks[ti] = { ...tasks[ti], ...patch, id: tasks[ti].id, rev }
+    return { state: clearRetrying(replacePart(state, index, { ...part, tasks })) }
 }
 
 function terminal(state, event, phase, messagePatch, runPatch) {
@@ -482,6 +509,19 @@ const HANDLERS = {
             state: next,
             effects: [{ type: 'pane.update', tabId: String(e.tab_id), kind: parsed.kind, patch: tabPatch }],
         }
+    },
+
+    [EVENT.TASK_STARTED]: applyTaskPatch,
+    [EVENT.TASK_PROGRESS]: applyTaskPatch,
+    [EVENT.TASK_FINISHED]: applyTaskPatch,
+
+    [EVENT.RESEARCH_RECORDED](state, e) {
+        if (e.capture_id === undefined || e.capture_id === null || e.capture_id === '') return { state }
+        if (e.kind !== 'serp' && e.kind !== 'page') return { state }
+        const capture = e.capture && typeof e.capture === 'object' ? e.capture : {}
+        const { state: next } = mergeResearch(state, e.kind, String(e.capture_id), capture)
+        // No pane effect: the task row that took the capture opens it on click.
+        return { state: next }
     },
 }
 

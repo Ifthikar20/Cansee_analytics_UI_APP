@@ -15,9 +15,28 @@
     <h2 v-else class="ag-apx-heading">Research data</h2>
 
     <div v-show="open || expanded" :id="bodyId" class="ag-apx-body">
-      <p v-if="!serp.length && !engines.length && !pages.length" class="ag-apx-empty">
+      <p v-if="!swarm && !serp.length && !engines.length && !pages.length" class="ag-apx-empty">
         This report was saved without research data.
       </p>
+
+      <section v-if="swarm" class="ag-apx-section ag-apx-swarm">
+        <h3 class="ag-apx-sub">Research agents</h3>
+        <p class="ag-apx-line">{{ swarmSummary }}</p>
+        <ul v-if="swarmCategories.length" class="ag-apx-list">
+          <li v-for="c in swarmCategories" :key="c.key">{{ c.text }}</li>
+        </ul>
+        <div v-if="!expanded && swarmSheets.length" class="ag-apx-actions">
+          <AgButton
+            v-for="sheet in swarmSheets"
+            :key="sheet.key"
+            size="xs"
+            :icon="Download"
+            @click="downloadSheet(sheet)"
+          >
+            Download {{ sheet.title || sheet.key }} CSV
+          </AgButton>
+        </div>
+      </section>
 
       <section v-if="serp.length" class="ag-apx-section">
         <h3 class="ag-apx-sub">Google results</h3>
@@ -113,9 +132,14 @@
 
 <script setup>
 import { computed, ref, useId } from 'vue'
-import { ChevronRight } from '@lucide/vue'
+import { ChevronRight, Download } from '@lucide/vue'
+import AgButton from '@/components/agent/common/AgButton.vue'
+import { csvFilename, csvRows, tableSheets } from '@/components/agent/swarm/tableModel'
+import { formatDuration } from '@/composables/agent/useElapsed'
 import { engineMeta } from '@/lib/engines'
 import { aiOverviewUnread } from '@/lib/gap'
+import { toCsv } from '@/lib/agent/csv'
+import { downloadText } from '@/lib/agent/download'
 import { displayUrl, hostOf } from '@/lib/agent/url'
 import { formatCapturedAt, formatNumber, regionName } from '../format'
 
@@ -133,8 +157,50 @@ const serp = computed(() => list(props.data?.serp))
 const engines = computed(() => list(props.data?.engines))
 const pages = computed(() => list(props.data?.pages))
 
+// The research agents behind the report (data.swarm, null without one).
+// The results table itself is in the report's Markdown, so only the run's
+// summary and the CSV downloads show here.
+const swarm = computed(() => {
+  const value = props.data?.swarm
+  return value && typeof value === 'object' ? value : null
+})
+
+const swarmSummary = computed(() => {
+  const s = swarm.value
+  const counts = (s && s.counts) || {}
+  const total = Number(counts.total) || 0
+  const parts = [`${Number(counts.done) || 0} done`]
+  for (const key of ['failed', 'skipped', 'stopped']) {
+    if (Number(counts[key]) > 0) parts.push(`${Number(counts[key])} ${key}`)
+  }
+  const ms = s && s.duration_ms !== null && s.duration_ms !== undefined ? Number(s.duration_ms) : NaN
+  const took = Number.isFinite(ms) ? ` in ${formatDuration(ms)}` : ''
+  return `Ran ${total} ${total === 1 ? 'agent' : 'agents'}${took}: ${parts.join(', ')}.`
+})
+
+const swarmCategories = computed(() =>
+  list(swarm.value?.categories)
+    .filter((c) => c.key && c.counts && Number(c.counts.total) > 0)
+    .map((c) => ({
+      key: c.key,
+      text: `${c.label || c.key}: ${Number(c.counts.done) || 0} of ${Number(c.counts.total)} done`,
+    }))
+)
+
+const swarmSheets = computed(() => tableSheets(swarm.value?.table))
+
+function downloadSheet(sheet) {
+  const table = swarm.value?.table
+  if (!table || !sheet) return
+  downloadText(toCsv(csvRows(sheet)), csvFilename(table, sheet), 'text/csv;charset=utf-8')
+}
+
 const summary = computed(() => {
   const parts = []
+  if (swarm.value) {
+    const total = Number(swarm.value.counts?.total) || 0
+    parts.push(`${total} research ${total === 1 ? 'agent' : 'agents'}`)
+  }
   if (serp.value.length) parts.push(`${serp.value.length} Google ${serp.value.length === 1 ? 'page' : 'pages'}`)
   if (engines.value.length) parts.push(`${engines.value.length} engine ${engines.value.length === 1 ? 'check' : 'checks'}`)
   if (pages.value.length) parts.push(`${pages.value.length} ${pages.value.length === 1 ? 'page' : 'pages'} inspected`)
@@ -297,6 +363,21 @@ function chars(n) {
 
 .ag-apx-line.is-error {
   color: var(--ag-danger);
+}
+
+.ag-apx-list {
+  margin: 0 0 6px;
+  padding-left: 18px;
+  color: var(--ag-fg-2);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.ag-apx-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-top: 10px;
 }
 
 .ag-apx-table {

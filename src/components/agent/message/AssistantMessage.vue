@@ -23,12 +23,25 @@
       :live="live"
     />
 
+    <div v-if="groups.swarms.length" class="ag-assistant-swarms">
+      <SwarmBlock
+        v-for="part in groups.swarms"
+        :key="part.id"
+        :part="part"
+        :message="message"
+        :live="live"
+        :website-id="websiteId"
+        :busy="busy"
+      />
+    </div>
+
     <div v-if="groups.body.length" class="ag-assistant-body">
       <template v-for="part in groups.body" :key="part.id">
         <MarkdownBlock v-if="part.type === 'text'" :text="part.text || ''" :streaming="live" />
         <ChartBlock v-else-if="part.type === 'chart'" :spec="part.spec" />
         <BrowserOpenChip v-else-if="part.type === 'browser_open'" :url="part.url || ''" :title="part.title || ''" />
         <NoticePart v-else-if="part.type === 'notice'" :level="part.level" :code="part.code || ''" :message="part.message || ''" />
+        <SwarmTable v-else-if="part.type === 'swarm_table'" :part="part" :message="message" mode="inline" :busy="busy" />
       </template>
     </div>
 
@@ -97,9 +110,10 @@
 </template>
 
 <script setup>
-// One assistant turn: "Working"/"Worked for Ns" with the step list, the reply
-// (text, charts, suggested pages, notices) in arrival order, sub-agent
-// deliverables, errors, and the actions row.
+// One assistant turn: "Working"/"Worked for Ns" with the step list, the
+// research agents, the reply (text, charts, suggested pages, notices and the
+// research results table) in arrival order, sub-agent deliverables, errors,
+// and the actions row.
 import { computed, ref, watch } from 'vue'
 import { ArrowDownToLine } from '@lucide/vue'
 import AgButton from '@/components/agent/common/AgButton.vue'
@@ -114,6 +128,8 @@ import NoticePart from './NoticePart.vue'
 import SourceList from './SourceList.vue'
 import StepTimeline from './StepTimeline.vue'
 import WorkedLabel from './WorkedLabel.vue'
+import SwarmBlock from '@/components/agent/swarm/SwarmBlock.vue'
+import SwarmTable from '@/components/agent/swarm/SwarmTable.vue'
 import { errorInfo, messageCitations, messageText, splitParts } from './parts'
 import { agentMeta } from '@/lib/agent/agentsMeta'
 import { useAgentStore } from '@/stores/agent'
@@ -238,6 +254,16 @@ function switchBranch(dir) {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+
+.ag-assistant-swarms {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.ag-assistant-swarms:first-child {
+  margin-top: 0;
 }
 
 .ag-assistant-body {

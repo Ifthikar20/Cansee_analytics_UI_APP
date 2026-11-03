@@ -11,6 +11,7 @@ const AgentContextPage = () => import('@/pages/agent/AgentContextPage.vue')
 const AgentAgentsPage = () => import('@/pages/agent/AgentAgentsPage.vue')
 const AgentArtifactsPage = () => import('@/pages/agent/AgentArtifactsPage.vue')
 const AgentArtifactPage = () => import('@/pages/agent/AgentArtifactPage.vue')
+const AgentFindingsPage = () => import('@/pages/agent/AgentFindingsPage.vue')
 
 const meta = { requiresAuth: true, workspace: true }
 // Tab titles for pages that do not set their own (AgentShell applies them);
@@ -43,6 +44,13 @@ export const agentRoutes = [
             { path: 'c/:chatId', name: 'agent-chat', component: AgentChatPage, props: true },
             { path: 'context', name: 'agent-context', component: AgentContextPage, props: true, meta: titled('Context') },
             { path: 'agents', name: 'agent-agents', component: AgentAgentsPage, props: true, meta: titled('Agents') },
+            {
+                path: 'findings',
+                name: 'agent-findings',
+                component: AgentFindingsPage,
+                props: true,
+                meta: titled('Findings'),
+            },
             {
                 path: 'reports',
                 name: 'agent-reports',

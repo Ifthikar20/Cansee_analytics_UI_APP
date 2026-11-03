@@ -6,11 +6,19 @@ import { reactive, ref } from 'vue'
 
 export const useAgentStore = defineStore('agent', () => {
   const websiteId = ref('w1')
+  const status = ref({ swarm: { enabled: true, max_agents: 30 } })
   const messages = reactive({})
   const paths = reactive({})
   const chatState = reactive({})
   const artifacts = reactive({})
   const loadCalls = []
+  // Research agents loaded by API, as the real store keeps them:
+  // {[swarmId]: {detail, versions: {[n]: SwarmVersion}, loading, error}}.
+  const swarms = reactive({})
+  // What the swarm endpoints answer in a spec: details and versions by id,
+  // and failures by `swarm:<id>` or `version:<id>:<n>` ({status, code,
+  // message}; a 404 sets the entry's error, anything else throws).
+  const swarmApi = { details: {}, versions: {}, failures: {} }
 
   function visiblePath(chatId) {
     return (paths[chatId] || []).map((id) => messages[id]).filter(Boolean)
@@ -30,7 +38,106 @@ export const useAgentStore = defineStore('agent', () => {
     return artifacts[id]?.versions || []
   }
 
-  return { websiteId, messages, paths, chatState, artifacts, loadCalls, visiblePath, artifact, loadArtifact, loadVersions }
+  function tableParts(swarmId) {
+    const out = []
+    for (const message of Object.values(messages)) {
+      for (const part of message?.parts || []) {
+        if (part && part.type === 'swarm_table' && part.swarm_id === swarmId) out.push(part)
+      }
+    }
+    return out
+  }
+
+  function swarmTable(swarmId, version) {
+    const part = tableParts(swarmId).find((p) => Number(p.version) === Number(version))
+    if (part) return part.table
+    return swarms[swarmId]?.versions?.[version]?.table || null
+  }
+
+  function latestSwarmVersion(swarmId) {
+    const versions = tableParts(swarmId).map((p) => Number(p.version) || 0)
+    versions.push(Number(swarms[swarmId]?.detail?.latest_version) || 0)
+    return Math.max(...versions) || null
+  }
+
+  function swarmCategories(swarmId) {
+    return swarms[swarmId]?.detail?.categories || []
+  }
+
+  function entry(swarmId) {
+    if (!swarms[swarmId]) swarms[swarmId] = { detail: null, versions: {}, loading: false, error: null }
+    return swarms[swarmId]
+  }
+
+  function fail(target, failure) {
+    const error = Object.assign(new Error(failure.message || 'Failed'), failure)
+    if (failure.status === 404) {
+      target.error = error
+      return null
+    }
+    throw error
+  }
+
+  async function loadSwarm(swarmId) {
+    loadCalls.push(['swarm', swarmId])
+    const target = entry(swarmId)
+    const failure = swarmApi.failures[`swarm:${swarmId}`]
+    if (failure) return fail(target, failure)
+    target.detail = swarmApi.details[swarmId] || null
+    target.error = null
+    return target.detail
+  }
+
+  async function loadSwarmVersion(swarmId, version) {
+    loadCalls.push(['version', swarmId, version])
+    const target = entry(swarmId)
+    const failure = swarmApi.failures[`version:${swarmId}:${version}`]
+    if (failure) return fail(target, failure)
+    const loaded = swarmApi.versions[`${swarmId}:${version}`] || null
+    if (loaded) target.versions = { ...target.versions, [version]: loaded }
+    target.error = null
+    return loaded
+  }
+
+  function isChatBusy() {
+    return false
+  }
+
+  return {
+    websiteId,
+    status,
+    messages,
+    paths,
+    chatState,
+    artifacts,
+    loadCalls,
+    swarms,
+    swarmApi,
+    visiblePath,
+    artifact,
+    loadArtifact,
+    loadVersions,
+    swarmTable,
+    latestSwarmVersion,
+    swarmCategories,
+    loadSwarm,
+    loadSwarmVersion,
+    isChatBusy,
+  }
+})
+
+// Findings as the results table reads them, without the API client.
+export const useAgentFindingsStore = defineStore('agentFindings', () => {
+  const canEdit = ref(true)
+  const added = reactive({})
+  function isAdded(swarmId, sheet, rowKey) {
+    return Boolean(added[`${swarmId}:${sheet}:${rowKey}`])
+  }
+  function init() {}
+  async function addFromTable() {
+    return { created: [], duplicates: [] }
+  }
+  return { canEdit, added, isAdded, init, addFromTable }
 })
 
 export const useAuthStore = defineStore('auth', () => {

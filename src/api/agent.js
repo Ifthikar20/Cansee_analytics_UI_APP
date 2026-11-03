@@ -6,7 +6,8 @@ import api from './client'
 // in lib/agent/streamClient.js and lib/agent/poller.js.
 //
 // Run-starting POSTs set _noRetry429 so the 429 retry never re-sends them.
-// sendMessage is also _silentError: its failure shows on the message itself.
+// sendMessage is also _silentError: its failure shows on the message itself;
+// so is rerunSwarm, whose caller shows the code-specific copy.
 
 const site = (wid) => `/agent/websites/${encodeURIComponent(wid)}`
 const live = (wid) => `/agent/live/websites/${encodeURIComponent(wid)}`
@@ -54,6 +55,26 @@ export default {
     suggestions: (wid, config) => api.get(`${site(wid)}/suggestions/`, config),
     activity: (wid, config) => api.get(`${site(wid)}/activity/`, config),
 
+    /* ── research agents (swarms): private to the chat's user ── */
+
+    // SwarmDetail: plan, categories, tasks and versions (newest first)
+    getSwarm: (wid, sid, config) => api.get(`${site(wid)}/swarms/${encodeURIComponent(sid)}/`, config),
+    // SwarmVersion: counts, status and the table (null until it has one)
+    getSwarmVersion: (wid, sid, number, config) =>
+        api.get(`${site(wid)}/swarms/${encodeURIComponent(sid)}/versions/${encodeURIComponent(number)}/`, config),
+
+    /* ── findings: shared with the project's members ── */
+
+    // {status, category, severity, swarm_id, q, cursor} -> {results, next_cursor, counts, can_edit}
+    listFindings: (wid, params = {}, config = {}) => api.get(`${site(wid)}/findings/`, { ...config, params: clean(params) }),
+    // {from_swarm: {swarm_id, version, sheet, row_keys}} | {title, detail, category, severity, prompt_text};
+    // 201 {created, duplicates}
+    createFindings: (wid, data, config) => api.post(`${site(wid)}/findings/`, data, config),
+    // any of {status, severity, title, detail}
+    updateFinding: (wid, fid, data, config) =>
+        api.patch(`${site(wid)}/findings/${encodeURIComponent(fid)}/`, data, config),
+    deleteFinding: (wid, fid, config) => api.delete(`${site(wid)}/findings/${encodeURIComponent(fid)}/`, config),
+
     /* ── agent process ── */
 
     // {text, parent_id?, agent?}; 202 {user_message, assistant_message, run}
@@ -76,6 +97,18 @@ export default {
     // 202 {user_message, assistant_message, run}
     continueMessage: (wid, mid, config) =>
         api.post(`${live(wid)}/messages/${encodeURIComponent(mid)}/continue/`, {}, runStart(config)),
+    // {scope: 'all'|'category'|'task', category?, task_id?};
+    // 202 {user_message, assistant_message, run, swarm_version}
+    rerunSwarm: (wid, sid, data, { idempotencyKey, ...config } = {}) =>
+        api.post(
+            `${live(wid)}/swarms/${encodeURIComponent(sid)}/rerun/`,
+            clean(data),
+            runStart({
+                _silentError: true,
+                ...config,
+                headers: { ...(config.headers || {}), ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
+            })
+        ),
     // idempotent; {status}
     cancelRun: (rid, config) =>
         api.post(`/agent/live/runs/${encodeURIComponent(rid)}/cancel/`, {}, { _noRetry429: true, _silentError: true, ...config }),

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 vi.mock('@/api/client', () => ({
     default: { get: vi.fn(), post: vi.fn() },
@@ -51,6 +52,21 @@ describe('agent routes', () => {
         expect(props('agent-reports')).toEqual({ websiteId: '2', kinds: ['report'] })
         expect(props('agent-documents').kinds).toEqual(['document', 'page'])
         expect(props('agent-sheets').kinds).toEqual(['sheet'])
+    })
+
+    it('resolves the Findings page under the project, lazily, with its title', () => {
+        const router = createRouter({ history: createMemoryHistory(), routes: agentRoutes })
+        const target = router.resolve({ name: 'agent-findings', params: { websiteId: '2' } })
+        expect(target.path).toBe('/projects/2/agent/findings')
+        expect(target.params).toEqual({ websiteId: '2' })
+        expect(target.meta).toEqual({ requiresAuth: true, workspace: true, title: 'Findings' })
+        expect(router.resolve('/projects/2/agent/findings').name).toBe('agent-findings')
+
+        const findings = child('agent-findings')
+        expect(findings.props).toBe(true)
+        // A lazy component: a loader function, never the page module itself.
+        expect(typeof findings.component).toBe('function')
+        expect(findings.component).not.toBe(child('agent-home').component)
     })
 })
 

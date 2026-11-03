@@ -402,4 +402,236 @@ describe('agentPane store', () => {
       expect(pane.chatKey).toBe(null)
     })
   })
+
+  describe('research agents', () => {
+    const PAGE_CAPTURE = {
+      capture_id: 'pg1',
+      url: 'https://notely.test/',
+      final_url: 'https://notely.test/',
+      frameable: true,
+      status_code: 200,
+      seo: { title: 'Notely: notes for teams' },
+      error: null,
+    }
+
+    // A finished swarm whose agents took one Google page and one page (read
+    // twice); the Claude agent failed without a capture.
+    function swarmPart(overrides = {}) {
+      return {
+        id: 'p4',
+        type: 'swarm',
+        swarm_id: 's1',
+        version: 1,
+        status: 'done',
+        tasks: [
+          {
+            id: 'google.p1.page1',
+            status: 'done',
+            pane: { kind: 'serp', tab_id: 'serp:c1' },
+            detail: { query: 'best note app', page: 2, location: 'us' },
+          },
+          {
+            id: 'competitors.p1.c1',
+            status: 'done',
+            pane: { kind: 'page', tab_id: 'page:pg1' },
+            detail: { url: 'https://notely.test/', title: 'Notely' },
+          },
+          { id: 'engines.p1.claude', status: 'failed', pane: null, error: { code: 'rate_limited', message: 'Busy' } },
+          { id: 'site.p1.page', status: 'done', pane: { kind: 'page', tab_id: 'page:pg1' }, detail: { url: 'https://notely.test/' } },
+        ],
+        ...overrides,
+      }
+    }
+
+    function seedSwarmChat(chatId, part = swarmPart(), research = { serp: { c1: serpCapture() }, pages: { pg1: PAGE_CAPTURE } }) {
+      agent.messages.m1 = { id: 'm1', role: 'user', parts: [{ id: 'p0', type: 'text', text: 'Research' }] }
+      agent.messages.m2 = { ...assistant('m2', [part], research), status: 'complete' }
+      agent.paths[chatId] = ['m1', 'm2']
+      agent.chatState[chatId] = { loaded: true }
+    }
+
+    it('opens one results table tab per swarm and switches its version', () => {
+      expect(pane.openTable('s1', { version: 2, title: 'Research Notion' })).toBe('table:s1')
+      expect(pane.activeTab).toMatchObject({ id: 'table:s1', kind: 'table', swarmId: 's1', version: 2, status: 'ready' })
+      expect(pane.open).toBe(true)
+      expect(pane.titleOf(pane.activeTab)).toBe('Research Notion')
+
+      // Again: the same tab, now on the latest version, keeping its title.
+      expect(pane.openTable('s1')).toBe('table:s1')
+      expect(pane.tabs).toHaveLength(1)
+      expect(pane.activeTab).toMatchObject({ version: null, title: 'Research Notion' })
+
+      pane.openTable('s2', { activate: false })
+      expect(pane.tabs.map((t) => t.id)).toEqual(['table:s1', 'table:s2'])
+      expect(pane.activeId).toBe('table:s1')
+      expect(pane.titleOf(pane.tabs[1])).toBe('Research results')
+      pane.updateTab('table:s2', { version: 3 })
+      expect(pane.tabs[1].version).toBe(3)
+      expect(pane.openTable('')).toBe(null)
+      expect(pane.openTable(null)).toBe(null)
+    })
+
+    it('persists results table tabs by swarm and version, and restores them ready', async () => {
+      vi.useFakeTimers()
+      agent.paths.c = []
+      agent.chatState.c = { loaded: true }
+      pane.bindChat('c')
+      pane.openTable('s1', { version: 2, title: 'Research Notion' })
+      pane.openTable('s2')
+      await nextTick()
+      vi.advanceTimersByTime(200)
+
+      const state = JSON.parse(localStorage.getItem(TABS_KEY)).chats.c.state
+      expect(state.tabs).toEqual([
+        { id: 'table:s1', kind: 'table', swarm_id: 's1', version: 2 },
+        { id: 'table:s2', kind: 'table', swarm_id: 's2', version: null },
+      ])
+      expect(state.active).toBe('table:s2')
+
+      pane.bindChat('other')
+      expect(pane.tabs).toHaveLength(0)
+      pane.bindChat('c')
+      expect(pane.tabs.map((t) => [t.id, t.kind, t.swarmId, t.version, t.status])).toEqual([
+        ['table:s1', 'table', 's1', 2, 'ready'],
+        ['table:s2', 'table', 's2', null, 'ready'],
+      ])
+      expect(pane.activeId).toBe('table:s2')
+      expect(pane.titleOf(pane.tabs[0])).toBe('Research results')
+    })
+
+    it('derives the agents\' captures only when asked: first occurrence, never opened by itself', () => {
+      seedSwarmChat('c')
+      expect(researchTabs(agent.visiblePath('c'))).toEqual([])
+      const specs = researchTabs(agent.visiblePath('c'), { includeSwarm: true })
+      expect(specs.map((s) => [s.id, s.kind, s.status, s.auto])).toEqual([
+        ['serp:c1', 'serp', 'ready', false],
+        ['page:pg1', 'page', 'ready', false],
+      ])
+      expect(specs[0].title).toBe('Google · best note app · p2')
+      expect(specs[1].title).toBe('Notely: notes for teams')
+    })
+
+    it('never adds an agent capture to the pane on its own, on load or while the swarm runs', async () => {
+      const running = swarmPart({ status: 'running' })
+      running.tasks = running.tasks.map((t) => ({ ...t, status: 'running', pane: null }))
+      seedSwarmChat('c', running, { serp: {}, pages: {} })
+      agent.messages.m2.status = 'streaming'
+      pane.bindChat('c')
+      expect(pane.tabs).toHaveLength(0)
+
+      // The agents finish and name their captures.
+      agent.messages.m2.research = { serp: { c1: serpCapture() }, pages: { pg1: PAGE_CAPTURE } }
+      agent.messages.m2.parts = [swarmPart()]
+      agent.messages.m2.status = 'complete'
+      await nextTick()
+      expect(pane.tabs).toHaveLength(0)
+      expect(pane.open).toBe(false)
+
+      // A chat loaded with a finished swarm opens nothing either.
+      pane.bindChat('other')
+      seedSwarmChat('d')
+      pane.bindChat('d')
+      expect(pane.tabs).toHaveLength(0)
+      expect(pane.open).toBe(false)
+    })
+
+    it('openCapture opens a capture that only a research agent names', () => {
+      seedSwarmChat('c')
+      pane.bindChat('c')
+      expect(pane.openCapture('serp:c1')).toBe('serp:c1')
+      expect(pane.activeTab).toMatchObject({ id: 'serp:c1', kind: 'serp', status: 'ready' })
+      expect(pane.activeTab.data.results).toHaveLength(3)
+      expect(pane.titleOf(pane.activeTab)).toBe('Google · best note app · p2')
+      expect(pane.open).toBe(true)
+
+      expect(pane.openCapture('page:pg1', { activate: false })).toBe('page:pg1')
+      const page = pane.tabs.find((t) => t.id === 'page:pg1')
+      expect(page).toMatchObject({ kind: 'page', status: 'ready', url: 'https://notely.test/', finalUrl: 'https://notely.test/' })
+      expect(pane.activeId).toBe('serp:c1')
+
+      // Again: the open tab is activated, not duplicated.
+      expect(pane.openCapture('page:pg1')).toBe('page:pg1')
+      expect(pane.tabs).toHaveLength(2)
+      expect(pane.activeId).toBe('page:pg1')
+
+      // Closed, it reopens from the research store.
+      pane.closeTab('serp:c1')
+      expect(pane.activateTab('serp:c1')).toBe('serp:c1')
+      expect(pane.activeTab.data.query).toBe('best note app')
+    })
+
+    it('openCapture opens any capture in the chat research, and refuses the rest', () => {
+      seedSwarmChat('c', swarmPart({ tasks: [] }), {
+        serp: { c9: serpCapture({ capture_id: 'c9', query: 'notion alternatives', page: 1 }) },
+        pages: {},
+      })
+      pane.bindChat('c')
+      expect(pane.openCapture('serp:c9')).toBe('serp:c9')
+      expect(pane.activeTab).toMatchObject({ kind: 'serp', status: 'ready' })
+      expect(pane.titleOf(pane.activeTab)).toBe('Google · notion alternatives · p1')
+
+      for (const id of ['serp:missing', 'page:', 'table:s1', 'artifact:a1', 'c9', '', null]) {
+        expect(pane.openCapture(id)).toBe(null)
+      }
+      expect(pane.tabs).toHaveLength(1)
+    })
+
+    it('openCapture needs a bound chat', () => {
+      seedSwarmChat('c')
+      expect(pane.openCapture('serp:c1')).toBe(null)
+      expect(pane.tabs).toHaveLength(0)
+    })
+
+    it('keeps restored tabs of agent captures instead of marking them gone', () => {
+      localStorage.setItem(
+        TABS_KEY,
+        JSON.stringify({
+          v: 1,
+          chats: {
+            c: {
+              at: 1,
+              state: {
+                open: true,
+                active: 'serp:c1',
+                tabs: [
+                  { id: 'serp:c1', kind: 'serp' },
+                  { id: 'page:pg1', kind: 'page' },
+                  { id: 'page:old', kind: 'page' },
+                ],
+              },
+            },
+          },
+        })
+      )
+      seedSwarmChat('c')
+      pane.bindChat('c')
+      expect(pane.tabs.map((t) => [t.id, t.status])).toEqual([
+        ['serp:c1', 'ready'],
+        ['page:pg1', 'ready'],
+        ['page:old', 'gone'],
+      ])
+      expect(pane.tabs[0].data.results).toHaveLength(3)
+      expect(pane.tabs[1].url).toBe('https://notely.test/')
+      expect(pane.activeId).toBe('serp:c1')
+    })
+
+    it('fills a restored agent capture tab once the task names its capture', async () => {
+      localStorage.setItem(
+        TABS_KEY,
+        JSON.stringify({ v: 1, chats: { c: { at: 1, state: { open: false, active: 'serp:c1', tabs: [{ id: 'serp:c1', kind: 'serp' }] } } } })
+      )
+      const running = swarmPart({ status: 'running' })
+      running.tasks = running.tasks.map((t) => ({ ...t, pane: null }))
+      seedSwarmChat('c', running, { serp: { c1: serpCapture() }, pages: {} })
+      agent.chatState.c = { loaded: false }
+      pane.bindChat('c')
+      expect(pane.tabs[0].status).toBe('missing')
+
+      agent.messages.m2.parts = [swarmPart()]
+      agent.chatState.c = { loaded: true }
+      await nextTick()
+      expect(pane.tabs[0]).toMatchObject({ id: 'serp:c1', status: 'ready' })
+      expect(pane.tabs[0].data.query).toBe('best note app')
+    })
+  })
 })

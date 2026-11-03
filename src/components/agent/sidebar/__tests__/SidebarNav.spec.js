@@ -26,6 +26,7 @@ async function setup(component, path, props) {
       { path: '/projects/:websiteId/agent/c/:chatId', name: 'agent-chat', component: Blank },
       { path: '/projects/:websiteId/agent/context', name: 'agent-context', component: Blank },
       { path: '/projects/:websiteId/agent/agents', name: 'agent-agents', component: Blank },
+      { path: '/projects/:websiteId/agent/findings', name: 'agent-findings', component: Blank },
       { path: '/projects/:websiteId/agent/reports', name: 'agent-reports', component: Blank },
       { path: '/projects/:websiteId/agent/sheets', name: 'agent-sheets', component: Blank },
       { path: '/projects/:websiteId/agent/documents', name: 'agent-documents', component: Blank },
@@ -42,20 +43,39 @@ beforeEach(() => {
 })
 
 describe('SidebarNav', () => {
-  it('lists the seven sections in order with project links', async () => {
+  it('lists the eight sections in order with project links', async () => {
     const w = await setup(SidebarNav, '/projects/w1/agent', { websiteId: 'w1' })
     const links = w.findAll('a.ag-nav-row')
-    expect(links.map((a) => a.text())).toEqual(['Agent', 'Projects', 'Context', 'Agents', 'Reports', 'Sheets', 'Documents'])
+    expect(links.map((a) => a.text())).toEqual([
+      'Agent',
+      'Projects',
+      'Context',
+      'Agents',
+      'Findings',
+      'Reports',
+      'Sheets',
+      'Documents',
+    ])
     expect(links.map((a) => a.attributes('href'))).toEqual([
       '/projects/w1/agent',
       '/agent/projects',
       '/projects/w1/agent/context',
       '/projects/w1/agent/agents',
+      '/projects/w1/agent/findings',
       '/projects/w1/agent/reports',
       '/projects/w1/agent/sheets',
       '/projects/w1/agent/documents',
     ])
-    expect(w.findAll('svg.ag-nav-icon')).toHaveLength(7)
+    expect(w.findAll('svg.ag-nav-icon')).toHaveLength(8)
+  })
+
+  it('shows Findings with the flag glyph and marks it current on its page', async () => {
+    const w = await setup(SidebarNav, '/projects/w1/agent/findings', { websiteId: 'w1' })
+    const current = w.find('[aria-current="page"]')
+    expect(current.text()).toBe('Findings')
+    expect(current.classes()).toContain('is-active')
+    expect(current.find('svg.ag-icon-findings').exists()).toBe(true)
+    expect(w.findAll('.is-active')).toHaveLength(1)
   })
 
   it('marks the current section and not Agent while a chat is open', async () => {
@@ -74,7 +94,7 @@ describe('SidebarNav', () => {
   it('disables project sections when there is no project', async () => {
     const w = await setup(SidebarNav, '/agent/projects', { websiteId: null })
     expect(w.findAll('a.ag-nav-row').map((a) => a.text())).toEqual(['Projects'])
-    expect(w.findAll('[aria-disabled="true"]')).toHaveLength(6)
+    expect(w.findAll('[aria-disabled="true"]')).toHaveLength(7)
   })
 })
 

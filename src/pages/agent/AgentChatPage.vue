@@ -2,6 +2,7 @@
   <AgentWorkspaceSplit class="ag-chat-page">
     <template #chat>
       <ChatPane
+        :key="chatPaneKey"
         :website-id="websiteId"
         :chat-id="chatId || null"
         :project-name="projectName"
@@ -9,6 +10,21 @@
         :pane-dom-id="PANE_PANEL_ID"
         @created="onCreated"
       />
+      <AgConfirmDialog
+        v-model:open="firstResearchOpen"
+        title="Run your first research?"
+        :description="firstResearchIntro"
+        confirm-label="Start research"
+        busy-label="Starting"
+        cancel-label="Not now"
+        :busy="firstResearchBusy"
+        @confirm="confirmFirstResearch"
+        @cancel="declineFirstResearch"
+      >
+        <ol v-if="firstResearchPrompts.length" class="ag-first-research-prompts">
+          <li v-for="(prompt, i) in firstResearchPrompts" :key="i">{{ prompt }}</li>
+        </ol>
+      </AgConfirmDialog>
     </template>
     <template #pane="{ layout }">
       <BrowserPane :layout="layout" />
@@ -20,17 +36,34 @@
 // New chat (/projects/:websiteId/agent) and chat (/c/:chatId) share this
 // instance: moving to the chat URL after the first message keeps the page,
 // its composer and the pane. ?agent=<key> preselects an agent on a new chat;
-// ?artifact=<id> opens that artifact in the pane.
-import { computed, onBeforeUnmount, watch } from 'vue'
+// ?artifact=<id> opens that artifact in the pane; ?tab=<serp:…|page:…>
+// opens one of the chat's captures once the chat has loaded.
+//
+// The first research from onboarding waits in useFirstResearch. A new chat
+// opened with ?start=first-research sends it at once with the research
+// agent; without the query (after the paywall, say) the page offers it.
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AgentWorkspaceSplit from '@/components/agent/workspace/AgentWorkspaceSplit.vue'
 import BrowserPane from '@/components/agent/browser/BrowserPane.vue'
 import ChatPane from '@/components/agent/chat/ChatPane.vue'
+import AgConfirmDialog from '@/components/agent/common/AgConfirmDialog.vue'
 import { PANE_PANEL_ID } from '@/components/agent/browser/ids'
-import { AGENT_KEY_LIST } from '@/lib/agent/types'
+import { errorInfo } from '@/components/agent/message/parts'
+import { useFirstResearch } from '@/composables/agent/useFirstResearch'
+import { useToast } from '@/composables/useToast'
+import { saveDraft } from '@/lib/agent/storage'
+import { AGENT_KEY_LIST, NEW_CHAT_KEY } from '@/lib/agent/types'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentPaneStore } from '@/stores/agentPane'
+import { useAgentUiStore } from '@/stores/agentUi'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
+
+// The agent that runs the research agents.
+const FIRST_RESEARCH_AGENT = 'gap_analyst'
+const START_FIRST_RESEARCH = 'first-research'
+const CAPTURE_TAB = /^(serp|page):\S+$/
 
 const props = defineProps({
   websiteId: { type: String, required: true },
@@ -41,9 +74,16 @@ const route = useRoute()
 const router = useRouter()
 const store = useAgentStore()
 const pane = useAgentPaneStore()
+const ui = useAgentUiStore()
 const app = useAppStore()
+const auth = useAuthStore()
+const toast = useToast()
+const firstResearch = useFirstResearch()
 
 const chatKey = computed(() => props.chatId || 'new')
+// Bumped to mount the chat column again: its composer reads the saved
+// draft when it mounts, which is how a failed first research lands there.
+const chatPaneKey = ref(0)
 
 const projectName = computed(() => {
   const active = app.activeWebsite
@@ -95,20 +135,136 @@ watch(
   { immediate: true }
 )
 
+/** Replace the route without these query keys. */
+function dropQuery(...keys) {
+  const query = { ...route.query }
+  const present = keys.filter((key) => key in query)
+  if (!present.length) return
+  present.forEach((key) => delete query[key])
+  router.replace({ query, hash: route.hash })
+}
+
 watch(
   () => route.query.artifact,
   (id) => {
     if (typeof id !== 'string' || !id) return
     pane.openArtifact(id, { activate: true })
-    const query = { ...route.query }
-    delete query.artifact
-    router.replace({ query, hash: route.hash })
+    dropQuery('artifact')
+  },
+  { immediate: true }
+)
+
+// A capture lives in the chat's research, so it opens once the chat has
+// loaded (the Findings page links here with ?tab=). A chat that failed to
+// load, or no chat at all, just drops the query.
+watch(
+  () => {
+    const tab = typeof route.query.tab === 'string' ? route.query.tab : ''
+    const st = props.chatId ? store.chatState?.[props.chatId] : null
+    return [tab, props.chatId || '', Boolean(st?.loaded), Boolean(st?.error)]
+  },
+  ([tab, cid, loaded, failed]) => {
+    if (!tab) return
+    if (cid && !loaded && !failed) return
+    if (cid && loaded && CAPTURE_TAB.test(tab) && typeof pane.openCapture === 'function') {
+      pane.openCapture(tab, { activate: true })
+    }
+    dropQuery('tab')
   },
   { immediate: true }
 )
 
 function onCreated(chatId) {
   router.replace({ name: 'agent-chat', params: { websiteId: String(props.websiteId), chatId: String(chatId) } })
+}
+
+/* ── First research (from onboarding) ── */
+
+const firstResearchOpen = ref(false)
+const firstResearchEntry = ref(null)
+const firstResearchBusy = ref(false)
+let firstResearchSending = false
+
+const firstResearchLines = computed(() => String(firstResearchEntry.value?.text || '').split('\n'))
+// The message's own first line ("Research {brand} ({host}) on Google and
+// the AI engines for these prompts:") introduces its numbered prompts.
+const firstResearchIntro = computed(() => firstResearchLines.value[0] || '')
+const firstResearchPrompts = computed(() =>
+  firstResearchLines.value.map((line) => /^\d+\.\s+(.+)$/.exec(line)?.[1]?.trim()).filter(Boolean)
+)
+
+/** Send the stashed message as a new chat with the research agent. */
+async function sendFirstResearch(entry) {
+  if (!entry || firstResearchSending) return false
+  firstResearchSending = true
+  const wid = String(props.websiteId)
+  try {
+    const cid = await store.send({ chatId: null, text: entry.text, agent: FIRST_RESEARCH_AGENT })
+    if (String(props.websiteId) === wid && cid) {
+      router.replace({ name: 'agent-chat', params: { websiteId: wid, chatId: String(cid) } })
+    }
+    return true
+  } catch (error) {
+    const message = errorInfo(error).message || 'The research could not be started. Try again.'
+    toast.error(message)
+    ui.announce(message, 'assertive')
+    // Keep the message: it goes to the new chat's composer with the research
+    // agent picked, so Send starts it again.
+    const uid = auth.user?.id
+    if (uid !== undefined && uid !== null) saveDraft(String(uid), wid, NEW_CHAT_KEY, entry.text)
+    if (String(props.websiteId) === wid && !props.chatId) {
+      router.replace({ name: 'agent-home', params: { websiteId: wid }, query: { agent: FIRST_RESEARCH_AGENT } })
+      chatPaneKey.value += 1
+    }
+    return false
+  } finally {
+    firstResearchSending = false
+  }
+}
+
+watch(
+  () => [props.websiteId, props.chatId || '', String(store.websiteId ?? ''), route.query.start],
+  ([wid, cid, storeWid, start]) => {
+    if (cid || !wid || storeWid !== String(wid)) {
+      firstResearchOpen.value = false
+      return
+    }
+    if (firstResearchSending) return
+    const wantsStart = start === START_FIRST_RESEARCH
+    const entry = firstResearch.peek(wid)
+    if (!entry) {
+      if (wantsStart) dropQuery('start')
+      return
+    }
+    if (wantsStart) {
+      sendFirstResearch(firstResearch.take(wid))
+    } else if (!firstResearchOpen.value) {
+      firstResearchEntry.value = entry
+      firstResearchOpen.value = true
+    }
+  },
+  { immediate: true }
+)
+
+async function confirmFirstResearch() {
+  if (firstResearchBusy.value) return
+  const entry = firstResearch.take(props.websiteId)
+  if (!entry) {
+    firstResearchOpen.value = false
+    return
+  }
+  firstResearchBusy.value = true
+  try {
+    await sendFirstResearch(entry)
+  } finally {
+    firstResearchBusy.value = false
+    firstResearchOpen.value = false
+  }
+}
+
+function declineFirstResearch() {
+  firstResearch.discard()
+  firstResearchEntry.value = null
 }
 
 onBeforeUnmount(() => {
@@ -120,5 +276,17 @@ onBeforeUnmount(() => {
 .ag-chat-page {
   height: 100%;
   min-height: 0;
+}
+
+.ag-first-research-prompts {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  color: var(--ag-fg-1);
+  font-size: 14px;
+  line-height: 21px;
+}
+
+.ag-first-research-prompts li + li {
+  margin-top: 4px;
 }
 </style>

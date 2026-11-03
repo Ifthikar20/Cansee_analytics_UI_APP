@@ -10,6 +10,11 @@
 // | cs-agent-tabs-v1:<uid>:<wid>          | pane state per chat, LRU of 30 chats  |
 // | cs-agent-draft-v1:<uid>:<wid>:<cid>   | composer draft (`new` before a chat)  |
 // | cs-agent-activity-seen-v1:<uid>       | activity last seen, per project       |
+// | cs-agent-findings-v1:<uid>:<wid>      | Findings filters {status, category,   |
+// |                                       | severity}                             |
+//
+// Pane state tabs are {id, kind} plus `url` (url tabs), `artifact_id` and
+// `version` (artifact tabs), `swarm_id` and `version` (research table tabs).
 //
 // Logout removes every per-user key (clearUserData).
 
@@ -19,6 +24,7 @@ const LAST_CHAT_PREFIX = 'cs-agent-last-chat:'
 const TABS_PREFIX = 'cs-agent-tabs-v1:'
 const DRAFT_PREFIX = 'cs-agent-draft-v1:'
 const ACTIVITY_SEEN_PREFIX = 'cs-agent-activity-seen-v1:'
+const FINDINGS_PREFIX = 'cs-agent-findings-v1:'
 
 export const USER_KEY_PREFIXES = Object.freeze([
     LAST_PROJECT_PREFIX,
@@ -26,7 +32,10 @@ export const USER_KEY_PREFIXES = Object.freeze([
     TABS_PREFIX,
     DRAFT_PREFIX,
     ACTIVITY_SEEN_PREFIX,
+    FINDINGS_PREFIX,
 ])
+
+const FINDINGS_PREF_KEYS = Object.freeze(['status', 'category', 'severity'])
 
 export const PANE_STATE_CHAT_LIMIT = 30
 export const DRAFT_MAX_CHARS = 20000
@@ -39,6 +48,7 @@ export const storageKeys = Object.freeze({
     tabs: (uid, wid) => `${TABS_PREFIX}${uid}:${wid}`,
     draft: (uid, wid, cid) => `${DRAFT_PREFIX}${uid}:${wid}:${cid || NEW_CHAT}`,
     activitySeen: (uid) => `${ACTIVITY_SEEN_PREFIX}${uid}`,
+    findings: (uid, wid) => `${FINDINGS_PREFIX}${uid}:${wid}`,
 })
 
 function backend() {
@@ -257,6 +267,27 @@ export function moveDraft(uid, wid, fromCid, toCid) {
     const text = loadDraft(uid, wid, fromCid)
     clearDraft(uid, wid, fromCid)
     if (text) saveDraft(uid, wid, toCid, text)
+}
+
+/* ── Findings filters per project (string values only; the store validates them) ── */
+
+function pickFindingsPrefs(source) {
+    const out = {}
+    if (!isPlainObject(source)) return out
+    for (const key of FINDINGS_PREF_KEYS) {
+        if (typeof source[key] === 'string') out[key] = source[key]
+    }
+    return out
+}
+
+export function loadFindingsPrefs(uid, wid) {
+    if (!present(uid) || !present(wid)) return {}
+    return pickFindingsPrefs(readJSON(storageKeys.findings(uid, wid), {}))
+}
+
+export function saveFindingsPrefs(uid, wid, prefs) {
+    if (!present(uid) || !present(wid) || !isPlainObject(prefs)) return false
+    return writeJSON(storageKeys.findings(uid, wid), pickFindingsPrefs(prefs))
 }
 
 /* ── Logout ── */

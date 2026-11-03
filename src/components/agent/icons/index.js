@@ -90,6 +90,12 @@ export const IconReports = createIcon('IconReports', [
   ['path', { d: 'M15 17v-5' }],
 ])
 
+/** Findings: a flag on its pole, the fly cut back to a notch. */
+export const IconFindings = createIcon('IconFindings', [
+  ['path', { d: 'M5 21V4' }],
+  ['path', { d: 'M5 4h11.5l-2.5 4.5 2.5 4.5H5' }],
+])
+
 /** Recent chat: two round speech bubbles, the front one covering the back. */
 export const IconRecentChat = createIcon('IconRecentChat', [
   ['path', { d: 'M7.5 16H4.5a1 1 0 0 1-1-1V9.75a6.25 6.25 0 0 1 12.08-2.25' }],
@@ -116,6 +122,7 @@ export const AGENT_ICONS = Object.freeze({
   IconSheets,
   IconDocuments,
   IconReports,
+  IconFindings,
   IconRecentChat,
   IconPanelLeft,
   IconPanelRight,

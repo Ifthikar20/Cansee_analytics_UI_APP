@@ -13,6 +13,8 @@ import {
     normalizeError,
     normalizeMessage,
     normalizeRun,
+    normalizeSwarmDetail,
+    normalizeSwarmVersion,
 } from '@/lib/agent/normalize'
 import { reduceEvents } from '@/lib/agent/reducer'
 import { createRunManager } from '@/lib/agent/runManager'
@@ -32,7 +34,9 @@ import {
     ERROR_CODE,
     MESSAGE_STATUS,
     NEW_CHAT_KEY,
+    PART_TYPES,
     RUN_PHASE,
+    SWARM_CATEGORY_LABELS,
     TRANSPORT_STATE,
     isTerminalPhase,
     phaseFromMessageStatus,
@@ -56,6 +60,13 @@ import {
 // The server decides when a run is over. A run this tab had to end on its
 // own (its transport failed for good) is `settledLocally`; when the server
 // still lists it as active, the next chat detail attaches it again.
+//
+// Research agents (design/swarm_contract.md): a chat renders its swarms
+// and their tables from its messages' `swarm` and `swarm_table` parts
+// alone. loadSwarm and loadSwarmVersion add the version list and the tables
+// of versions no loaded message holds, cached in `swarms` by swarm id (they
+// resolve null for a 404 and throw otherwise). rerunSwarm starts a re-run
+// as a new turn at the end of the chat, like a message.
 
 const SILENT = Object.freeze({ _silentError: true })
 
@@ -68,6 +79,14 @@ const SERVER_RUNS_TO_FOLLOW = 3
 const RUN_KEYS = ['phase', 'lastSeq', 'startedAt', 'durationMs', 'usage', 'error', 'retrying', 'model', 'stopReason', 'outcome']
 
 const idOf = (v) => (v === null || v === undefined || v === '' ? null : String(v))
+const positiveInt = (v) => {
+    const n = Number(v)
+    return Number.isInteger(n) && n > 0 ? n : null
+}
+
+const RERUN_SCOPES = new Set(['all', 'category', 'task'])
+// A version in one of these statuses changes no more (swarm_contract.md 1e).
+const SETTLED_VERSION_STATUSES = new Set(['done', 'partial', 'error', 'cancelled', 'interrupted'])
 
 function newId() {
     try {
@@ -89,6 +108,35 @@ function listOf(data) {
     if (Array.isArray(data)) return data
     if (data && Array.isArray(data.results)) return data.results
     return []
+}
+
+function freshSwarm() {
+    return { detail: null, versions: {}, loading: false, error: null }
+}
+
+function sameFound(a, b) {
+    if (a.length !== b.length) return false
+    for (let i = 0; i < a.length; i += 1) {
+        if (a[i].part !== b[i].part || a[i].messageId !== b[i].messageId) return false
+    }
+    return true
+}
+
+// Two swarm part indexes hold the same part objects in the same order.
+function sameSwarmParts(a, b) {
+    const keys = Object.keys(b)
+    if (keys.length !== Object.keys(a).length) return false
+    return keys.every((key) => a[key] && sameFound(a[key].runs, b[key].runs) && sameFound(a[key].tables, b[key].tables))
+}
+
+/** The text a user message shows. */
+function messageText(message) {
+    if (!message || !Array.isArray(message.parts)) return ''
+    return message.parts
+        .filter((p) => p && p.type === 'text' && typeof p.text === 'string')
+        .map((p) => p.text)
+        .join('\n')
+        .trim()
 }
 
 export const useAgentStore = defineStore('agent', () => {
@@ -116,6 +164,9 @@ export const useAgentStore = defineStore('agent', () => {
     const activity = ref([])
     // The chat on screen; a run finishing anywhere else marks its chat unseen.
     const viewingChatId = ref(null)
+    // Research agents loaded by API, by swarm id:
+    // {detail: SwarmDetail|null, versions: {[n]: SwarmVersion}, loading, error}.
+    const swarms = ref({})
 
     const inflightChats = new Map()
     const stopTimers = new Map()
@@ -123,6 +174,11 @@ export const useAgentStore = defineStore('agent', () => {
     // the pending checks for one (see followTitle).
     const titleWanted = new Set()
     const titleTimers = new Map()
+    // Swarm reads in flight (by request key), and how many per swarm id.
+    const swarmRequests = new Map()
+    const swarmPending = new Map()
+    // Swarms re-run from this tab since their detail was cached.
+    const staleSwarms = new Set()
     let chatsRequest = 0
     let initPromise = null
 
@@ -207,6 +263,118 @@ export const useAgentStore = defineStore('agent', () => {
         const message = messages.value[key]
         if (message && message.run_id && runs.value[message.run_id]) return runs.value[message.run_id]
         return Object.values(runs.value).find((r) => r.messageId === key) || null
+    })
+
+    /* ── Getters: research agents ── */
+
+    // The swarm and swarm_table parts of every loaded message, by swarm id.
+    // A chat renders its research from its own messages alone; the swarm
+    // endpoints only add what no loaded message holds. While a reply streams
+    // every batch replaces its message; the previous index is kept when no
+    // swarm part changed, so the getters below do not re-run for text.
+    const swarmParts = computed((previous) => {
+        const out = {}
+        for (const message of Object.values(messages.value)) {
+            if (!message || message.role !== 'assistant' || !Array.isArray(message.parts)) continue
+            for (const part of message.parts) {
+                if (!part || (part.type !== PART_TYPES.SWARM && part.type !== PART_TYPES.SWARM_TABLE)) continue
+                const sid = idOf(part.swarm_id)
+                if (!sid) continue
+                const entry = out[sid] || (out[sid] = { runs: [], tables: [] })
+                const found = { part, messageId: message.id }
+                if (part.type === PART_TYPES.SWARM) entry.runs.push(found)
+                else if (part.table && typeof part.table === 'object') entry.tables.push(found)
+            }
+        }
+        return previous && sameSwarmParts(previous, out) ? previous : out
+    })
+
+    function tablePartOf(sid, version) {
+        return (swarmParts.value[sid]?.tables || []).find(({ part }) => positiveInt(part.version) === version) || null
+    }
+
+    /**
+     * The newest version of a swarm that has a table: the detail's
+     * latest_version, a newer table in a loaded message, or a loaded version.
+     */
+    const latestSwarmVersion = computed(() => (swarmId) => {
+        const sid = idOf(swarmId)
+        if (!sid) return null
+        const entry = swarms.value[sid]
+        let best = positiveInt(entry?.detail?.latest_version)
+        const consider = (value) => {
+            const n = positiveInt(value)
+            if (n && (!best || n > best)) best = n
+        }
+        for (const { part } of swarmParts.value[sid]?.tables || []) consider(part.version)
+        for (const [n, loaded] of Object.entries(entry?.versions || {})) {
+            if (loaded && loaded.table) consider(n)
+        }
+        return best || null
+    })
+
+    /**
+     * SwarmTable of a version (null: the latest): the swarm_table part of a
+     * loaded message first, else the version loaded by loadSwarmVersion.
+     */
+    const swarmTable = computed(() => (swarmId, version = null) => {
+        const sid = idOf(swarmId)
+        if (!sid) return null
+        const n = version === null || version === undefined ? latestSwarmVersion.value(sid) : positiveInt(version)
+        if (!n) return null
+        const hit = tablePartOf(sid, n)
+        if (hit) return hit.part.table
+        const loaded = swarms.value[sid]?.versions?.[n]
+        return loaded && loaded.table ? loaded.table : null
+    })
+
+    /**
+     * The message that shows a version's table (null: the latest), for
+     * actions such as Add to report; null when it is not loaded.
+     */
+    const swarmTableMessage = computed(() => (swarmId, version = null) => {
+        const sid = idOf(swarmId)
+        if (!sid) return null
+        const n = version === null || version === undefined ? latestSwarmVersion.value(sid) : positiveInt(version)
+        if (!n) return null
+        const hit = tablePartOf(sid, n)
+        const messageId = hit ? hit.messageId : idOf(swarms.value[sid]?.versions?.[n]?.message_id)
+        return (messageId && messages.value[messageId]) || null
+    })
+
+    /**
+     * The categories a swarm can re-run, in category order:
+     * [{key, label, task_ids, count}]. From the detail when loaded, else from
+     * the newest loaded run of every agent (scope `all`); [] when neither.
+     */
+    const swarmCategories = computed(() => (swarmId) => {
+        const sid = idOf(swarmId)
+        if (!sid) return []
+        const shaped = (key, label, ids) => ({
+            key,
+            label: label || SWARM_CATEGORY_LABELS[key] || key,
+            task_ids: ids,
+            count: ids.length,
+        })
+        const detail = swarms.value[sid]?.detail
+        if (detail && Array.isArray(detail.categories)) {
+            return detail.categories
+                .map((c) => shaped(c.key, c.label, Array.isArray(c.task_ids) ? c.task_ids.map(String) : []))
+                .filter((c) => c.key && c.count > 0)
+        }
+        let full = null
+        for (const { part } of swarmParts.value[sid]?.runs || []) {
+            if (part.scope !== 'all' || !Array.isArray(part.categories) || !Array.isArray(part.tasks)) continue
+            if (!full || (positiveInt(part.version) || 0) > (positiveInt(full.version) || 0)) full = part
+        }
+        if (!full) return []
+        return full.categories
+            .filter((c) => c && c.key)
+            .map((c) => {
+                const ids = full.tasks.filter((t) => t && t.category === c.key).map((t) => String(t.id))
+                return shaped(c.key, c.label, ids)
+            })
+            .filter((c) => c.count > 0)
     })
 
     /* ── Internal helpers ── */
@@ -859,6 +1027,12 @@ export const useAgentStore = defineStore('agent', () => {
         clearTitleTimer(chatId)
         delete chats.value.byId[chatId]
         chats.value.order = chats.value.order.filter((id) => id !== chatId)
+        // Its research went with it (swarms belong to a chat).
+        for (const [sid, entry] of Object.entries(swarms.value)) {
+            if (entry?.detail?.chat_id !== chatId) continue
+            delete swarms.value[sid]
+            staleSwarms.delete(sid)
+        }
         // Reset the pane before dropping its stored tabs, or it writes them back.
         withPane(chatId, (pane) => pane.reset())
         const uid = userId()
@@ -1222,8 +1396,14 @@ export const useAgentStore = defineStore('agent', () => {
         }
     }
 
-    async function startSiblingTurn(message, request) {
-        const chatId = message.chat_id
+    /**
+     * Start a turn whose POST (`request`) answers 202 {user_message,
+     * assistant_message, run}: the messages join the tree, the run becomes the
+     * chat's active run and streams. `atEnd` is for a turn appended at the end
+     * of the thread (a re-run): the chat moves to the top of the list and a
+     * failed send left at the end, which the new turn replaces, is dropped.
+     */
+    async function startTurn(chatId, request, { atEnd = false } = {}) {
         const ep = epoch.value
         assertIdle(chatId)
         const st = ensureChatState(chatId)
@@ -1232,10 +1412,12 @@ export const useAgentStore = defineStore('agent', () => {
         try {
             const { data } = await request()
             if (ep !== epoch.value) return null
+            if (atEnd) dropFailedSends(chatId)
             const user = upsertMessage(data?.user_message, { chatId })
             if (user) addChild(childrenOf.value, parentKeyOf(user), user.id)
             const assistant = upsertMessage(data?.assistant_message, { chatId })
             if (assistant && user) addChild(childrenOf.value, user.id, assistant.id)
+            if (atEnd) moveToTop(chatId, messageText(user))
             const run = startRun(chatId, data?.run, assistant)
             applyEarlyStop(chatId)
             return run
@@ -1250,6 +1432,11 @@ export const useAgentStore = defineStore('agent', () => {
                 s.cancelOnStart = false
             }
         }
+    }
+
+    /** Edit and continue: a new sibling turn of `message`. */
+    function startSiblingTurn(message, request) {
+        return startTurn(message.chat_id, request)
     }
 
     /** Edit a user message: a new user sibling and a fresh reply. */
@@ -1276,6 +1463,153 @@ export const useAgentStore = defineStore('agent', () => {
         const message = messageOrThrow(assistantId)
         const wid = ensureProject()
         return startSiblingTurn(message, () => agentApi.continueMessage(wid, message.id, { ...SILENT }))
+    }
+
+    /* ── Actions: research agents ── */
+
+    /**
+     * Re-run a research (all agents, one category or one agent) as a new
+     * turn at the end of the chat: the server adds a user message that names
+     * the scope and an assistant message whose run executes the next version
+     * of the swarm without a model request. Resolves the RunState; errors
+     * throw an AgentError (run_in_progress, agent_busy, allowance_exceeded,
+     * insufficient_allowance, version_limit, swarm_disabled, ...).
+     */
+    async function rerunSwarm({ chatId, swarmId, scope, category = null, taskId = null } = {}) {
+        const cid = idOf(chatId)
+        const sid = idOf(swarmId)
+        if (!cid || cid === NEW_CHAT_KEY || !sid) {
+            throw new AgentError({ status: 400, code: ERROR_CODE.INVALID, message: 'This research cannot be re-run here.' })
+        }
+        if (!RERUN_SCOPES.has(scope)) {
+            throw new AgentError({ status: 400, code: ERROR_CODE.INVALID, message: 'Choose what to re-run.' })
+        }
+        const body = { scope }
+        if (scope === 'category') {
+            if (!idOf(category)) throw new AgentError({ status: 400, code: ERROR_CODE.INVALID, message: 'Choose a category to re-run.' })
+            body.category = String(category)
+        } else if (scope === 'task') {
+            if (!idOf(taskId)) throw new AgentError({ status: 400, code: ERROR_CODE.INVALID, message: 'Choose an agent to re-run.' })
+            body.task_id = String(taskId)
+        }
+        const wid = ensureProject()
+        const ep = epoch.value
+        assertIdle(cid)
+        // The new turn goes under the chat's current leaf: load the chat first.
+        if (!chatState.value[cid]?.loaded) await loadChatDetail(cid)
+        if (ep !== epoch.value) throw new AgentError({ code: 'aborted', message: 'The project changed.' })
+        try {
+            const run = await startTurn(cid, () => agentApi.rerunSwarm(wid, sid, body, { idempotencyKey: newId() }), {
+                atEnd: true,
+            })
+            // The new version is not in a cached detail yet.
+            if (run) staleSwarms.add(sid)
+            return run
+        } catch (err) {
+            // Turned off, unconfigured or over allowance: refresh the banner and the menus.
+            const allowance = err.code === ERROR_CODE.ALLOWANCE_EXCEEDED || err.code === ERROR_CODE.INSUFFICIENT_ALLOWANCE
+            if (ep === epoch.value && (err.status === 503 || allowance)) loadStatus()
+            throw err
+        }
+    }
+
+    function swarmEntry(sid) {
+        if (!swarms.value[sid]) swarms.value[sid] = freshSwarm()
+        return swarms.value[sid]
+    }
+
+    // A cached detail misses a newer version: a re-run started here, a loaded
+    // message runs or shows a version it does not list, or a version it lists
+    // was still running when it loaded.
+    function swarmDetailStale(sid) {
+        const detail = swarms.value[sid]?.detail
+        if (!detail || staleSwarms.has(sid)) return true
+        const versions = Array.isArray(detail.versions) ? detail.versions : []
+        if (versions.some((v) => !SETTLED_VERSION_STATUSES.has(v.status))) return true
+        const known = versions.reduce((max, v) => Math.max(max, v.version || 0), detail.latest_version || 0)
+        const parts = swarmParts.value[sid] || { runs: [], tables: [] }
+        return [...parts.runs, ...parts.tables].some(({ part }) => (positiveInt(part.version) || 0) > known)
+    }
+
+    // One request per key at a time; `loading` holds while any request for the swarm runs.
+    function trackSwarmRequest(sid, key, run) {
+        if (swarmRequests.has(key)) return swarmRequests.get(key)
+        const ep = epoch.value
+        swarmEntry(sid).loading = true
+        swarmPending.set(sid, (swarmPending.get(sid) || 0) + 1)
+        const promise = run(ep).finally(() => {
+            if (swarmRequests.get(key) === promise) swarmRequests.delete(key)
+            if (ep !== epoch.value) return
+            const left = (swarmPending.get(sid) || 1) - 1
+            if (left > 0) swarmPending.set(sid, left)
+            else swarmPending.delete(sid)
+            if (swarms.value[sid]) swarms.value[sid].loading = left > 0
+        })
+        swarmRequests.set(key, promise)
+        return promise
+    }
+
+    // A failed swarm read: recorded on the swarm; a 404 resolves null, anything else throws.
+    function swarmReadFailed(sid, ep, err) {
+        const error = normalizeError(err)
+        if (ep !== epoch.value) return null
+        swarmEntry(sid).error = error
+        if (error.status === 404) return null
+        throw error
+    }
+
+    /**
+     * The swarm's detail (plan, categories, tasks, versions), cached; `force`
+     * or a newer version than the cache knows reloads it. A 404 (deleted, or
+     * not this user's) sets `swarms[id].error` and resolves null.
+     */
+    async function loadSwarm(swarmId, { force = false } = {}) {
+        const sid = idOf(swarmId)
+        if (!sid) return null
+        const cached = swarms.value[sid]?.detail || null
+        if (cached && !force && !swarmDetailStale(sid)) return cached
+        const wid = ensureProject()
+        return trackSwarmRequest(sid, `detail:${sid}`, async (ep) => {
+            try {
+                const { data } = await agentApi.getSwarm(wid, sid, { ...SILENT })
+                if (ep !== epoch.value) return null
+                const detail = normalizeSwarmDetail(data)
+                const entry = swarmEntry(sid)
+                entry.detail = detail
+                entry.error = null
+                staleSwarms.delete(sid)
+                return entry.detail
+            } catch (err) {
+                return swarmReadFailed(sid, ep, err)
+            }
+        })
+    }
+
+    /**
+     * One version of a swarm with its table (null until it has one), cached
+     * once the version has settled. A 404 sets `swarms[id].error` and
+     * resolves null.
+     */
+    async function loadSwarmVersion(swarmId, version, { force = false } = {}) {
+        const sid = idOf(swarmId)
+        const n = positiveInt(version)
+        if (!sid || !n) return null
+        const cached = swarms.value[sid]?.versions?.[n] || null
+        if (cached && !force && (cached.table || SETTLED_VERSION_STATUSES.has(cached.status))) return cached
+        const wid = ensureProject()
+        return trackSwarmRequest(sid, `version:${sid}:${n}`, async (ep) => {
+            try {
+                const { data } = await agentApi.getSwarmVersion(wid, sid, n, { ...SILENT })
+                if (ep !== epoch.value) return null
+                const loaded = normalizeSwarmVersion(data)
+                const entry = swarmEntry(sid)
+                if (loaded) entry.versions = { ...entry.versions, [n]: loaded }
+                entry.error = null
+                return entry.versions[n] || null
+            } catch (err) {
+                return swarmReadFailed(sid, ep, err)
+            }
+        })
     }
 
     /* ── Actions: branches and feedback ── */
@@ -1518,6 +1852,9 @@ export const useAgentStore = defineStore('agent', () => {
         titleTimers.clear()
         titleWanted.clear()
         inflightChats.clear()
+        swarmRequests.clear()
+        swarmPending.clear()
+        staleSwarms.clear()
         epoch.value += 1
         chatsRequest += 1
         initPromise = null
@@ -1532,6 +1869,7 @@ export const useAgentStore = defineStore('agent', () => {
         context.value = null
         activity.value = []
         viewingChatId.value = null
+        swarms.value = {}
     }
 
     /** Sign-out or a different user: drop everything, including status and the catalog. */
@@ -1586,6 +1924,7 @@ export const useAgentStore = defineStore('agent', () => {
         context,
         activity,
         viewingChatId,
+        swarms,
         // getters
         recents,
         visiblePath,
@@ -1594,6 +1933,10 @@ export const useAgentStore = defineStore('agent', () => {
         isChatBusy,
         artifact,
         runOf,
+        swarmTable,
+        swarmTableMessage,
+        latestSwarmVersion,
+        swarmCategories,
         // loading
         init,
         loadStatus,
@@ -1610,6 +1953,10 @@ export const useAgentStore = defineStore('agent', () => {
         editMessage,
         continueMessage,
         retrySend,
+        // research agents
+        rerunSwarm,
+        loadSwarm,
+        loadSwarmVersion,
         // branches and feedback
         switchBranch,
         sendFeedback,

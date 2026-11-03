@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { computed } from 'vue'
 
 const rm = vi.hoisted(() => ({ hooks: null, attached: [], detached: [] }))
 
@@ -28,10 +29,13 @@ vi.mock('@/api/agent', () => ({
         putContext: vi.fn(),
         suggestions: vi.fn(),
         activity: vi.fn(),
+        getSwarm: vi.fn(),
+        getSwarmVersion: vi.fn(),
         sendMessage: vi.fn(),
         regenerate: vi.fn(),
         editMessage: vi.fn(),
         continueMessage: vi.fn(),
+        rerunSwarm: vi.fn(),
         cancelRun: vi.fn(),
         browse: vi.fn(),
     },
@@ -75,6 +79,13 @@ import {
     eventFactory,
     researchRunEvents,
 } from '@/lib/agent/__tests__/__fixtures__/runEvents'
+import {
+    CAPTURE_ID,
+    SERP_CAPTURE as SWARM_SERP_CAPTURE,
+    SWARM_ID,
+    expectedSwarmPart,
+    swarmTable,
+} from '@/lib/agent/__tests__/__fixtures__/swarmEvents'
 
 const ok = (data) => ({ success: true, data })
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
@@ -975,6 +986,378 @@ describe('agent store: what a run leaves when it ends', () => {
         await vi.advanceTimersByTimeAsync(60000)
         // The one call is openRunningChat's own load.
         expect(agentApi.getChat).toHaveBeenCalledTimes(1)
+    })
+})
+
+describe('agent store: research agents', () => {
+    const RERUN_TEXT = 'Re-run the Google (SEO) agents'
+
+    // The finished research of version 1: the swarm part and its table.
+    function finishedSwarmParts() {
+        return [
+            expectedSwarmPart(),
+            {
+                id: 'p5',
+                type: 'swarm_table',
+                request: 1,
+                swarm_id: SWARM_ID,
+                version: 1,
+                title: 'Research Notion',
+                status: 'partial',
+                generated_at: '2026-11-04T10:17:18.880Z',
+                table: swarmTable(1),
+            },
+        ]
+    }
+
+    function swarmChatDetail() {
+        return ok(
+            chatDetail({
+                title: 'Research Notion',
+                current_leaf_id: ASSISTANT_ID,
+                messages: [
+                    userMessage(),
+                    emptyAssistant({
+                        status: 'complete',
+                        parts: finishedSwarmParts(),
+                        parts_seq: 145,
+                        research: { serp: { [CAPTURE_ID]: SWARM_SERP_CAPTURE }, pages: {} },
+                    }),
+                ],
+            })
+        )
+    }
+
+    async function openSwarmChat() {
+        agentApi.getChat.mockResolvedValueOnce(swarmChatDetail())
+        await store.openChat(CHAT_ID)
+    }
+
+    function rerunAccepted(overrides = {}) {
+        return ok({
+            user_message: userMessage({
+                id: 'u2',
+                parent_id: ASSISTANT_ID,
+                sibling_ids: ['u2'],
+                parts: [{ id: 'u2-text', type: 'text', text: RERUN_TEXT }],
+            }),
+            assistant_message: emptyAssistant({ id: 'a2', parent_id: 'u2', sibling_ids: ['a2'], run_id: 'run-2' }),
+            run: { id: 'run-2', chat_id: CHAT_ID, message_id: 'a2', status: 'queued', last_seq: 0 },
+            swarm_version: { swarm_id: SWARM_ID, version: 2, scope: 'category', scope_key: 'google', task_ids: ['google.p1.page1'] },
+            ...overrides,
+        })
+    }
+
+    // The re-run turn streams version 2: its swarm part, then its table.
+    function streamVersion2() {
+        const e = eventFactory({ runId: 'run-2', messageId: 'a2' })
+        const [google] = expectedSwarmPart().tasks
+        rm.hooks.applyEvents('run-2', [
+            e('run.started'),
+            e('part.added', {
+                part: {
+                    ...expectedSwarmPart(),
+                    id: 'p1',
+                    version: 2,
+                    scope: 'category',
+                    scope_label: 'Google (SEO)',
+                    status: 'running',
+                    ended_at: null,
+                    duration_ms: null,
+                    table_version: null,
+                    categories: [expectedSwarmPart().categories[0]],
+                    tasks: [{ ...google, status: 'queued', result: '', tone: null, pane: null, detail: null, rev: 1 }],
+                },
+            }),
+            e('task.finished', { part_id: 'p1', task_id: 'google.p1.page1', rev: 2, patch: { status: 'done', result: "You're #3" } }),
+            e('part.updated', { part_id: 'p1', patch: { status: 'done', ended_at: '2026-11-04T11:02:10Z', duration_ms: 9000 } }),
+            e('part.added', {
+                part: {
+                    id: 'p2',
+                    type: 'swarm_table',
+                    request: 1,
+                    swarm_id: SWARM_ID,
+                    version: 2,
+                    title: 'Research Notion',
+                    status: 'done',
+                    generated_at: '2026-11-04T11:02:10Z',
+                    table: swarmTable(2),
+                },
+            }),
+        ])
+    }
+
+    it('rerunSwarm posts the scope with a fresh Idempotency-Key and appends the turn', async () => {
+        await initProject()
+        await openSwarmChat()
+        agentApi.rerunSwarm.mockResolvedValueOnce(rerunAccepted())
+        const run = await store.rerunSwarm({ chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'category', category: 'google' })
+
+        const [wid, sid, body, options] = agentApi.rerunSwarm.mock.calls[0]
+        expect([wid, sid]).toEqual(['5', SWARM_ID])
+        expect(body).toEqual({ scope: 'category', category: 'google' })
+        expect(options.idempotencyKey).toEqual(expect.any(String))
+
+        expect(run).toMatchObject({ id: 'run-2', chatId: CHAT_ID, messageId: 'a2' })
+        expect(store.visiblePath(CHAT_ID).map((m) => m.id)).toEqual([USER_MESSAGE_ID, ASSISTANT_ID, 'u2', 'a2'])
+        expect(store.childrenOf[ASSISTANT_ID]).toEqual(['u2'])
+        expect(store.childrenOf.u2).toEqual(['a2'])
+        expect(rm.attached).toEqual([{ id: 'run-2', lastSeq: 0 }])
+        expect(store.activeRun(CHAT_ID).id).toBe('run-2')
+        expect(store.isChatBusy(CHAT_ID)).toBe(true)
+        expect(store.recents[0]).toMatchObject({ id: CHAT_ID, preview: RERUN_TEXT, running: true })
+    })
+
+    it('rerunSwarm refuses while the chat is busy, and each re-run takes its own key', async () => {
+        await initProject()
+        await openSwarmChat()
+        agentApi.rerunSwarm.mockResolvedValueOnce(rerunAccepted())
+        await store.rerunSwarm({ chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'all' })
+        await expect(store.rerunSwarm({ chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'all' })).rejects.toMatchObject({
+            code: 'run_in_progress',
+        })
+        expect(agentApi.rerunSwarm).toHaveBeenCalledTimes(1)
+
+        rm.hooks.applyEvents('run-2', [eventFactory({ runId: 'run-2', messageId: 'a2' })('run.completed', { status: 'complete' })])
+        agentApi.rerunSwarm.mockResolvedValueOnce(
+            rerunAccepted({
+                user_message: userMessage({ id: 'u3', parent_id: 'a2', sibling_ids: ['u3'] }),
+                assistant_message: emptyAssistant({ id: 'a3', parent_id: 'u3', sibling_ids: ['a3'] }),
+                run: { id: 'run-3', chat_id: CHAT_ID, message_id: 'a3', status: 'queued', last_seq: 0 },
+            })
+        )
+        await store.rerunSwarm({ chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'task', taskId: 'engines.p1.claude' })
+        const [first, second] = agentApi.rerunSwarm.mock.calls
+        expect(first[2]).toEqual({ scope: 'all' })
+        expect(second[2]).toEqual({ scope: 'task', task_id: 'engines.p1.claude' })
+        expect(second[3].idempotencyKey).not.toBe(first[3].idempotencyKey)
+    })
+
+    it('rerunSwarm loads a chat it has not opened, so the turn goes under its leaf', async () => {
+        await initProject()
+        agentApi.getChat.mockResolvedValueOnce(swarmChatDetail())
+        agentApi.rerunSwarm.mockResolvedValueOnce(rerunAccepted())
+        await store.rerunSwarm({ chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'all' })
+        expect(agentApi.getChat).toHaveBeenCalledTimes(1)
+        expect(store.visiblePath(CHAT_ID).map((m) => m.id)).toEqual([USER_MESSAGE_ID, ASSISTANT_ID, 'u2', 'a2'])
+    })
+
+    it('rerunSwarm checks its arguments before calling the API', async () => {
+        await initProject()
+        await openSwarmChat()
+        for (const args of [
+            { chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'everything' },
+            { chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'category' },
+            { chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'task' },
+            { chatId: null, swarmId: SWARM_ID, scope: 'all' },
+            { chatId: CHAT_ID, swarmId: '', scope: 'all' },
+        ]) {
+            await expect(store.rerunSwarm(args)).rejects.toMatchObject({ code: 'invalid' })
+        }
+        expect(agentApi.rerunSwarm).not.toHaveBeenCalled()
+    })
+
+    it('rerunSwarm throws the server refusal, frees the chat and refreshes the status when the agents are off', async () => {
+        await initProject()
+        await openSwarmChat()
+        agentApi.rerunSwarm.mockRejectedValueOnce(
+            axiosError(400, { code: 'version_limit', message: 'This research already has 50 versions; start a new research.' })
+        )
+        await expect(store.rerunSwarm({ chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'all' })).rejects.toMatchObject({
+            status: 400,
+            code: 'version_limit',
+            message: 'This research already has 50 versions; start a new research.',
+        })
+        expect(store.isChatBusy(CHAT_ID)).toBe(false)
+        expect(agentApi.status).toHaveBeenCalledTimes(1)
+
+        agentApi.rerunSwarm.mockRejectedValueOnce(axiosError(503, { code: 'swarm_disabled' }))
+        await expect(store.rerunSwarm({ chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'all' })).rejects.toMatchObject({
+            code: 'swarm_disabled',
+            message: 'The research agents are turned off on this server.',
+        })
+        expect(agentApi.status).toHaveBeenCalledTimes(2)
+        expect(store.visiblePath(CHAT_ID).map((m) => m.id)).toEqual([USER_MESSAGE_ID, ASSISTANT_ID])
+    })
+
+    it('swarmTable reads the tables in loaded messages before API data', async () => {
+        await initProject()
+        await openSwarmChat()
+        expect(store.swarmTable(SWARM_ID, 1)).toEqual(swarmTable(1))
+
+        // A version the chat's messages do not hold comes from the API.
+        expect(store.swarmTable(SWARM_ID, 2)).toBeNull()
+        agentApi.getSwarmVersion.mockResolvedValueOnce(
+            ok({ swarm_id: SWARM_ID, version: 2, scope: 'all', status: 'done', message_id: 'elsewhere', table: swarmTable(2, { title: 'From the API' }) })
+        )
+        await store.loadSwarmVersion(SWARM_ID, 2)
+        expect(agentApi.getSwarmVersion).toHaveBeenCalledWith('5', SWARM_ID, 2, { _silentError: true })
+        expect(store.swarmTable(SWARM_ID, 2).title).toBe('From the API')
+        expect(store.swarmTable(SWARM_ID).version).toBe(2)
+        expect(store.swarmTableMessage(SWARM_ID, 2)).toBeNull()
+        expect(store.swarmTableMessage(SWARM_ID, 1).id).toBe(ASSISTANT_ID)
+
+        // The message's own table wins over an API copy of the same version.
+        agentApi.getSwarmVersion.mockResolvedValueOnce(
+            ok({ swarm_id: SWARM_ID, version: 1, status: 'partial', table: swarmTable(1, { title: 'Stale copy' }) })
+        )
+        await store.loadSwarmVersion(SWARM_ID, 1)
+        expect(store.swarmTable(SWARM_ID, 1).title).toBe('Research Notion')
+        expect(store.swarmTable('unknown', 1)).toBeNull()
+    })
+
+    it('latestSwarmVersion follows the detail and every table that arrives', async () => {
+        await initProject()
+        await openSwarmChat()
+        expect(store.latestSwarmVersion(SWARM_ID)).toBe(1)
+        expect(store.latestSwarmVersion('unknown')).toBeNull()
+
+        agentApi.rerunSwarm.mockResolvedValueOnce(rerunAccepted())
+        await store.rerunSwarm({ chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'category', category: 'google' })
+        streamVersion2()
+        expect(store.latestSwarmVersion(SWARM_ID)).toBe(2)
+        expect(store.swarmTable(SWARM_ID, 2)).toEqual(swarmTable(2))
+        expect(store.swarmTableMessage(SWARM_ID).id).toBe('a2')
+
+        agentApi.getSwarm.mockResolvedValueOnce(ok({ id: SWARM_ID, chat_id: CHAT_ID, latest_version: 3, versions: [] }))
+        await store.loadSwarm(SWARM_ID)
+        expect(store.latestSwarmVersion(SWARM_ID)).toBe(3)
+    })
+
+    it('swarmCategories come from the newest run of every agent until the detail is loaded', async () => {
+        await initProject()
+        await openSwarmChat()
+        expect(store.swarmCategories(SWARM_ID)).toEqual([
+            { key: 'google', label: 'Google (SEO)', task_ids: ['google.p1.page1'], count: 1 },
+            { key: 'engines', label: 'AI engines (GEO)', task_ids: ['engines.p1.chatgpt', 'engines.p1.claude'], count: 2 },
+        ])
+        // A re-run of one category does not narrow the menu.
+        agentApi.rerunSwarm.mockResolvedValueOnce(rerunAccepted())
+        await store.rerunSwarm({ chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'category', category: 'google' })
+        streamVersion2()
+        expect(store.swarmCategories(SWARM_ID).map((c) => c.key)).toEqual(['google', 'engines'])
+
+        agentApi.getSwarm.mockResolvedValueOnce(
+            ok({
+                id: SWARM_ID,
+                chat_id: CHAT_ID,
+                latest_version: 2,
+                categories: [
+                    { key: 'google', label: 'Google (SEO)', task_ids: ['google.p1.page1'] },
+                    { key: 'sources', label: 'Sources and citations', task_ids: [] },
+                ],
+                versions: [],
+            })
+        )
+        await store.loadSwarm(SWARM_ID)
+        expect(store.swarmCategories(SWARM_ID)).toEqual([
+            { key: 'google', label: 'Google (SEO)', task_ids: ['google.p1.page1'], count: 1 },
+        ])
+        expect(store.swarmCategories('unknown')).toEqual([])
+    })
+
+    it('loadSwarm caches the detail and reloads it after a re-run or on force', async () => {
+        await initProject()
+        await openSwarmChat()
+        const detail = {
+            id: SWARM_ID,
+            title: 'Research Notion',
+            chat_id: CHAT_ID,
+            latest_version: 1,
+            versions: [{ version: 1, scope: 'all', status: 'partial', has_table: true }],
+        }
+        agentApi.getSwarm.mockResolvedValue(ok(detail))
+        const [a, b] = await Promise.all([store.loadSwarm(SWARM_ID), store.loadSwarm(SWARM_ID)])
+        expect(a).toBe(b)
+        expect(a.versions.map((v) => v.version)).toEqual([1])
+        expect(agentApi.getSwarm).toHaveBeenCalledTimes(1)
+        expect(agentApi.getSwarm).toHaveBeenCalledWith('5', SWARM_ID, { _silentError: true })
+        expect(store.swarms[SWARM_ID]).toMatchObject({ loading: false, error: null })
+
+        await store.loadSwarm(SWARM_ID)
+        expect(agentApi.getSwarm).toHaveBeenCalledTimes(1)
+        await store.loadSwarm(SWARM_ID, { force: true })
+        expect(agentApi.getSwarm).toHaveBeenCalledTimes(2)
+
+        agentApi.rerunSwarm.mockResolvedValueOnce(rerunAccepted())
+        await store.rerunSwarm({ chatId: CHAT_ID, swarmId: SWARM_ID, scope: 'all' })
+        await store.loadSwarm(SWARM_ID)
+        expect(agentApi.getSwarm).toHaveBeenCalledTimes(3)
+    })
+
+    it('loadSwarm resolves null for a 404 and records the error; other failures throw', async () => {
+        await initProject()
+        agentApi.getSwarm.mockRejectedValueOnce(axiosError(404, { code: 'not_found', message: 'Not found.' }))
+        await expect(store.loadSwarm('gone')).resolves.toBeNull()
+        expect(store.swarms.gone).toMatchObject({ detail: null, loading: false, error: { status: 404, code: 'not_found' } })
+
+        agentApi.getSwarm.mockRejectedValueOnce(axiosError(500, { code: 'server_error' }))
+        await expect(store.loadSwarm('broken')).rejects.toMatchObject({ status: 500 })
+        expect(store.swarms.broken.error).toMatchObject({ status: 500 })
+
+        agentApi.getSwarmVersion.mockRejectedValueOnce(axiosError(404, { code: 'not_found', message: 'Not found.' }))
+        await expect(store.loadSwarmVersion('gone', 3)).resolves.toBeNull()
+        await expect(store.loadSwarmVersion('gone', 0)).resolves.toBeNull()
+        expect(agentApi.getSwarmVersion).toHaveBeenCalledTimes(1)
+    })
+
+    it('loadSwarmVersion caches a settled version and asks again for one still running', async () => {
+        await initProject()
+        agentApi.getSwarmVersion
+            .mockResolvedValueOnce(ok({ swarm_id: SWARM_ID, version: 2, status: 'running', table: null }))
+            .mockResolvedValueOnce(ok({ swarm_id: SWARM_ID, version: 2, status: 'done', table: swarmTable(2) }))
+        expect(await store.loadSwarmVersion(SWARM_ID, 2)).toMatchObject({ status: 'running', table: null })
+        expect(await store.loadSwarmVersion(SWARM_ID, 2)).toMatchObject({ status: 'done' })
+        await store.loadSwarmVersion(SWARM_ID, 2)
+        expect(agentApi.getSwarmVersion).toHaveBeenCalledTimes(2)
+        expect(store.swarmTable(SWARM_ID, 2)).toEqual(swarmTable(2))
+    })
+
+    it('the swarm getters do not re-run while the report text streams, only when a swarm part changes', async () => {
+        await initProject()
+        agentApi.getChat.mockResolvedValueOnce(
+            ok(
+                chatDetail({
+                    current_leaf_id: ASSISTANT_ID,
+                    messages: [
+                        userMessage(),
+                        emptyAssistant({ parts: [...finishedSwarmParts(), { id: 'p6', type: 'text', request: 2, text: '' }], parts_seq: 143 }),
+                    ],
+                    active_run: { id: RUN_ID, status: 'running', message_id: ASSISTANT_ID, last_seq: 143 },
+                })
+            )
+        )
+        await store.openChat(CHAT_ID)
+        let evaluations = 0
+        const probe = computed(() => {
+            evaluations += 1
+            return [store.swarmTable(SWARM_ID, 1), store.latestSwarmVersion(SWARM_ID), store.swarmCategories(SWARM_ID).length]
+        })
+        expect(probe.value.slice(1)).toEqual([1, 2])
+
+        const e = eventFactory({ start: 143 })
+        rm.hooks.applyEvents(RUN_ID, [e('part.delta', { part_id: 'p6', field: 'text', append: '# Notion' })])
+        rm.hooks.applyEvents(RUN_ID, [e('part.delta', { part_id: 'p6', field: 'text', append: ' on Google' })])
+        expect(store.messages[ASSISTANT_ID].parts[2].text).toBe('# Notion on Google')
+        expect(probe.value[1]).toBe(1)
+        expect(evaluations).toBe(1)
+
+        rm.hooks.applyEvents(RUN_ID, [e('part.updated', { part_id: 'p4', patch: { table_version: 1, title: 'Renamed' } })])
+        expect(probe.value[1]).toBe(1)
+        expect(evaluations).toBe(2)
+    })
+
+    it('a project switch drops the swarms and ignores late answers', async () => {
+        await initProject()
+        let resolveLate
+        agentApi.getSwarm.mockImplementationOnce(() => new Promise((resolve) => (resolveLate = resolve)))
+        const late = store.loadSwarm(SWARM_ID)
+        expect(store.swarms[SWARM_ID].loading).toBe(true)
+        await store.init(6)
+        expect(store.swarms).toEqual({})
+        resolveLate(ok({ id: SWARM_ID, latest_version: 1, versions: [] }))
+        await expect(late).resolves.toBeNull()
+        expect(store.swarms).toEqual({})
     })
 })
 

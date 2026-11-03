@@ -1,12 +1,14 @@
 // Pure helpers that turn a message's parts into what the chat shows: the
-// step list, the background engine checks, the reply body and the agent
-// deliverables. Labels follow the contract's part fields only; nothing here
-// invents a value that a part does not carry.
+// step list, the background engine checks, the research agents, the reply
+// body and the agent deliverables. Labels follow the contract's part fields
+// only; nothing here invents a value that a part does not carry.
 import { engineMeta } from '@/lib/engines'
 import { displayUrl, hostOf } from '@/lib/agent/url'
 
 export const STEP_TYPES = new Set(['thinking', 'tool', 'web_search', 'web_fetch', 'serp', 'page_inspect'])
-export const BODY_TYPES = new Set(['text', 'chart', 'browser_open', 'notice'])
+// swarm_table renders with the body, in arrival order, so the results table
+// comes before the report the model writes from it.
+export const BODY_TYPES = new Set(['text', 'chart', 'browser_open', 'notice', 'swarm_table'])
 
 const LIVE_STATUSES = new Set(['preparing', 'queued', 'running', 'planning', 'drafting', 'validating', 'loading'])
 
@@ -14,13 +16,14 @@ export function isLiveStatus(status) {
   return LIVE_STATUSES.has(status)
 }
 
-/** {steps, checks, body, calls} in arrival order. */
+/** {steps, checks, swarms, body, calls} in arrival order. */
 export function splitParts(parts) {
-  const out = { steps: [], checks: [], body: [], calls: [] }
+  const out = { steps: [], checks: [], swarms: [], body: [], calls: [] }
   for (const part of Array.isArray(parts) ? parts : []) {
     if (!part || !part.type) continue
     if (STEP_TYPES.has(part.type)) out.steps.push(part)
     else if (part.type === 'engine_check') out.checks.push(part)
+    else if (part.type === 'swarm') out.swarms.push(part)
     else if (part.type === 'agent_call') out.calls.push(part)
     else if (BODY_TYPES.has(part.type)) out.body.push(part)
   }

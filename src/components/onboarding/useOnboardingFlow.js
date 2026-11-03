@@ -5,300 +5,688 @@
 // provide/inject (rather than props) because steps deep-mutate `form`
 // (checkbox toggles, chip removal) and prop mutation is both a lint
 // error and a lie about ownership.
-import { ref, computed, inject, provide } from 'vue'
+//
+// Five steps: website (with the homepage scan inline) -> brand ->
+// competitors -> prompts -> first research. The scan drafts brand facts,
+// competitors and buyer prompts for the user to review; nothing is saved
+// until the last step. That step saves the project, writes the brand
+// context the agents use (only into an empty one), and then either hands
+// the first research to the agent chat (useFirstResearch) or, skipped,
+// tracks the chosen prompts the way Add prompts on the Overview does.
+import { computed, getCurrentScope, inject, onScopeDispose, provide, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import api from '@/api/client'
+import agentApi from '@/api/agent'
+import websitesApi from '@/api/websites'
 import { useAuthStore } from '@/stores/auth'
+import { useAppStore } from '@/stores/app'
 import { useToast } from '@/composables/useToast'
+import { useFirstResearch } from '@/composables/agent/useFirstResearch'
+import { saveDraft } from '@/lib/agent/storage'
+import { NEW_CHAT_KEY } from '@/lib/agent/types'
+import { countryLabel, DEFAULT_COUNTRY } from '@/lib/countries'
 
 const FlowKey = Symbol('onboarding-flow')
 
-// welcome -> url -> scanning -> describe -> competitors.
-// `scanning` is not a user step: the visible progress collapses it
-// into the url step (see displayStep).
-const STEPS = Object.freeze([
-  { id: 'welcome' },
-  { id: 'url' },
-  { id: 'scanning' },
-  { id: 'describe' },
+export const STEPS = Object.freeze([
+  { id: 'website' },
+  { id: 'brand' },
   { id: 'competitors' },
+  { id: 'prompts' },
+  { id: 'run' },
 ])
+
+export const MAX_COMPETITORS = 5
+export const MAX_PROMPTS = 5
+const DEFAULT_PROMPTS = 3
+
+// Field caps: the save endpoint's serializer (business_name 200, industry
+// 100, description 600, each keyword 100), the brand context (offerings 20,
+// each name 120) and the research prompt (3 to 300 characters).
+export const LIMITS = Object.freeze({
+  name: 200,
+  industry: 100,
+  description: 600,
+  offering: 120,
+  offerings: 20,
+  audience: 600,
+  voice: 300,
+  competitorName: 120,
+  competitorDomain: 253,
+  promptMin: 3,
+  prompt: 300,
+  keyword: 100,
+})
+
+// How long the resolved scan stays on screen before the brand step.
+export const SCAN_SETTLE_MS = 600
+
+const COPY = Object.freeze({
+  badUrl: 'Enter your website address, like yourcompany.com.',
+  scanFailed: "We couldn't read this site.",
+  tooManyScans: 'Too many scans in a row. Wait a minute and try again.',
+  saveFailed: "We couldn't save your project. Please try again.",
+  promptsNotTracked: "Your project is saved, but we couldn't add its starter prompts. Add them from the Overview.",
+})
+
+const clip = (value, max) => String(value ?? '').trim().slice(0, max).trim()
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
+
+/** https URL for what the user typed, or '' when it is not a web address. */
+export function normalizeSiteUrl(raw) {
+  const value = String(raw ?? '').trim()
+  if (!value) return ''
+  const withScheme = /^https?:\/\//i.test(value) ? value : `https://${value}`
+  try {
+    const { hostname } = new URL(withScheme)
+    return hostname.includes('.') ? withScheme : ''
+  } catch {
+    return ''
+  }
+}
+
+/** Host without "www." for display and the first message. */
+export function siteHost(url) {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, '')
+  } catch {
+    return String(url || '')
+  }
+}
+
+export function normalizeDomain(raw) {
+  return String(raw ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .replace(/[/?#].*$/, '')
+    .slice(0, LIMITS.competitorDomain)
+}
+
+function uniqueTexts(values, max) {
+  const seen = new Set()
+  const out = []
+  for (const value of Array.isArray(values) ? values : []) {
+    if (typeof value !== 'string') continue
+    const text = clip(value.replace(/\s+/g, ' '), max)
+    const key = text.toLowerCase()
+    if (!text || seen.has(key)) continue
+    seen.add(key)
+    out.push(text)
+  }
+  return out
+}
+
+function uniqueCompetitors(values) {
+  const seen = new Set()
+  const out = []
+  for (const raw of Array.isArray(values) ? values : []) {
+    if (!raw || typeof raw !== 'object') continue
+    const domain = normalizeDomain(raw.domain)
+    const name = clip(raw.name || domain, LIMITS.competitorName)
+    if (!name) continue
+    const key = domain || name.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ name, domain })
+  }
+  return out
+}
+
+function emptyScan() {
+  return { products: 0, topics: 0, competitors: 0, topics_source: '', missing_keys: [] }
+}
+
+function blankForm({ url = '', location = DEFAULT_COUNTRY } = {}) {
+  return {
+    url,
+    business_name: '',
+    industry: '',
+    description: '',
+    offerings: [],
+    audience: '',
+    voice: '',
+    competitors: [],
+    prompts: [],
+    location,
+    scan: emptyScan(),
+  }
+}
+
+/**
+ * The first message of the first research (swarm_frontend.md 12f). The
+ * prompts appear verbatim so the agent may track them.
+ */
+export function firstResearchText({ brand, host, prompts, location, competitors }) {
+  const lines = [`Research ${brand} (${host}) on Google and the AI engines for these prompts:`]
+  ;(prompts || []).forEach((text, index) => lines.push(`${index + 1}. ${text}`))
+  lines.push(location ? `Search from ${countryLabel(location)} (${location}).` : 'Search without a country (global).')
+  const named = (competitors || []).map((c) => (c.domain ? `${c.name} (${c.domain})` : c.name))
+  if (named.length) lines.push(`Competitors to compare: ${named.join(', ')}.`)
+  return lines.join('\n')
+}
+
+function prefersReducedMotion() {
+  try {
+    return Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)
+  } catch {
+    return false
+  }
+}
 
 export function provideOnboardingFlow({ onComplete } = {}) {
   const auth = useAuthStore()
+  const app = useAppStore()
   const toast = useToast()
   const router = useRouter()
+  const firstResearch = useFirstResearch()
 
   const step = ref(0)
   // 'forward' | 'back' — set BEFORE mutating `step` so the step
   // transition picks the right slide direction.
   const direction = ref('forward')
+  const form = ref(blankForm())
+
+  /* ── Step 1: website and scan ── */
+
   const urlInput = ref('')
-  const loading = ref(false)
-  const saving = ref(false)
-  const error = ref('')
+  // 'idle' (the address field) | 'scanning' | 'resolved' (rows filled in)
+  const scanState = ref('idle')
+  const scanHost = ref('')
+  // A typed address that is not a web address; the scan never ran.
+  const urlError = ref('')
+  // The scan ran and failed; the step offers Try again and Fill in by hand.
+  const scanError = ref('')
+  // The address the form was drafted from: the same address again keeps
+  // the user's edits instead of scanning (and paying for) it twice.
+  const scannedUrl = ref('')
+  let scanToken = 0
+  let advanceTimer = null
 
-  const form = ref({
-    url: '',
-    business_name: '',
-    industry: '',
-    description: '',
-    keywords: [],
-    // Parallel to `keywords`: brand names that show up alongside the
-    // topic in well-ranked LLM answers. Rendered under each chip on
-    // the describe step so the user can see what they're benchmarked
-    // against.
-    topic_brands: [],
-    competitors: [],
-  })
+  /* ── Steps 2 to 4: inputs for the "add" rows ── */
 
-  // True when the scan drafted no prompts (e.g. AI drafting is not
-  // available), so the describe step can say so instead of showing an
-  // empty list.
-  const noDraftedTopics = ref(false)
-
-  // "Add your own topic" input on the describe step.
-  const newTopic = ref('')
-
-  // "Add your own competitor" inputs on the competitors step.
+  const newOffering = ref('')
   const newCompetitorName = ref('')
   const newCompetitorDomain = ref('')
+  const newPrompt = ref('')
 
-  const urlHostname = computed(() => {
-    try {
-      const raw = form.value.url || urlInput.value
-      return new URL(raw.startsWith('http') ? raw : `https://${raw}`).hostname
-    } catch (_) {
-      return urlInput.value
+  /* ── Step 5: agent status and finishing ── */
+
+  const agentStatus = ref(null)
+  // 'idle' | 'loading' | 'ready' | 'error'
+  const statusState = ref('idle')
+  // '' | 'research' | 'skip': which finish is running.
+  const finishing = ref('')
+  const saving = computed(() => Boolean(finishing.value))
+
+  const displayStep = computed(() => step.value + 1)
+  const totalSteps = STEPS.length
+  const host = computed(() => siteHost(form.value.url))
+
+  const selectedCompetitors = computed(() => form.value.competitors.filter((c) => c.selected))
+  const competitorCapReached = computed(() => selectedCompetitors.value.length >= MAX_COMPETITORS)
+  const selectedPrompts = computed(() => form.value.prompts.filter((p) => p.selected))
+  const promptCapReached = computed(() => selectedPrompts.value.length >= MAX_PROMPTS)
+
+  // The website step moves on through the scan (or Fill in by hand), and
+  // the last step through its finish buttons; next() serves the others.
+  const canContinue = computed(() => {
+    switch (STEPS[step.value]?.id) {
+      case 'brand':
+        return Boolean(form.value.business_name.trim())
+      case 'competitors':
+        return selectedCompetitors.value.length <= MAX_COMPETITORS
+      case 'prompts':
+        return selectedPrompts.value.length >= 1 && selectedPrompts.value.length <= MAX_PROMPTS
+      default:
+        return false
     }
   })
 
-  // Progress shown in the topbar: scanning shares the url step's slot.
-  const displayStep = computed(
-    () => ({ 0: 1, 1: 2, 2: 2, 3: 3, 4: 4 })[step.value] ?? 1,
-  )
+  const scanRows = computed(() => {
+    const resolved = scanState.value === 'resolved'
+    const s = form.value.scan
+    const row = (key, label, n, found, missing) => ({
+      key,
+      label,
+      state: resolved ? (n > 0 ? 'found' : 'missing') : 'pending',
+      text: resolved ? (n > 0 ? found(n) : missing) : '',
+    })
+    return [
+      row('brand', 'Your brand and what you sell', s.products, (n) => `${plural(n, 'offering', 'offerings')} found`, 'Not found on your homepage'),
+      row('prompts', 'Buyer prompts', s.topics, (n) => `${plural(n, 'prompt', 'prompts')} drafted`, "Couldn't draft prompts"),
+      row('competitors', 'Competitors', s.competitors, (n) => `${plural(n, 'competitor', 'competitors')} found`, 'None found'),
+    ]
+  })
 
-  function begin() {
-    direction.value = 'forward'
-    step.value = 1
+  /* ── Navigation ── */
+
+  function goTo(index) {
+    const target = Math.max(0, Math.min(STEPS.length - 1, index))
+    if (target === step.value) return
+    direction.value = target > step.value ? 'forward' : 'back'
+    // Back on the website step shows the address field, not the old scan.
+    if (target === 0) {
+      clearAdvance()
+      scanState.value = 'idle'
+    }
+    step.value = target
   }
 
-  async function startScan() {
-    const raw = (urlInput.value || '').trim()
-    if (!raw) return
-    const url = raw.startsWith('http') ? raw : `https://${raw}`
-    loading.value = true
-    error.value = ''
-    direction.value = 'forward'
-    step.value = 2
-    try {
-      // Silent: the url step shows the failure inline.
-      const { data: payload } = await api.post('/onboarding/scan/', { url }, { _silentError: true })
-      if (!payload?.success) {
-        throw new Error(payload?.error || "We couldn't read this site.")
-      }
-      const topics = (payload.topics || []).slice(0, 8)
-      form.value = {
-        url: payload.url || url,
-        business_name: payload.business_name || '',
-        industry: payload.industry || '',
-        description: payload.description_short || payload.description_raw || '',
-        keywords: topics,
-        topic_brands: (payload.topic_brands || []).slice(0, 8),
-        competitors: (payload.competitors || []).slice(0, 12).map(c => ({
-          name: c.name || c.domain || '',
-          domain: c.domain || '',
-          selected: true,
-        })),
-      }
-      noDraftedTopics.value = topics.length === 0
-      direction.value = 'forward'
-      step.value = 3
-    } catch (e) {
-      // displayMessage is set for HTTP failures; a plain Error carries the
-      // scanner's own message.
-      error.value = e.displayMessage || e.message || "We couldn't read this site. Please try again."
-      direction.value = 'back'
-      step.value = 1
-    } finally {
-      loading.value = false
-    }
+  function next() {
+    if (!canContinue.value) return false
+    goTo(step.value + 1)
+    return true
   }
 
   function back() {
-    direction.value = 'back'
-    if (step.value === 4) step.value = 3
-    else if (step.value === 3) step.value = 1 // skip the scanning step
-    else if (step.value > 0) step.value -= 1
+    if (saving.value) return
+    goTo(step.value - 1)
   }
 
-  function goToCompetitors() {
-    direction.value = 'forward'
-    step.value = 4
+  function clearAdvance() {
+    if (advanceTimer) clearTimeout(advanceTimer)
+    advanceTimer = null
   }
 
-  function _normalizeDomain(d) {
-    return (d || '').trim().toLowerCase()
-      .replace(/^https?:\/\//, '')
-      .replace(/^www\./, '')
-      .replace(/\/$/, '')
+  /* ── Scan ── */
+
+  function adoptScan(payload, url) {
+    const offerings = uniqueTexts(payload.products, LIMITS.offering).slice(0, LIMITS.offerings)
+    const prompts = uniqueTexts(payload.topics, LIMITS.prompt).filter((t) => t.length >= LIMITS.promptMin)
+    const competitors = uniqueCompetitors(payload.competitors)
+    form.value = {
+      ...blankForm({ url: typeof payload.url === 'string' && payload.url ? payload.url : url, location: form.value.location }),
+      business_name: clip(payload.business_name, LIMITS.name),
+      industry: clip(payload.industry, LIMITS.industry),
+      description: clip(payload.description_short || payload.description_raw, LIMITS.description),
+      offerings,
+      competitors: competitors.map((c, i) => ({ ...c, selected: i < MAX_COMPETITORS, custom: false })),
+      prompts: prompts.map((text, i) => ({ text, selected: i < DEFAULT_PROMPTS, custom: false })),
+      scan: {
+        products: offerings.length,
+        topics: prompts.length,
+        competitors: competitors.length,
+        topics_source: typeof payload.topics_source === 'string' ? payload.topics_source : '',
+        missing_keys: Array.isArray(payload.missing_keys) ? payload.missing_keys.map(String) : [],
+      },
+    }
   }
 
-  function addCustomCompetitor() {
-    const name = newCompetitorName.value.trim()
-    if (!name) return
-    const domain = _normalizeDomain(newCompetitorDomain.value)
-    // Dedupe against existing rows by domain (preferred) or name (fallback).
-    const exists = form.value.competitors.some(c => {
-      const cDom = _normalizeDomain(c.domain)
-      if (domain && cDom) return cDom === domain
-      return c.name.toLowerCase() === name.toLowerCase()
-    })
-    if (exists) {
-      newCompetitorName.value = ''
-      newCompetitorDomain.value = ''
+  function scanFailure(err) {
+    const status = err?.response?.status
+    if (status === 429) return { scan: COPY.tooManyScans }
+    const server = err?.response?.data?.error
+    const message = typeof server === 'object' && typeof server?.message === 'string' ? server.message.trim() : ''
+    // 400: the address itself was refused; scanning it again cannot help.
+    if (status === 400) return { url: message || COPY.badUrl }
+    if (err?.scanMessage) return { scan: err.scanMessage }
+    return { scan: message && status && status < 500 ? message : COPY.scanFailed }
+  }
+
+  async function startScan() {
+    if (scanState.value === 'scanning' || saving.value) return
+    const url = normalizeSiteUrl(urlInput.value)
+    urlError.value = ''
+    scanError.value = ''
+    if (!url) {
+      urlError.value = COPY.badUrl
       return
     }
-    form.value.competitors.push({
-      name,
-      domain,
-      selected: true,
-      custom: true,
+    if (scannedUrl.value && scannedUrl.value === url) {
+      goTo(1)
+      return
+    }
+    const token = ++scanToken
+    scanHost.value = siteHost(url)
+    scanState.value = 'scanning'
+    try {
+      // Silent: the step shows the failure inline. No 429 retry: the user
+      // is told to wait instead of watching a silent retry.
+      const { data: payload } = await api.post('/onboarding/scan/', { url }, { _silentError: true, _noRetry429: true })
+      if (token !== scanToken) return
+      if (!payload?.success) {
+        const failed = new Error('scan failed')
+        failed.scanMessage = typeof payload?.error === 'string' && payload.error.trim() ? payload.error.trim() : COPY.scanFailed
+        throw failed
+      }
+      adoptScan(payload, url)
+      scannedUrl.value = url
+      scanState.value = 'resolved'
+      clearAdvance()
+      if (prefersReducedMotion()) {
+        goTo(1)
+      } else {
+        advanceTimer = setTimeout(() => {
+          advanceTimer = null
+          if (step.value === 0 && scanState.value === 'resolved') goTo(1)
+        }, SCAN_SETTLE_MS)
+      }
+    } catch (err) {
+      if (token !== scanToken) return
+      scanState.value = 'idle'
+      const failure = scanFailure(err)
+      urlError.value = failure.url || ''
+      scanError.value = failure.scan || ''
+    }
+  }
+
+  /** Skip the scan: the brand step with only the address filled in. */
+  function fillByHand() {
+    const url = normalizeSiteUrl(urlInput.value)
+    if (!url) {
+      scanError.value = ''
+      urlError.value = COPY.badUrl
+      return
+    }
+    scanToken += 1
+    clearAdvance()
+    form.value = blankForm({ url, location: form.value.location })
+    scannedUrl.value = ''
+    urlError.value = ''
+    scanError.value = ''
+    scanState.value = 'idle'
+    goTo(1)
+  }
+
+  /* ── Brand ── */
+
+  function addOffering() {
+    const name = clip(newOffering.value.replace(/\s+/g, ' '), LIMITS.offering)
+    if (!name) return false
+    const list = form.value.offerings
+    const exists = list.some((o) => o.toLowerCase() === name.toLowerCase())
+    if (!exists && list.length >= LIMITS.offerings) return false
+    if (!exists) list.push(name)
+    newOffering.value = ''
+    return !exists
+  }
+
+  function removeOffering(index) {
+    if (index < 0 || index >= form.value.offerings.length) return
+    form.value.offerings.splice(index, 1)
+  }
+
+  /* ── Competitors ── */
+
+  function setCompetitorSelected(index, on) {
+    const row = form.value.competitors[index]
+    if (!row) return false
+    if (on && !row.selected && competitorCapReached.value) return false
+    row.selected = Boolean(on)
+    return true
+  }
+
+  function addCompetitor() {
+    const name = clip(newCompetitorName.value.replace(/\s+/g, ' '), LIMITS.competitorName)
+    if (!name) return false
+    const domain = normalizeDomain(newCompetitorDomain.value)
+    // Dedupe against existing rows by domain (preferred) or name (fallback).
+    const exists = form.value.competitors.some((c) => {
+      if (domain && c.domain) return c.domain === domain
+      return c.name.toLowerCase() === name.toLowerCase()
     })
     newCompetitorName.value = ''
     newCompetitorDomain.value = ''
+    if (exists) return false
+    form.value.competitors.push({ name, domain, selected: !competitorCapReached.value, custom: true })
+    return true
   }
 
   function removeCompetitor(index) {
-    if (index < 0 || index >= form.value.competitors.length) return
+    const row = form.value.competitors[index]
+    if (!row || !row.custom) return
     form.value.competitors.splice(index, 1)
   }
 
-  // Two-tier logo fallback: Clearbit -> Google favicon -> initial.
-  // State machine driven by an internal `_logoErr` field on the row.
-  function onLogoError(competitor) {
-    if (!competitor._logoErr) {
-      competitor._logoErr = 'clearbit'
-    } else {
-      competitor._logoErr = 'fallback'
+  /* ── Prompts ── */
+
+  function setPromptSelected(index, on) {
+    const row = form.value.prompts[index]
+    if (!row) return false
+    if (on && !row.selected && promptCapReached.value) return false
+    row.selected = Boolean(on)
+    return true
+  }
+
+  function addPrompt() {
+    const text = clip(newPrompt.value.replace(/\s+/g, ' '), LIMITS.prompt)
+    if (text.length < LIMITS.promptMin) return false
+    const existing = form.value.prompts.find((p) => p.text.toLowerCase() === text.toLowerCase())
+    newPrompt.value = ''
+    if (existing) {
+      if (!existing.selected && !promptCapReached.value) existing.selected = true
+      return false
+    }
+    form.value.prompts.push({ text, selected: !promptCapReached.value, custom: true })
+    return true
+  }
+
+  function removePrompt(index) {
+    const row = form.value.prompts[index]
+    if (!row || !row.custom) return
+    form.value.prompts.splice(index, 1)
+  }
+
+  /* ── Step 5: the agent's status ── */
+
+  async function loadAgentStatus() {
+    if (statusState.value === 'loading') return
+    statusState.value = 'loading'
+    try {
+      const { data } = await agentApi.status({ _silentError: true })
+      agentStatus.value = data && typeof data === 'object' ? data : null
+      statusState.value = agentStatus.value ? 'ready' : 'error'
+    } catch {
+      agentStatus.value = null
+      statusState.value = 'error'
     }
   }
 
-  function removeKeyword(k) {
-    // Drop the matching brand list at the same index to keep the two
-    // arrays aligned for the "vs Brand1, Brand2" sub-label.
-    const idx = form.value.keywords.indexOf(k)
-    if (idx === -1) return
-    form.value.keywords.splice(idx, 1)
-    if (idx < form.value.topic_brands.length) {
-      form.value.topic_brands.splice(idx, 1)
+  // 'checking' | 'available' | 'unavailable' | 'allowance' | 'unknown'
+  const availability = computed(() => {
+    if (statusState.value === 'idle' || statusState.value === 'loading') return 'checking'
+    const s = agentStatus.value
+    if (!s) return 'unknown'
+    if (s.enabled !== true || s.configured === false || s.live_available === false || s.swarm?.enabled === false) {
+      return 'unavailable'
+    }
+    if (s.allowance?.exceeded) return 'allowance'
+    return 'available'
+  })
+
+  watch(
+    step,
+    (index) => {
+      if (STEPS[index]?.id === 'run' && statusState.value !== 'ready') loadAgentStatus()
+    },
+  )
+
+  /* ── Finish ── */
+
+  const firstMessage = computed(() =>
+    firstResearchText({
+      brand: form.value.business_name.trim(),
+      host: host.value,
+      prompts: selectedPrompts.value.map((p) => p.text),
+      location: form.value.location,
+      competitors: selectedCompetitors.value,
+    }),
+  )
+
+  /** Brand facts for the agents, written only into a project with no context yet. */
+  async function saveBrandContext(websiteId) {
+    const audience = form.value.audience.trim()
+    const voice = form.value.voice.trim()
+    const offerings = form.value.offerings.map((name) => ({ name, description: '', url: '' }))
+    if (!audience && !voice && !offerings.length) return
+    try {
+      const { data } = await agentApi.getContext(websiteId, { _silentError: true })
+      // A saved context (a project set up before) is never overwritten.
+      if (Number(data?.revision) !== 0) return
+      await agentApi.putContext(websiteId, { audience, voice, offerings, rules: [], revision: 0 }, { _silentError: true })
+    } catch {
+      // 409: a teammate saved first. Anything else: the context page can
+      // still be filled in later; it never blocks setup.
     }
   }
 
-  function addCustomTopic() {
-    const t = newTopic.value.trim().replace(/[.,]+$/, '')
-    if (!t) return
-    // Dedupe against the existing list, case-insensitive.
-    const exists = form.value.keywords.some(
-      k => k.toLowerCase() === t.toLowerCase(),
-    )
-    if (exists) {
-      newTopic.value = ''
-      return
-    }
-    form.value.keywords.push(t)
-    // Push an empty brand slot so the parallel arrays stay aligned.
-    // User-added topics show no "vs ..." sub-label.
-    form.value.topic_brands.push([])
-    newTopic.value = ''
-  }
-
-  async function finish() {
-    saving.value = true
+  async function finish(mode) {
+    if (finishing.value) return
+    finishing.value = mode
+    const research = mode === 'research'
+    const prompts = selectedPrompts.value.map((p) => p.text)
+    const competitors = selectedCompetitors.value.map((c) => ({ name: c.name, domain: c.domain }))
+    const text = firstMessage.value
+    let websiteId
     try {
       // Silent: the one toast below reports the failure.
-      const { data: saved } = await api.post('/onboarding/save/', {
-        url: form.value.url,
-        business_name: form.value.business_name,
-        industry: form.value.industry,
-        description: form.value.description,
-        keywords: form.value.keywords,
-        competitors: form.value.competitors
-          .filter(c => c.selected)
-          .map(c => ({ name: c.name, domain: c.domain })),
-      }, { _silentError: true })
-      // The starter prompts the user confirmed become tracked prompts, the
-      // same way Add prompts on the Overview adds them (which also starts
-      // their first AI engine check). The project is already saved, so a
-      // failure here only asks the user to add them again.
-      const starters = form.value.keywords.map(k => k.trim()).filter(Boolean)
-      if (saved?.website_id && starters.length) {
-        try {
-          await api.post(
-            `/prompt-library/websites/${saved.website_id}/prompts/`,
-            { text: starters.join('\n') },
-            { _silentError: true },
-          )
-        } catch (_) {
-          toast.warning("Your project is saved, but we couldn't add its starter prompts. Add them from the Overview.")
-        }
-      }
-      // Hand the paywall its personalization line ("{domain} is set up
-      // with N competitors") — the session payload carries no
-      // domains, and /paywall renders outside the app store's website
-      // loading, so a same-tab handoff is the cheapest exact source.
-      try {
-        sessionStorage.setItem('cs-onb-summary', JSON.stringify({
-          domain: urlHostname.value,
-          competitors: form.value.competitors.filter(c => c.selected).length,
-          topics: form.value.keywords.length,
-          ts: Date.now(),
-        }))
-      } catch (_) { /* storage full/blocked: the paywall falls back */ }
-      await auth.fetchSession()
-      // Route from HERE, not from the parent: the session refresh above
-      // flips needs_onboarding, which unmounts the whole flow while this
-      // function is still running — an emit at that point can die with
-      // the instance (this exact bug shipped: finished users sat on the
-      // dashboard instead of the paywall). router.push is app-level and
-      // survives the unmount.
-      if (auth.session?.next_route === 'paywall') {
-        router.push('/paywall')
-      }
-      onComplete?.()
-    } catch (e) {
-      toast.error(e.displayMessage || "We couldn't save your project. Please try again.")
-    } finally {
-      saving.value = false
+      const { data: saved } = await api.post(
+        '/onboarding/save/',
+        {
+          url: form.value.url,
+          business_name: form.value.business_name.trim(),
+          industry: form.value.industry.trim(),
+          description: form.value.description.trim(),
+          // The project's topics; the endpoint takes at most 100 characters each.
+          keywords: prompts.map((p) => clip(p, LIMITS.keyword)),
+          competitors,
+        },
+        { _silentError: true },
+      )
+      websiteId = saved?.website_id ? String(saved.website_id) : ''
+      if (!websiteId) throw new Error('The project was not created.')
+    } catch (err) {
+      toast.error(err?.displayMessage || COPY.saveFailed)
+      finishing.value = ''
+      return
     }
+
+    if (agentStatus.value?.enabled !== false) await saveBrandContext(websiteId)
+
+    // The agent routes resolve :websiteId against this list.
+    try {
+      const { data } = await websitesApi.list({ _silentError: true })
+      if (Array.isArray(data)) app.setWebsites(data)
+    } catch {}
+
+    // Where the agent chat finds the first research: the stash, or, when
+    // session storage refuses it, the new chat's composer with the research
+    // agent picked (the user then presses Send).
+    let handedOff = false
+    if (research) {
+      handedOff = firstResearch.stash({ websiteId, text })
+      const uid = auth.user?.id
+      if (!handedOff && uid !== undefined && uid !== null) saveDraft(String(uid), websiteId, NEW_CHAT_KEY, text)
+    } else {
+      // The chosen prompts become tracked prompts, the same way Add prompts
+      // on the Overview adds them (which also starts their first AI engine
+      // check). The project is already saved, so a failure here only asks
+      // the user to add them again.
+      try {
+        await api.post(
+          `/prompt-library/websites/${encodeURIComponent(websiteId)}/prompts/`,
+          { text: prompts.join('\n'), location: form.value.location },
+          { _silentError: true },
+        )
+      } catch {
+        toast.warning(COPY.promptsNotTracked)
+      }
+    }
+
+    // Hand the paywall its personalization line ("{domain} is set up with
+    // N competitors"): the session payload carries no domains, and
+    // /paywall renders outside the app store's website loading.
+    try {
+      sessionStorage.setItem(
+        'cs-onb-summary',
+        JSON.stringify({ domain: host.value, competitors: competitors.length, topics: prompts.length, ts: Date.now() }),
+      )
+    } catch {
+      // storage full/blocked: the paywall falls back
+    }
+
+    await auth.fetchSession()
+    // Route from HERE, not from the parent: the session refresh above
+    // flips needs_onboarding, which unmounts the whole flow while this
+    // function is still running. router.push is app-level and survives
+    // the unmount. A paywalled user meets the research after paying (the
+    // agent page finds it waiting and offers it).
+    if (auth.session?.next_route === 'paywall') {
+      router.push('/paywall')
+    } else if (research) {
+      router.push({
+        name: 'agent-home',
+        params: { websiteId },
+        query: handedOff ? { start: 'first-research' } : { agent: 'gap_analyst' },
+      })
+    }
+    onComplete?.()
+    finishing.value = ''
   }
+
+  function startResearch() {
+    return finish('research')
+  }
+
+  function skipResearch() {
+    return finish('skip')
+  }
+
+  if (getCurrentScope()) onScopeDispose(clearAdvance)
 
   const flow = {
     steps: STEPS,
+    totalSteps,
     step,
     direction,
     displayStep,
-    urlInput,
-    loading,
-    saving,
-    error,
     form,
-    noDraftedTopics,
-    newTopic,
+    host,
+    canContinue,
+    next,
+    back,
+    goTo,
+    // website
+    urlInput,
+    scanState,
+    scanHost,
+    scanRows,
+    urlError,
+    scanError,
+    startScan,
+    fillByHand,
+    // brand
+    newOffering,
+    addOffering,
+    removeOffering,
+    // competitors
     newCompetitorName,
     newCompetitorDomain,
-    urlHostname,
-    begin,
-    startScan,
-    back,
-    goToCompetitors,
-    addCustomCompetitor,
+    selectedCompetitors,
+    competitorCapReached,
+    setCompetitorSelected,
+    addCompetitor,
     removeCompetitor,
-    onLogoError,
-    removeKeyword,
-    addCustomTopic,
-    finish,
+    // prompts
+    newPrompt,
+    selectedPrompts,
+    promptCapReached,
+    setPromptSelected,
+    addPrompt,
+    removePrompt,
+    // first research
+    agentStatus,
+    statusState,
+    availability,
+    loadAgentStatus,
+    firstMessage,
+    finishing,
+    saving,
+    startResearch,
+    skipResearch,
   }
   provide(FlowKey, flow)
   return flow

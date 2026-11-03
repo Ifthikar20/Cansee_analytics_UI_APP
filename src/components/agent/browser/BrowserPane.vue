@@ -14,6 +14,7 @@
           <SerpView v-if="tab.kind === 'serp'" :key="tab.id" :tab="tab" />
           <PageView v-else-if="tab.kind === 'page' || tab.kind === 'url'" :key="tab.id" :tab="tab" />
           <NewTabView v-else-if="tab.kind === 'newtab'" :key="tab.id" :tab="tab" />
+          <SwarmTableView v-else-if="tab.kind === 'table'" :key="tab.id" :tab="tab" />
           <ArtifactView v-else-if="tab.kind === 'artifact'" :key="tab.id" :source="source" @version="setVersion" />
         </div>
       </div>
@@ -34,6 +35,7 @@ import ArtifactView from './views/ArtifactView.vue'
 import NewTabView from './views/NewTabView.vue'
 import PageView from './views/PageView.vue'
 import SerpView from './views/SerpView.vue'
+import SwarmTableView from './views/SwarmTableView.vue'
 
 // The browser pane: tab strip, header and the active tab's view. Mounted in
 // the workspace's #pane slot, and inside the full-screen dialog on phones.

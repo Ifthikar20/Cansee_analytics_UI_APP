@@ -48,6 +48,7 @@ async function setup(path = '/projects/w1/agent') {
           { path: 'c/:chatId', name: 'agent-chat', component: Page },
           { path: 'context', name: 'agent-context', component: Page },
           { path: 'agents', name: 'agent-agents', component: Page },
+          { path: 'findings', name: 'agent-findings', component: Page },
           { path: 'reports', name: 'agent-reports', component: Page },
           { path: 'documents', name: 'agent-documents', component: Page },
           { path: 'sheets', name: 'agent-sheets', component: Page },

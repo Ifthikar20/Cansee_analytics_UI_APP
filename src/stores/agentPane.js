@@ -3,6 +3,7 @@ import { computed, markRaw, ref, watch } from 'vue'
 import { useAgentStore } from '@/stores/agent'
 import { useAuthStore } from '@/stores/auth'
 import { hostOf, isHttpUrl, normalizeAddress } from '@/lib/agent/url'
+import { taskError } from '@/lib/agent/normalize'
 import { loadPaneState, loadUiPrefs, movePaneState, savePaneState, saveUiPrefs } from '@/lib/agent/storage'
 
 // Browser pane state for the bound chat: the tab list, the active tab and the
@@ -12,6 +13,13 @@ import { loadPaneState, loadUiPrefs, movePaneState, savePaneState, saveUiPrefs }
 // (cs-agent-tabs-v1); the split ratio and the SEO facts panel are device
 // prefs (cs-agent-ui-v1).
 //
+// The research agents (swarm parts) take their captures without browser
+// events: a task row opens its capture with openCapture, and the pane
+// rebuilds those tabs from the research store but never adds them on its
+// own (a swarm takes dozens). A swarm's results table is a `table` tab, one
+// per swarm: {id: 'table:<swarmId>', kind: 'table', swarmId, version, title},
+// where a null version follows the latest.
+//
 // Tab statuses: idle (a URL not fetched yet), loading, ready, error, missing
 // (restored from storage, waiting for the chat's research) and gone (the
 // chat loaded without that capture).
@@ -20,7 +28,19 @@ export const MAX_TABS = 12
 const MAX_CLOSED = 100
 const MAX_STASH = 30
 const RESEARCH_KINDS = new Set(['serp', 'page'])
-const TAB_FIELDS = new Set(['title', 'status', 'mode', 'url', 'finalUrl', 'history', 'version', 'kind', 'artifactId', 'nonce'])
+const TAB_FIELDS = new Set([
+    'title',
+    'status',
+    'mode',
+    'url',
+    'finalUrl',
+    'history',
+    'version',
+    'kind',
+    'artifactId',
+    'swarmId',
+    'nonce',
+])
 const ACTIVE_AGENT_STATUSES = new Set(['planning', 'drafting', 'validating'])
 const SETTLED_AGENT_STATUSES = new Set(['done', 'error', 'cancelled'])
 // Reply statuses after which none of its steps is still running, whatever
@@ -145,6 +165,54 @@ function errorText(error) {
     return error && typeof error.message === 'string' ? error.message : ''
 }
 
+// "serp:<id>" -> 'serp', "page:<id>" -> 'page'; '' for anything else.
+function captureKind(tabId) {
+    if (typeof tabId !== 'string') return ''
+    const colon = tabId.indexOf(':')
+    if (colon <= 0 || colon === tabId.length - 1) return ''
+    const kind = tabId.slice(0, colon)
+    return RESEARCH_KINDS.has(kind) ? kind : ''
+}
+
+// The tab of a capture a research agent took (task.pane), built from the
+// research store like a step's tab. A task names its capture only once it
+// has finished, so without a capture the tab is `missing`.
+function swarmTaskSpec(task, serps, pages) {
+    const tabId = task.pane.tab_id
+    const kind = captureKind(tabId)
+    if (!kind) return null
+    const captureId = tabId.slice(kind.length + 1)
+    const detail = task.detail && typeof task.detail === 'object' ? task.detail : {}
+    const error = task.status === 'done' ? null : taskError(task.error)
+    if (kind === 'serp') {
+        const capture = serps[captureId] || null
+        const status = captureStatus('serp', capture)
+        const data = capture || { query: detail.query, page: detail.page, location: detail.location, error }
+        return {
+            id: tabId,
+            kind: 'serp',
+            title: serpTitle(data),
+            status: status === 'loading' ? (error ? 'error' : 'missing') : status,
+            data,
+            complete: status !== 'loading',
+            auto: false,
+        }
+    }
+    const capture = pages[captureId] || null
+    const status = captureStatus('page', capture)
+    const url = detail.final_url || detail.url || ''
+    const data = capture || { url: detail.url || null, error }
+    return {
+        id: tabId,
+        kind: 'page',
+        title: capture?.seo?.title || detail.title || hostOf(url) || 'Page',
+        status: status === 'loading' ? (error ? 'error' : 'missing') : status,
+        data,
+        complete: status !== 'loading',
+        auto: false,
+    }
+}
+
 // Research and artifact tabs referenced by the messages, oldest first.
 //
 // An artifact gets one spec, from its first call; later calls on it (its
@@ -153,7 +221,11 @@ function errorText(error) {
 // version. unsaved: none did and none is running, so the artifact was never
 // created: the agent names it when it starts and saves it only when a draft
 // passes its checks.
-export function researchTabs(messages) {
+//
+// includeSwarm also yields the capture of each research agent (the first
+// task naming it), with `auto: false`: the pane rebuilds and reopens those
+// tabs but never adds them by itself.
+export function researchTabs(messages, { includeSwarm = false } = {}) {
     const out = []
     const seen = new Set()
     const artifacts = new Map()
@@ -165,6 +237,18 @@ export function researchTabs(messages) {
         const ended = ENDED_STATUSES.has(m.status)
         for (const part of m.parts || []) {
             if (!part) continue
+            if (part.type === 'swarm') {
+                if (!includeSwarm || !Array.isArray(part.tasks)) continue
+                for (const task of part.tasks) {
+                    const tabId = task && task.pane && task.pane.tab_id
+                    if (typeof tabId !== 'string' || seen.has(tabId)) continue
+                    const spec = swarmTaskSpec(task, serps, pages)
+                    if (!spec) continue
+                    seen.add(tabId)
+                    out.push(spec)
+                }
+                continue
+            }
             if ((part.type === 'serp' || part.type === 'page_inspect') && typeof part.tab_id === 'string') {
                 if (seen.has(part.tab_id)) continue
                 seen.add(part.tab_id)
@@ -297,6 +381,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
             return (a && ((a.draft && a.draft.title) || a.title)) || tab.title || 'Untitled'
         }
         if (tab.kind === 'newtab') return 'New tab'
+        if (tab.kind === 'table') return tab.title || 'Research results'
         if (tab.kind === 'url' || tab.kind === 'page') {
             const d = tab.data || {}
             return d.title || d.seo?.title || tab.title || hostOf(tab.finalUrl || tab.url) || 'Page'
@@ -343,6 +428,10 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
                 if (t.kind === 'artifact') {
                     entry.artifact_id = t.artifactId
                     if (t.version) entry.version = t.version
+                }
+                if (t.kind === 'table') {
+                    entry.swarm_id = t.swarmId
+                    entry.version = t.version ?? null
                 }
                 if (t.mode) entry.mode = t.mode
                 return entry
@@ -469,7 +558,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         if (spec.kind === 'artifact') {
             return { id: spec.id, kind: 'artifact', artifactId: spec.artifactId, title: spec.title, status: spec.status }
         }
-        const { complete: _c, ...fields } = spec
+        const { complete: _c, auto: _a, ...fields } = spec
         if (spec.kind === 'page') Object.assign(fields, pageFields(spec.data))
         const kept = stash.get(spec.id)
         if (kept && !spec.complete) Object.assign(fields, kept)
@@ -479,10 +568,28 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
     function reopenFromResearch(id) {
         const key = chatKey.value
         if (!key || typeof id !== 'string') return null
-        const spec = researchTabs(messageList(key)).find((s) => s.id === id)
+        const spec = researchTabs(messageList(key), { includeSwarm: true }).find((s) => s.id === id)
         if (!spec || spec.unsaved) return null
         closed.delete(id)
         return addTab(specFields(spec))
+    }
+
+    // A capture of the bound chat that no step or agent names (a results
+    // table can link one), straight from its messages' research.
+    function storedCaptureSpec(id) {
+        const key = chatKey.value
+        const kind = captureKind(id)
+        if (!key || !kind) return null
+        const captureId = id.slice(kind.length + 1)
+        for (const m of messageList(key)) {
+            const research = (m && m.research) || {}
+            const capture = (kind === 'serp' ? research.serp : research.pages)?.[captureId]
+            if (!capture || typeof capture !== 'object') continue
+            const data = { ...capture, capture_id: capture.capture_id || captureId }
+            const spec = kind === 'serp' ? serpSpec(data) : pageSpec(data)
+            return spec ? { ...spec, id, kind, complete: true } : null
+        }
+        return null
     }
 
     function activateTab(id) {
@@ -624,6 +731,52 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         }
     }
 
+    // The results table of a research swarm: one tab per swarm, showing
+    // `version` (null: the latest). Opening it again switches its version.
+    function openTable(swarmId, { version = null, activate = true, title = '' } = {}) {
+        if (swarmId === undefined || swarmId === null || swarmId === '') return null
+        const sid = String(swarmId)
+        const n = Number(version)
+        const v = version !== null && Number.isInteger(n) && n > 0 ? n : null
+        const tabId = `table:${sid}`
+        let tab = byId(tabId)
+        if (tab) {
+            tab.version = v
+            if (title) tab.title = title
+        } else {
+            tab = addTab({ id: tabId, kind: 'table', swarmId: sid, version: v, title: title || '', status: 'ready' })
+        }
+        if (activate) {
+            select(tab)
+            show()
+        }
+        return tabId
+    }
+
+    // Opens (or activates) the tab of a Google results page or page capture
+    // ("serp:<id>" / "page:<id>") of the bound chat: one a step showed, one
+    // a research agent took, or any capture in its messages' research.
+    // Returns the tab id, or null when the chat has no such capture.
+    function openCapture(tabId, { activate = true } = {}) {
+        const id = typeof tabId === 'string' ? tabId.trim() : ''
+        if (!captureKind(id)) return null
+        let tab = byId(id)
+        if (!tab) {
+            const key = chatKey.value
+            if (!key) return null
+            const spec =
+                researchTabs(messageList(key), { includeSwarm: true }).find((s) => s.id === id) || storedCaptureSpec(id)
+            if (!spec) return null
+            closed.delete(id)
+            tab = addTab(specFields(spec))
+        }
+        if (activate) {
+            select(tab)
+            show()
+        }
+        return tab.id
+    }
+
     function openNewTab() {
         const existing = tabs.value.find((t) => t.kind === 'newtab')
         if (existing) return activateTab(existing.id)
@@ -745,6 +898,11 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         if (entry.kind === 'artifact' && entry.artifact_id !== undefined && entry.artifact_id !== null) {
             return { ...base, artifactId: entry.artifact_id, version: entry.version || null }
         }
+        if (entry.kind === 'table' && entry.swarm_id !== undefined && entry.swarm_id !== null && entry.swarm_id !== '') {
+            const n = Number(entry.version)
+            const version = entry.version !== null && Number.isInteger(n) && n > 0 ? n : null
+            return { ...base, swarmId: String(entry.swarm_id), version, title: '', status: 'ready' }
+        }
         if (entry.kind === 'url' && isHttpUrl(entry.url)) {
             return { ...base, title: hostOf(entry.url), status: 'idle', ...pageFields({ url: entry.url }) }
         }
@@ -803,14 +961,18 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         const key = chatKey.value
         if (!key || key === 'new') return
         loadSaved()
-        const specs = researchTabs(messageList(key))
+        const specs = researchTabs(messageList(key), { includeSwarm: true })
         const fresh = !restored
         let lastAdded = null
-        const candidates = fresh ? specs.slice(-MAX_TABS) : specs
-        for (const spec of candidates) {
+        // Only the steps' own tabs open by themselves; a research agent's
+        // capture (auto: false) only rebuilds a tab that is already there.
+        const auto = specs.filter((s) => s.auto !== false)
+        const candidates = new Set((fresh ? auto.slice(-MAX_TABS) : auto).map((s) => s.id))
+        for (const spec of specs) {
             const tab = byId(spec.id)
             if (tab) hydrate(tab, spec)
-            else if (!closed.has(spec.id) && !spec.unsaved) lastAdded = addTab(specFields(spec))
+            else if (candidates.has(spec.id) && !closed.has(spec.id) && !spec.unsaved) lastAdded = addTab(specFields(spec))
+            if (!candidates.has(spec.id)) continue
             const call = `${spec.id}|${spec.callId ?? ''}`
             if (spec.kind === 'artifact' && ACTIVE_AGENT_STATUSES.has(spec.agentStatus) && !autoOpened.has(call)) {
                 autoOpened.add(call)
@@ -904,6 +1066,12 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
                     if (!p) continue
                     if (p.type === 'agent_call') sig += `:${p.artifact_id ?? ''}/${p.status || ''}/${p.version ?? ''}`
                     else if (p.type === 'serp' || p.type === 'page_inspect') sig += `:${p.tab_id || ''}/${p.status || ''}`
+                    else if (p.type === 'swarm' && Array.isArray(p.tasks)) {
+                        // A task names its capture when it finishes.
+                        let panes = 0
+                        for (const t of p.tasks) if (t && t.pane && t.pane.tab_id) panes += 1
+                        sig += `:${p.swarm_id ?? ''}/${p.status || ''}/${panes}`
+                    }
                 }
                 sig += '|'
             }
@@ -961,6 +1129,8 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         updateTab,
         openPage,
         openUrl,
+        openTable,
+        openCapture,
         openNewTab,
         navigateTab,
         goBack: (id) => goHistory(id, -1),
