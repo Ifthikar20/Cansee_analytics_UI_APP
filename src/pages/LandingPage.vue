@@ -39,12 +39,10 @@
             </div>
           </Transition>
         </div>
-        <router-link to="/blog" class="lp-link">Blog</router-link>
       </nav>
 
       <div class="lp-actions">
-        <router-link to="/login" class="lp-login">Log in</router-link>
-        <router-link to="/login" class="lp-start">Get started</router-link>
+        <router-link to="/login" class="lp-start">Sign in</router-link>
         <button
           type="button"
           class="lp-burger"
@@ -67,8 +65,7 @@
             </router-link>
           </div>
           <div class="lp-sheet-group">
-            <router-link to="/blog" @click="closeAll">Blog</router-link>
-            <router-link to="/login" @click="closeAll">Log in</router-link>
+            <router-link to="/login" @click="closeAll">Sign in</router-link>
           </div>
         </div>
       </Transition>
@@ -99,7 +96,7 @@
 
           <div class="lp-ctas">
             <router-link to="/login" class="lp-btn lp-btn--solid">
-              Get started
+              Sign in
               <ArrowRight class="lp-btn-icon" aria-hidden="true" />
             </router-link>
             <router-link to="/docs" class="lp-btn lp-btn--ghost">Read the docs</router-link>
@@ -166,20 +163,19 @@ const menus = [
     key: 'product',
     label: 'Product',
     items: [
-      { label: 'AI Visibility', blurb: 'Where you rank on each engine, and who gets picked instead.', to: '/docs#visibility' },
-      { label: 'Prompts', blurb: 'The buyer questions you are measured on.', to: '/docs#prompts' },
-      { label: 'Brand Research', blurb: 'Threads, questions, and pages worth acting on.', to: '/docs#research' },
-      { label: 'Source Influence', blurb: 'The sites that feed the answers.', to: '/docs#sources' },
-      { label: 'Brand Security', blurb: 'Catch wrong or harmful claims about you.', to: '/docs#security' },
+      { label: 'Overview', blurb: 'Your Google rank against five AI engines, prompt by prompt.', to: '/docs#overview' },
+      { label: 'Prompt page', blurb: 'Each engine next to Google, and what to change.', to: '/docs#prompt' },
+      { label: 'Sources', blurb: 'The pages AI pulls up while answering.', to: '/docs#sources' },
+      { label: 'Brand facts', blurb: 'What is true about you, checked against the answers.', to: '/docs#brand-facts' },
     ],
   },
   {
     key: 'docs',
     label: 'Docs',
     items: [
-      { label: 'What is Cansee', blurb: 'The one-paragraph version.', to: '/docs#welcome' },
-      { label: 'Quick start', blurb: 'From a URL to your first result.', to: '/docs#quickstart' },
-      { label: 'Metrics', blurb: 'The five numbers every result comes back to.', to: '/docs#metrics' },
+      { label: 'What Cansee does', blurb: 'The short version.', to: '/docs#welcome' },
+      { label: 'Quick start', blurb: 'From your website to your first comparison.', to: '/docs#quickstart' },
+      { label: 'How the gap is scored', blurb: 'Search score, AI score and the gap between them.', to: '/docs#scoring' },
       { label: 'Glossary', blurb: 'Every term, in plain words.', to: '/docs#glossary' },
     ],
   },
@@ -187,10 +183,8 @@ const menus = [
     key: 'resources',
     label: 'Resources',
     items: [
-      { label: 'About', blurb: 'Who we are and why we built Cansee.', to: '/about' },
-      { label: 'Changelog', blurb: 'What shipped recently.', to: '/changelog' },
-      { label: 'Status', blurb: 'Live service health.', to: '/status' },
-      { label: 'Contact', blurb: 'Talk to the team.', to: '/contact' },
+      { label: 'About', blurb: 'What Cansee does and who runs it.', to: '/about' },
+      { label: 'Contact', blurb: 'The right address for your question.', to: '/contact' },
     ],
   },
 ]
@@ -201,7 +195,7 @@ const steps = [
   { title: 'Ask', desc: 'Cansee puts the questions your customers ask to five AI engines, on a schedule, without ever naming you.' },
   { title: 'Measure', desc: 'Visibility, position, sentiment, and share of voice, plus the brands recommended instead of you.' },
   { title: 'Trace', desc: 'The domains and pages each engine cites, so you know where a mention would move you most.' },
-  { title: 'Act', desc: 'Threads to join, pages to publish, and an alert when an AI gets your facts wrong.' },
+  { title: 'Act', desc: 'What to change for each prompt and which pages to work on, plus a flag when an AI answer gets your facts wrong.' },
 ]
 
 const footerLinks = [
@@ -210,7 +204,6 @@ const footerLinks = [
   { label: 'Cookies', to: '/cookies' },
   { label: 'DPA', to: '/dpa' },
   { label: 'Responsible AI', to: '/ai-policy' },
-  { label: 'Status', to: '/status' },
   { label: 'Support', to: '/support' },
 ]
 
@@ -423,17 +416,6 @@ function renewCookieConsent() {
   display: flex;
   align-items: center;
   gap: 22px;
-}
-
-.lp-login {
-  color: var(--lp-lavender);
-  font-size: 15px;
-  font-weight: 500;
-  transition: color 0.15s ease;
-}
-
-.lp-login:hover {
-  color: #ffffff;
 }
 
 .lp-start {
@@ -815,8 +797,7 @@ function renewCookieConsent() {
 
 /* ── Responsive ── */
 @media (max-width: 1080px) {
-  .lp-links,
-  .lp-login {
+  .lp-links {
     display: none;
   }
   .lp-burger {

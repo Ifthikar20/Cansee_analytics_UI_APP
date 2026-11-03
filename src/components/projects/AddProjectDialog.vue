@@ -1,17 +1,20 @@
 <template>
   <BaseModal :model-value="open" title="Add a project" @update:model-value="open = $event">
     <div v-if="!appStore.canCreateProject" class="apj-limit">
-      <p>Your <strong>{{ authStore.planState.tierLabel }}</strong> plan allows {{ appStore.projectLimit }} project(s).</p>
-      <p>Upgrade to Pro for up to 5 projects.</p>
+      <p>
+        Your <strong>{{ authStore.planState.tierLabel }}</strong> allows
+        {{ appStore.projectLimit }} {{ appStore.projectLimit === 1 ? 'project' : 'projects' }}.
+      </p>
+      <p>Upgrade in Billing to add more projects.</p>
     </div>
     <form v-else id="add-project-form" class="apj" @submit.prevent="create">
       <label class="apj-field">
         <span class="apj-label">Project name</span>
-        <input v-model="form.name" class="apj-input" placeholder="Acme" required />
+        <input v-model="form.name" class="apj-input" placeholder="Project name" required />
       </label>
       <label class="apj-field">
         <span class="apj-label">Website URL</span>
-        <input v-model="form.url" class="apj-input" placeholder="https://acme.com" required />
+        <input v-model="form.url" class="apj-input" placeholder="https://yourcompany.com" required />
       </label>
       <label class="apj-field">
         <span class="apj-label">Industry <span class="apj-optional">(optional)</span></span>
@@ -23,7 +26,7 @@
     <template #footer>
       <div class="apj-footer">
         <Button variant="outline" @click="open = false">Cancel</Button>
-        <Button v-if="!appStore.canCreateProject" @click="goToBilling">View plans</Button>
+        <Button v-if="!appStore.canCreateProject" @click="goToBilling">Open Billing</Button>
         <Button v-else type="submit" form="add-project-form" :disabled="!form.name || !form.url || creating">
           {{ creating ? 'Creating...' : 'Create project' }}
         </Button>
@@ -37,7 +40,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import { Button } from '@/components/ui/button'
-import websitesApi from '@/api/websites'
+import api from '@/api/client'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
@@ -57,7 +60,8 @@ async function create() {
   creating.value = true
   error.value = ''
   try {
-    const { data: project } = await websitesApi.create(form.value)
+    // Silent: the dialog shows the failure inline.
+    const { data: project } = await api.post('/websites/', form.value, { _silentError: true })
     appStore.websites.push(project)
     appStore.setActiveWebsite(project)
     form.value = { name: '', url: '', industry: '' }

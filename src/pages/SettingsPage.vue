@@ -47,7 +47,7 @@
       <SettingsSection
         label="Usage"
         title="AI usage"
-        description="Tokens and requests used by prompt runs and the prompt library in the current billing period."
+        description="Tokens and requests used by AI features in the current billing period."
       >
         <div v-if="usageLoading" class="sp-loading">
           <span class="spinner"></span>
@@ -118,7 +118,7 @@
             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" /><path d="M12 6v6l4 2" />
             </svg>
-            <p>No AI usage recorded this billing period. Token tracking starts automatically when you use AI features like prompt runs or the prompt library.</p>
+            <p>No AI usage recorded this billing period yet.</p>
           </div>
 
           <p class="sp-footnote">
@@ -126,39 +126,28 @@
             are calculated against the current market rates of the underlying
             providers (Anthropic, OpenAI, xAI, Perplexity, Google); the
             allowance may be adjusted if provider pricing changes.
-            <template v-if="usage.source === 'polar'">
-              Token totals are served live from Polar metering.
-            </template>
           </p>
         </template>
 
-        <p v-else class="sp-muted">Usage isn't available right now. Refresh to try again.</p>
+        <div v-else class="sp-failed">
+          <p class="sp-muted">We couldn't load your AI usage.</p>
+          <Button variant="outline" class="sp-btn" @click="loadUsage">Try again</Button>
+        </div>
       </SettingsSection>
     </template>
 
     <!-- ── Notifications ───────────────────────────────────────── -->
+    <!-- No email alerts are sent today, so there is nothing to toggle. -->
     <template v-else-if="section === 'notifications'">
       <SettingsSection
         label="Email"
         title="Email notifications"
-        description="Choose which updates Cansee sends to your inbox."
       >
-        <div class="sp-rows">
-          <label v-for="opt in NOTIF_OPTIONS" :key="opt.key" class="sp-row">
-            <span class="sp-row-text">
-              <span class="sp-row-title">{{ opt.label }}</span>
-              <span class="sp-row-desc">{{ opt.desc }}</span>
-            </span>
-            <input
-              v-model="notifPrefs[opt.key]"
-              type="checkbox"
-              class="sp-switch"
-              role="switch"
-              :aria-checked="notifPrefs[opt.key] ? 'true' : 'false'"
-              @change="saveNotifPrefs"
-            />
-          </label>
-        </div>
+        <p class="sp-muted">Email alerts aren't available yet.</p>
+        <p class="sp-muted sp-muted--spaced">
+          For a daily report in Slack, Discord or Microsoft Teams, connect a channel in
+          <router-link :to="{ name: 'settings-connections' }" class="sp-inline-link">Connections</router-link>.
+        </p>
       </SettingsSection>
     </template>
 
@@ -178,15 +167,16 @@
           </span>
           <span class="sp-row-text">
             <span class="sp-row-title">Email support</span>
-            <span class="sp-row-desc">We reply to every message, usually within one business day.</span>
           </span>
           <a class="sp-contact-btn" :href="supportHref">{{ SUPPORT_EMAIL }}</a>
         </div>
         <p class="sp-contact-hint">
           Write from the email address on your account ({{ authStore.user?.email || 'the one you signed up with' }})
           so we can find your workspace and billing history right away. For refunds, mention the
-          approximate charge date. Prefer to stay in the app? Use the Help &amp; feedback button
-          in the top bar — replies land right there.
+          approximate charge date.
+          <template v-if="feedbackEnabled">
+            Prefer to stay in the app? Use the Help &amp; feedback button in the top bar; replies show up there.
+          </template>
         </p>
       </SettingsSection>
     </template>
@@ -259,8 +249,8 @@ ChartJS.register(BarElement, CategoryScale, LinearScale, ChartTooltip)
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
+import api from '@/api/client'
 import authApi from '@/api/auth'
-import notificationsApi from '@/api/notifications'
 import SettingsShell from '@/components/settings/SettingsShell.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import OrgMembersSection from '@/components/org/OrgMembersSection.vue'
@@ -298,6 +288,9 @@ const supportHref = computed(() => {
   return `mailto:${SUPPORT_EMAIL}?${params.toString().replace(/\+/g, '%20')}`
 })
 
+// The in-app feedback panel only exists when its service URL is set.
+const feedbackEnabled = Boolean(import.meta.env.VITE_FEEDBACK_API_URL)
+
 const THEME_OPTIONS = [
   { key: 'system', label: 'System', note: "Follows your device's appearance setting and switches automatically." },
   { key: 'light', label: 'Light', note: 'White surfaces with near-black text.' },
@@ -308,13 +301,6 @@ const activeTheme = computed(() => {
   if (opt.key !== 'system') return opt
   return { ...opt, note: `${opt.note} Right now that means ${appStore.resolvedTheme} mode.` }
 })
-
-const NOTIF_OPTIONS = [
-  { key: 'hot_lead_email', label: 'Hot lead alerts', desc: 'An email when a high-intent visitor is detected on your site.' },
-  { key: 'weekly_report', label: 'Weekly report', desc: 'A weekly summary of your AI visibility and search performance.' },
-  { key: 'competitor_changes', label: 'Competitor changes', desc: "When a tracked competitor's position moves." },
-  { key: 'audit_complete', label: 'Prompt run complete', desc: 'When an AI visibility prompt run finishes.' },
-]
 
 // Deletion is irreversible, so the confirmation is deliberately manual:
 // the user must type their email exactly. A misclick cannot pass it.
@@ -345,13 +331,6 @@ const profile = ref({
   full_name: '',
   email: '',
   company_name: '',
-})
-
-const notifPrefs = ref({
-  hot_lead_email: true,
-  weekly_report: true,
-  competitor_changes: true,
-  audit_complete: true,
 })
 
 // ── AI Usage ──
@@ -420,16 +399,17 @@ function formatDay(isoDate) {
 async function loadUsage() {
   usageLoading.value = true
   try {
-    const { data } = await authApi.aiUsage()
+    // Silent: the section shows the failure inline.
+    const { data } = await api.get('/auth/me/ai-usage/', { _silentError: true })
     usage.value = data
-  } catch (e) {
-    console.error('Failed to load AI usage', e)
+  } catch {
+    usage.value = null
   } finally {
     usageLoading.value = false
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   if (authStore.user) {
     profile.value = {
       full_name: authStore.user.full_name || '',
@@ -437,13 +417,6 @@ onMounted(async () => {
       company_name: authStore.user.company_name || '',
     }
   }
-  try {
-    const { data } = await notificationsApi.getPreferences()
-    const d = data
-    if (d) notifPrefs.value = { ...notifPrefs.value, ...d }
-  } catch {}
-
-  // Load AI usage
   loadUsage()
 })
 
@@ -471,12 +444,6 @@ async function saveProfile() {
   } finally {
     saving.value = false
   }
-}
-
-async function saveNotifPrefs() {
-  try {
-    await notificationsApi.updatePreferences(notifPrefs.value)
-  } catch {}
 }
 </script>
 
@@ -525,55 +492,23 @@ async function saveNotifPrefs() {
 .sp-foot-note.is-error { color: var(--destructive); }
 .sp-muted { margin: 0; font-size: 13px; color: var(--muted-foreground); }
 
-/* ── Switch rows (notifications) ── */
-.sp-rows { display: flex; flex-direction: column; }
-.sp-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
+.sp-muted--spaced { margin-top: 8px; }
+.sp-inline-link {
+  color: var(--foreground);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
-.sp-row:first-child { padding-top: 2px; }
-.sp-row:last-child { padding-bottom: 2px; border-bottom: 0; }
+.sp-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* ── Row text (contact) ── */
 .sp-row-text { display: flex; flex-direction: column; min-width: 0; }
 .sp-row-title { font-size: 13px; font-weight: 500; color: var(--foreground); }
-.sp-row-desc { margin-top: 2px; font-size: 12px; line-height: 1.5; color: var(--muted-foreground); }
-
-.sp-switch {
-  appearance: none;
-  -webkit-appearance: none;
-  flex: none;
-  position: relative;
-  width: 38px;
-  height: 22px;
-  margin: 0;
-  border: 0;
-  border-radius: 999px;
-  background: var(--input);
-  cursor: pointer;
-  transition: background-color 160ms ease;
-}
-.sp-switch::before {
-  content: '';
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  /* Knob = the page background, so it inverts with the theme: white on
-     the black track in light mode, black on the white track in dark. */
-  background: var(--background);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.06);
-  transition: transform 160ms ease;
-}
-[data-theme="dark"] .sp-switch:not(:checked) { background: rgba(255, 255, 255, 0.32); }
-.sp-switch:checked { background: var(--primary); }
-.sp-switch:checked::before { transform: translateX(16px); }
-.sp-switch:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 
 /* ── Option tiles (appearance) ── */
 .sp-options {
@@ -829,26 +764,4 @@ async function saveNotifPrefs() {
   animation: spin 0.6s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* Daily chart */
-.usage-chart {
-  display: flex; align-items: flex-end; gap: 3px;
-  height: 120px; padding: 8px 0;
-}
-.chart-bar-wrap {
-  flex: 1; display: flex; flex-direction: column;
-  align-items: center; height: 100%; justify-content: flex-end;
-  cursor: pointer;
-}
-.chart-bar {
-  width: 100%; min-width: 4px; max-width: 32px;
-  background: linear-gradient(180deg, var(--chart-1), var(--chart-4));
-  border-radius: 3px 3px 0 0; transition: height 0.3s ease;
-}
-.chart-bar-wrap:hover .chart-bar { background: var(--primary); }
-.chart-label {
-  font-size: 9px; color: var(--muted-foreground); margin-top: 4px;
-  writing-mode: vertical-rl; text-orientation: mixed;
-  transform: rotate(180deg); white-space: nowrap;
-}
 </style>

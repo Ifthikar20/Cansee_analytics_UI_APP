@@ -4,13 +4,12 @@
  *
  * Every row is a web page an AI assistant pulled up while answering the
  * prompts this brand tracks. The page tells that story in order: what
- * happened (header facts + AI-referred visits), what to do about it
- * (opportunities), then the evidence (retrievals chart, movers, types,
- * and the URL table with real Google/AI traffic for the brand's own
- * pages). Every metric has a tooltip definition; there are no dead
- * controls.
+ * happened (header facts), what to do about it (opportunities), then the
+ * evidence (retrievals chart, movers, types, and the URL table with
+ * Google clicks for the brand's own pages). Every metric has a tooltip
+ * definition; there are no dead controls.
  */
-import { ENGINES } from '@/lib/engines'
+import { ENGINES, engineMeta } from '@/lib/engines'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Line } from 'vue-chartjs'
@@ -26,7 +25,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 import { useAppStore } from '@/stores/app'
-import citationsApi from '@/api/citations'
+import api from '@/api/client'
 import { cssVar } from '@/lib/theme'
 import {
   Card, CardHeader, CardTitle, CardContent,
@@ -52,11 +51,11 @@ const HELP = {
   movers: 'Top: most retrieved. New: first ever seen in the last week. Trending and Losing: biggest change versus the first half of the period.',
   urlTypes: 'Page format classified from the URL and title. Percentages are shares of all retrievals in this period.',
   googleClicks: 'Clicks from Google Search for this page over the same period, from Search Console. Google reports with about a 3-day delay. Only available for your own pages.',
-  aiVisits: 'Visits that arrived on this page from an AI assistant (ChatGPT, Perplexity, and others), measured by your tracking pixel. Only available for your own pages.',
 }
 
 /* ── Remote state ── */
 const loading = ref(true)
+const loaded = ref(false)
 const error = ref('')
 
 const DOMAIN_PALETTE = [
@@ -151,24 +150,9 @@ const totalRetrievals = ref(0)
 const urlTypeMaxPct = computed(() => Math.max(1, ...urlTypes.value.map(t => t.pct)))
 
 /* ── AI model avatars ── */
-const MODELS = {
-  chatgpt: { label: 'ChatGPT', color: '#10a37f', initial: 'C' },
-  perplexity: { label: 'Perplexity', color: '#8b5cf6', initial: 'P' },
-  gemini: { label: 'Gemini', color: '#5b8def', initial: 'G' },
-  claude: { label: 'Claude', color: '#f97316', initial: 'A' },
-  copilot: { label: 'Copilot', color: '#06b6d4', initial: 'M' },
-  grok: { label: 'Grok', color: '#0f172a', initial: 'X' },
-  deepseek: { label: 'DeepSeek', color: '#2563eb', initial: 'D' },
-  mistral: { label: 'Mistral', color: '#ef4444', initial: 'M' },
-  cohere: { label: 'Cohere', color: '#d946ef', initial: 'O' },
-  llama: { label: 'Llama', color: '#0ea5e9', initial: 'L' },
-  nova: { label: 'Nova', color: '#64748b', initial: 'N' },
-}
-// The five tracked engines take their label and colour from lib/engines,
-// so every screen agrees; the other models keep their own.
-for (const e of ENGINES) MODELS[e.key] = { ...MODELS[e.key], label: e.label, color: e.color }
 function modelStyle(key) {
-  return MODELS[key] || { label: key, color: '#94a3b8', initial: (key || '?')[0].toUpperCase() }
+  const meta = engineMeta(key)
+  return { label: meta.label, color: meta.color, initial: meta.label.slice(0, 2) }
 }
 
 /* Domain-type badges. "Your site" and "Competitor" carry the ownership
@@ -192,14 +176,12 @@ const selectedModel = ref(null)
 const periodDays = ref(30)
 const openMenu = ref(null)
 
-const MODEL_OPTIONS = [
-  { value: 'gpt4', label: 'ChatGPT' },
-  { value: 'perplexity', label: 'Perplexity' },
-  { value: 'gemini', label: 'Gemini' },
-  { value: 'claude', label: 'Claude' },
-  { value: 'grok', label: 'Grok' },
-  { value: 'deepseek', label: 'DeepSeek' },
-]
+// The filter sends the backend provider id; only ChatGPT's (gpt4)
+// differs from its display key.
+const MODEL_OPTIONS = ENGINES.map(e => ({
+  value: e.key === 'chatgpt' ? 'gpt4' : e.key,
+  label: e.label,
+}))
 const PERIOD_OPTIONS = [
   { value: 7, label: 'Last 7 days' },
   { value: 30, label: 'Last 30 days' },
@@ -263,7 +245,6 @@ const SORTABLE = {
   citationRate: (r) => r.citationRate,
   gap: (r) => r.gap,
   gscClicks: (r) => r.gsc?.clicks ?? -1,
-  aiVisits: (r) => r.aiVisits ?? -1,
 }
 
 function toggleSort(key) {
@@ -314,7 +295,6 @@ function mapRow(r) {
     citationRate: r.citation_rate ?? 0,
     gap: r.gap_score ?? 0,
     gsc: r.gsc || null,
-    aiVisits: r.ai_visits,
     isTarget: r.is_target,
     isCompetitor: r.is_competitor,
   }
@@ -328,7 +308,8 @@ async function load() {
     const params = { period_days: periodDays.value }
     if (selectedTopic.value) params.topic = selectedTopic.value
     if (selectedModel.value) params.provider = selectedModel.value
-    const res = await citationsApi.websiteUrls(websiteId.value, params)
+    // Silent: the page shows the failure inline.
+    const res = await api.get(`/citations/websites/${websiteId.value}/urls/`, { params, _silentError: true })
     const data = res.data || {}
     topics.value = data.topics || []
     chartLabels.value = data.overview?.labels || []
@@ -350,8 +331,9 @@ async function load() {
     trafficSummary.value = data.traffic_summary || null
     opportunities.value = data.opportunities || null
     urls.value = (data.urls || []).map(mapRow)
+    loaded.value = true
   } catch (e) {
-    error.value = e?.displayMessage || 'Failed to load URL analytics.'
+    error.value = e?.displayMessage || "We couldn't load your sources."
   } finally {
     loading.value = false
   }
@@ -424,14 +406,14 @@ const headerFacts = computed(() => {
       </div>
     </div>
 
-    <!-- ── Header strip: what this page is + what it means for traffic ── -->
+    <!-- ── Header strip: what this page is ── -->
     <div>
       <h2 class="text-lg font-bold text-foreground">AI answer sources</h2>
       <p class="mt-0.5 max-w-3xl text-sm text-muted-foreground">
         Every page AI assistants pulled up while answering the prompts you track for
-        {{ brandLabel }} — and what that means for your traffic.
+        {{ brandLabel }}.
       </p>
-      <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+      <div v-if="loaded && !error" class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
         <span class="text-foreground/90">
           <span class="font-bold text-foreground">{{ headerFacts.pages }}</span> pages retrieved
           <template v-if="headerFacts.pages">
@@ -440,30 +422,32 @@ const headerFacts = computed(() => {
             · {{ headerFacts.third }} third-party
           </template>
         </span>
-        <template v-if="trafficSummary">
-          <span v-if="trafficSummary.pixel_active" class="text-foreground/90">
-            <span class="font-bold text-foreground">{{ trafficSummary.ai_sessions }}</span>
-            AI-referred visit{{ trafficSummary.ai_sessions === 1 ? '' : 's' }} to your site
-            ({{ trafficSummary.ai_percentage }}% of all traffic)
-          </span>
-          <router-link
-            v-if="!trafficSummary.gsc_connected"
-            to="/settings/connections"
-            class="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          >Connect Search Console to see Google performance</router-link>
-        </template>
+        <router-link
+          v-if="trafficSummary && !trafficSummary.gsc_connected"
+          to="/settings/connections"
+          class="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        >Connect Search Console to see Google performance</router-link>
       </div>
     </div>
 
     <Alert v-if="error" variant="destructive">
       <CircleX />
-      <AlertTitle>Could not load sources</AlertTitle>
-      <AlertDescription>{{ error }}</AlertDescription>
+      <AlertTitle>We couldn't load your sources.</AlertTitle>
+      <AlertDescription>
+        <p>{{ error }}</p>
+        <button
+          type="button"
+          class="mt-1 font-semibold text-foreground underline underline-offset-2"
+          @click="load"
+        >Try again</button>
+      </AlertDescription>
     </Alert>
-    <div v-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
+    <div v-else-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
       <Loader2 class="size-4 animate-spin" /> Loading URL analytics…
     </div>
 
+    <!-- Empty states below render only when the last load succeeded. -->
+    <template v-if="!error">
     <!-- ── What to do next ── -->
     <div v-if="!loading && opportunities">
       <h2 class="text-base font-bold text-foreground">What to do next</h2>
@@ -472,7 +456,6 @@ const headerFacts = computed(() => {
       </p>
       <OpportunitiesRow
         :opportunities="opportunities"
-        :website-id="websiteId"
         @open-url="openOpportunity"
       />
     </div>
@@ -540,7 +523,7 @@ const headerFacts = computed(() => {
             :class="selectedTopic === t.name ? 'font-semibold text-foreground' : 'text-muted-foreground'">
             <span class="truncate">{{ t.name }}</span><span class="ml-2 shrink-0 text-xs text-muted-foreground">{{ t.count }}</span>
           </button>
-          <div v-if="!topics.length" class="px-2.5 py-2 text-xs text-muted-foreground">No topics yet. Group prompts into topics on the Prompts page.</div>
+          <div v-if="!topics.length" class="px-2.5 py-2 text-xs text-muted-foreground">No topics yet.</div>
         </div>
       </div>
     </div>
@@ -574,9 +557,9 @@ const headerFacts = computed(() => {
         <EmptyState
           v-else-if="!loading"
           title="No retrievals in this period yet"
-          body="Retrievals appear as your prompt runs complete. Run prompts to give the AI models something to answer."
-          cta-label="Run prompts"
-          :cta-to="websiteId ? `/llm-ranking/${websiteId}/prompts` : ''"
+          body="Retrievals appear as the AI engines answer the prompts you track."
+          cta-label="Add prompts"
+          cta-to="/dashboard"
         />
       </CardContent>
     </Card>
@@ -652,7 +635,7 @@ const headerFacts = computed(() => {
     <div>
       <h2 class="text-lg font-bold text-foreground">URLs</h2>
       <p class="text-sm text-muted-foreground">
-        Every page retrieved in this period. Traffic columns are available for your own pages.
+        Every page retrieved in this period. Google clicks show for your own pages when Search Console is connected.
       </p>
     </div>
 
@@ -717,13 +700,6 @@ const headerFacts = computed(() => {
                   </button>
                   <MetricInfo :text="HELP.googleClicks" side="bottom" />
                 </th>
-                <th class="py-2 pr-3">
-                  <button type="button" class="inline-flex items-center gap-1 hover:text-foreground" @click="toggleSort('aiVisits')">
-                    AI visits
-                    <component :is="sortKey === 'aiVisits' ? (sortDir === 'desc' ? ArrowDown : ArrowUp) : ArrowUpDown" class="size-3" />
-                  </button>
-                  <MetricInfo :text="HELP.aiVisits" side="bottom" />
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -764,12 +740,9 @@ const headerFacts = computed(() => {
                 <td class="py-3 pr-3 tabular-nums" :class="row.gsc ? 'text-foreground' : 'text-muted-foreground'">
                   {{ row.gsc ? row.gsc.clicks : '–' }}
                 </td>
-                <td class="py-3 pr-3 tabular-nums" :class="row.aiVisits != null ? 'text-foreground' : 'text-muted-foreground'">
-                  {{ row.aiVisits != null ? row.aiVisits : '–' }}
-                </td>
               </tr>
               <tr v-if="!loading && !filteredUrls.length">
-                <td colspan="9" class="p-0">
+                <td colspan="8" class="p-0">
                   <EmptyState
                     v-if="isFiltered"
                     title="Nothing matches"
@@ -778,9 +751,9 @@ const headerFacts = computed(() => {
                   <EmptyState
                     v-else
                     title="No URLs yet"
-                    body="Pages appear here as your prompt runs collect the sources AI answers rely on."
-                    cta-label="Run prompts"
-                    :cta-to="websiteId ? `/llm-ranking/${websiteId}/prompts` : ''"
+                    body="Pages appear here as the AI engines answer the prompts you track."
+                    cta-label="Add prompts"
+                    cta-to="/dashboard"
                   />
                 </td>
               </tr>
@@ -793,5 +766,6 @@ const headerFacts = computed(() => {
         </div>
       </CardContent>
     </Card>
+    </template>
   </div>
 </template>

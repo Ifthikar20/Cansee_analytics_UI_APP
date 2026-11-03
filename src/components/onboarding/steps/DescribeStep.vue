@@ -16,7 +16,7 @@
 
         <label class="ob-field">
           <span class="ob-label">Industry</span>
-          <input v-model="form.industry" class="ob-text-input" />
+          <input v-model="form.industry" class="ob-text-input" placeholder="SaaS, e-commerce, legal..." />
         </label>
 
         <label class="ob-field">
@@ -31,10 +31,13 @@
         </label>
 
         <div class="ob-field">
-          <span class="ob-label">Prompts we'll measure</span>
-          <span class="ob-label-hint">
-            Starter prompts we temporarily compare you on — refine or
-            replace them anytime from the Prompt Library.
+          <span class="ob-label">Starter prompts</span>
+          <span v-if="noDraftedTopics" class="ob-label-hint">
+            We couldn't draft prompts from your site. Add your own below.
+          </span>
+          <span v-else class="ob-label-hint">
+            Drafted from your site. Add or change the prompts you track
+            anytime from the Overview.
           </span>
           <!-- TransitionGroup: added topics pop in, removed ones shrink
                away, the rest glide into place. Keys are the topic text
@@ -66,7 +69,7 @@
           <div class="ob-add-topic">
             <input
               v-model="newTopic"
-              placeholder='Add your own prompt, e.g. "best payer credentialing in California"'
+              placeholder="Add your own prompt"
               class="ob-text-input ob-add-input"
               @keydown.enter.prevent="addCustomTopic"
             />
@@ -103,6 +106,7 @@ import { useOnboardingFlow } from '../useOnboardingFlow'
 
 const {
   form,
+  noDraftedTopics,
   newTopic,
   addCustomTopic,
   removeKeyword,

@@ -13,7 +13,7 @@
         <input
           v-model="urlInput"
           class="ob-input"
-          placeholder="acme.com"
+          placeholder="yourcompany.com"
           data-autofocus
           :disabled="loading"
           @keydown.enter.prevent="startScan"

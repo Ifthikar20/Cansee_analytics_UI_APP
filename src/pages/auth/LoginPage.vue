@@ -68,11 +68,6 @@
         </div>
       </div>
 
-      <label class="flex cursor-pointer items-center gap-2.5 text-sm text-muted-foreground">
-        <input type="checkbox" v-model="remember" class="size-4 accent-[#a78bfa]" />
-        <span>Remember me</span>
-      </label>
-
       <Button type="submit" class="login-btn mt-1 h-12 w-full text-[15px] font-semibold" :disabled="loading">
         {{ loading ? 'Signing in…' : 'Sign in' }}
       </Button>
@@ -121,7 +116,6 @@ const authStore = useAuthStore()
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
-const remember = ref(false)
 const loading = ref(false)
 const error = ref('')
 // Set when the backend answers 403 sso_required: {org_name, domain, methods, email}
@@ -178,7 +172,7 @@ async function handleLogin() {
       ssoRequired.value = { ...(err.details || {}), email: email.value }
       return
     }
-    error.value = err?.message || e.message || 'Login failed.'
+    error.value = err?.message || e.displayMessage || "We couldn't sign you in. Please try again."
   } finally {
     loading.value = false
   }

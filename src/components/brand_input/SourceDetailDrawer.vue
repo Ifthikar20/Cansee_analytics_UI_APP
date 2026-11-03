@@ -55,12 +55,26 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 const query = ref('')
 const testing = ref(false)
 const hits = ref(null)  // null = never run; [] = ran, no results
+// Why the search could not run (the backend's ``reason``); null after a
+// normal search, so an empty result is never mistaken for "no matches".
+const searchReason = ref(null)
+
+const REASON_TEXT = {
+  embeddings_not_configured: "Search isn't available yet.",
+  embeddings_pending: "This source hasn't been indexed for search yet.",
+  ai_allowance_exhausted: 'Your AI allowance for this month is used up, so search is paused.',
+  embeddings_failed: "We couldn't search right now. Try again.",
+}
+const reasonText = computed(() =>
+  searchReason.value ? (REASON_TEXT[searchReason.value] || "We couldn't search right now. Try again.") : '',
+)
 
 async function runTest() {
   const q = query.value.trim()
   if (!q) return
   testing.value = true
   hits.value = null
+  searchReason.value = null
   try {
     const res = await ragApi.retrieve(props.websiteId, {
       query: q,
@@ -68,6 +82,7 @@ async function runTest() {
       sourceId: props.source.id,
     })
     hits.value = (res.data && res.data.hits) || []
+    searchReason.value = (res.data && res.data.reason) || null
   } catch (err) {
     const msg = err?.response?.data?.error
       || err?.response?.data?.error?.message
@@ -207,8 +222,7 @@ const lastIngestedLabel = computed(
           <h3 class="text-sm font-semibold text-foreground">Test what this source would return</h3>
         </div>
         <p class="mt-1 text-xs text-muted-foreground">
-          Runs a similarity search against just this source's chunks. Shows exactly what the
-          Brand Security agents would see when they ask about your brand.
+          Runs a similarity search against just this source's passages.
         </p>
         <form class="mt-3 flex items-center gap-2" @submit.prevent="runTest">
           <input
@@ -229,11 +243,17 @@ const lastIngestedLabel = computed(
 
         <div v-if="hits !== null" class="mt-3 space-y-2">
           <div
-            v-if="hits.length === 0"
+            v-if="hits.length === 0 && reasonText"
             class="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground"
           >
-            No chunks from this source matched. Try a broader query, or check that the source
-            actually covers this topic.
+            {{ reasonText }}
+          </div>
+          <div
+            v-else-if="hits.length === 0"
+            class="rounded-md border border-dashed p-4 text-center text-xs text-muted-foreground"
+          >
+            No passages from this source matched. Try a broader query, or check that the source
+            covers this topic.
           </div>
           <div
             v-for="(hit, i) in hits"

@@ -15,21 +15,28 @@
     <main class="pw-main">
       <div class="pw-content">
         <div class="pw-stagger">
-          <span class="pw-eyebrow">Your 7-day free trial</span>
+          <span class="pw-eyebrow">{{ plan?.trial_days ? `Your ${plan.trial_days}-day free trial` : 'Upgrade' }}</span>
           <h1 class="pw-title">Get serious about how AI sees you.</h1>
 
           <p v-if="onbSummary" class="pw-sub">
-            We found <strong>{{ onbSummary.competitors }} competitors</strong>
-            for <strong>{{ onbSummary.domain }}</strong>. Your first prompt run is
-            ready to start.
+            <strong>{{ onbSummary.domain }}</strong> is set up with
+            <strong>{{ onbSummary.competitors }} {{ onbSummary.competitors === 1 ? 'competitor' : 'competitors' }}</strong>
+            to compare against.
           </p>
           <p v-else class="pw-sub">
             See what every major LLM says about you — and who they
             recommend instead.
           </p>
 
+          <p v-if="plansState === 'loading'" class="pw-plans-note">Loading plans…</p>
+          <p v-else-if="plansState === 'failed'" class="pw-plans-note">
+            We couldn't load the plans.
+            <button type="button" class="pw-retry" @click="loadPlans">Try again</button>
+          </p>
+          <p v-else-if="!plan" class="pw-plans-note">Upgrades aren't available right now.</p>
+
           <!-- Two compact plan rows; annual preselected. -->
-          <div class="pw-plans" role="radiogroup" aria-label="Billing cycle">
+          <div v-else class="pw-plans" role="radiogroup" aria-label="Billing cycle">
             <button
               type="button"
               role="radio"
@@ -42,11 +49,11 @@
               <span class="pw-plan-info">
                 <span class="pw-plan-name">
                   Annual
-                  <span class="pw-plan-badge">Save $90</span>
+                  <span v-if="annualSaving > 0" class="pw-plan-badge">Save {{ money(annualSaving) }}</span>
                 </span>
-                <span class="pw-plan-sub">${{ tier.annualPrice }}/year · billed annually</span>
+                <span class="pw-plan-sub">{{ money(plan.price_yearly) }}/year · billed annually</span>
               </span>
-              <span class="pw-plan-price">${{ annualPerMonth }}<i>/mo</i></span>
+              <span class="pw-plan-price">{{ money(annualPerMonth) }}<i>/mo</i></span>
             </button>
 
             <button
@@ -60,24 +67,24 @@
               <span class="pw-plan-radio" aria-hidden="true"></span>
               <span class="pw-plan-info">
                 <span class="pw-plan-name">Monthly</span>
-                <span class="pw-plan-sub">{{ tier.priceLabel }}/month · billed monthly</span>
+                <span class="pw-plan-sub">{{ money(plan.price_monthly) }}/month · billed monthly</span>
               </span>
-              <span class="pw-plan-price">{{ tier.priceLabel }}<i>/mo</i></span>
+              <span class="pw-plan-price">{{ money(plan.price_monthly) }}<i>/mo</i></span>
             </button>
           </div>
 
           <button
             type="button"
             class="pw-submit"
-            :disabled="submitting"
+            :disabled="submitting || !plan"
             @click="startTrial"
           >
             <span v-if="submitting" class="pw-spinner" aria-hidden="true"></span>
-            <span v-else>Start my 7-day free trial</span>
+            <span v-else>{{ plan?.trial_days ? `Start my ${plan.trial_days}-day free trial` : 'Continue to checkout' }}</span>
           </button>
 
           <p class="pw-charge-note">
-            You won't be charged until {{ trialEndDate }} · Cancel anytime
+            <template v-if="plan?.trial_days">You won't be charged until your trial ends · </template>Cancel anytime
           </p>
 
           <p v-if="error" class="pw-error" role="alert">{{ error }}</p>
@@ -90,7 +97,7 @@
               </svg>
               Secure checkout by Polar
             </li>
-            <li>
+            <li v-if="plan?.trial_days">
               <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <circle cx="8" cy="8" r="6"/>
                 <path d="M8 5v3.5l2.2 1.6"/>
@@ -119,8 +126,8 @@
               </svg>
             </button>
 
-            <p v-if="enterpriseTier" class="pw-enterprise">
-              Need more? <a href="#" @click.prevent="contactSales">Talk to us about {{ enterpriseTier.name }}</a>
+            <p v-if="customPlan" class="pw-enterprise">
+              Need more? <a :href="salesHref">Talk to us about {{ customPlan.name }}</a>
             </p>
           </div>
         </div>
@@ -142,21 +149,39 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import api from '@/api/client'
 import billingApi from '@/api/billing'
 import WatercolorBackdrop from '@/components/onboarding/WatercolorBackdrop.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
-import { TIERS } from '@/constants/pricing'
+import { SALES_EMAIL } from '@/constants/support'
 import { isPolarUrl } from '@/utils/polarRedirect'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const toast = useToast()
 
-// Single-plan page: Pro is the only self-serve tier. Business stays a
-// contact-sales line at the bottom.
-const tier = TIERS.find(t => t.id === 'pro')
-const enterpriseTier = computed(() => TIERS.find(t => t.price === null))
+// Plans come from GET /billing/plans/. The page offers the self-serve
+// plan; a custom-quoted plan stays a contact-sales line at the bottom.
+const plans = ref([])
+const plansState = ref('loading') // loading | ready | failed
+// price_monthly is 0 for Free and -1 for a custom-quoted plan.
+const plan = computed(() => plans.value.find(p => p.price_monthly > 0) || null)
+const customPlan = computed(() => plans.value.find(p => p.price_monthly < 0) || null)
+const salesHref = computed(() =>
+  `mailto:${SALES_EMAIL}?subject=${encodeURIComponent(`${customPlan.value?.name || 'Business'} plan inquiry`)}`,
+)
+
+async function loadPlans() {
+  plansState.value = 'loading'
+  try {
+    const res = await billingApi.getPlans()
+    plans.value = Array.isArray(res.data) ? res.data : []
+    plansState.value = 'ready'
+  } catch {
+    plansState.value = 'failed'
+  }
+}
 
 const annual = ref(true) // annual preselected — the better deal leads
 const submitting = ref(false)
@@ -165,14 +190,22 @@ const error = ref('')
 
 const email = computed(() => authStore.user?.email || '')
 
-const annualPerMonth = computed(() => (tier.annualPrice / 12).toFixed(2))
+function money(amount) {
+  const n = Number(amount)
+  return `$${n.toLocaleString('en-US', {
+    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`
+}
 
-const trialEndDate = computed(() =>
-  new Date(Date.now() + tier.trialDays * 864e5).toLocaleDateString(undefined, {
-    month: 'long',
-    day: 'numeric',
-  }),
-)
+const annualPerMonth = computed(() => (plan.value ? plan.value.price_yearly / 12 : 0))
+
+// What a year paid up front saves against twelve monthly payments.
+const annualSaving = computed(() => {
+  const p = plan.value
+  if (!p || !(p.price_yearly > 0)) return 0
+  return p.price_monthly * 12 - p.price_yearly
+})
 
 // Personalization handoff written by the onboarding flow in the same
 // tab (sessionStorage). Used only when fresh and non-empty; left in
@@ -192,22 +225,23 @@ const onbSummary = (() => {
 })()
 
 async function startTrial() {
+  if (!plan.value) return
   submitting.value = true
   error.value = ''
   try {
     // Polar hosted checkout — the backend creates the session and we
-    // redirect. The sandbox environment accepts Stripe test cards.
-    const res = await billingApi.checkout({
-      plan: tier.planCode,
-      annual: annual.value,
-    })
+    // redirect. Silent: a failure is shown once, inline below.
+    const res = await api.post(
+      '/billing/checkout/',
+      { plan: plan.value.id, annual: annual.value },
+      { _silentError: true },
+    )
     const url = res.data?.data?.checkout_url
     if (url && isPolarUrl(url)) {
       window.location.href = url
       return
     }
     error.value = "We couldn't start checkout. Please try again."
-    toast.error(error.value)
   } catch (e) {
     if (e?.response?.data?.error?.code === 'already_subscribed') {
       // The backend self-healed from Polar's records: this account is
@@ -218,8 +252,7 @@ async function startTrial() {
       router.replace('/dashboard')
       return
     }
-    error.value = e?.response?.data?.error?.message || "We couldn't start checkout."
-    toast.error(error.value)
+    error.value = e?.displayMessage || "We couldn't start checkout. Please try again."
   } finally {
     submitting.value = false
   }
@@ -235,18 +268,10 @@ async function continueFree() {
     // fetch must complete before navigating.
     await authStore.fetchSession()
     router.replace('/dashboard')
-  } catch (e) {
-    toast.error(
-      e?.response?.data?.error?.message
-      || "Couldn't switch you to the free plan. Try again.",
-    )
+  } catch {
+    // The client interceptor toasts the reason.
     dismissing.value = false
   }
-}
-
-function contactSales() {
-  const t = enterpriseTier.value
-  window.location.href = t?.contactTarget || 'mailto:sales@cansee.ai'
 }
 
 async function signOut() {
@@ -259,7 +284,9 @@ onMounted(() => {
   // URL, or a session refreshed elsewhere) — send it home.
   if (authStore.session?.subscription?.is_paying) {
     router.replace('/dashboard')
+    return
   }
+  loadPlans()
 })
 </script>
 
@@ -495,6 +522,23 @@ onMounted(() => {
   font-size: 11px;
   font-weight: 500;
   color: var(--pw-muted);
+}
+
+.pw-plans-note {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--pw-muted);
+}
+.pw-retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--pw-fg);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
 
 /* ── CTA + fine print ────────────────────────────────────── */

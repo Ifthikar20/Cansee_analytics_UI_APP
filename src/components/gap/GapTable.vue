@@ -62,7 +62,7 @@
                 <span class="gt-rank-dot" :style="{ background: gapMeta(cell(row, e.key).class).color }" aria-hidden="true"></span>
                 {{ rankText(cell(row, e.key)) }}
               </span>
-              <span v-else class="gt-muted" :title="cell(row, e.key).configured ? 'No answers yet' : 'Engine not configured'">—</span>
+              <span v-else class="gt-muted" :title="cell(row, e.key).configured ? 'No answers yet' : 'Not available yet'">—</span>
             </td>
             <td><GapBadge :cls="row.gap.class" :value="row.gap.value" show-value /></td>
             <td class="gt-fix" :title="row.top_action?.title || ''">

@@ -3,7 +3,7 @@
  *
  * A free trial is not a paid plan: the card has not been charged until
  * Polar converts the subscription at trial end. Every surface that names
- * the plan (sidebar badge + dropdown, Settings allowance, Billing) reads
+ * the plan (Settings allowance, Add project, Billing) reads
  * from here so a trial is always "Free trial", a charged subscription is
  * "Pro plan", and a lapsed or unpaid row never poses as either.
  *
@@ -17,7 +17,7 @@
 
 const BUSINESS_ALIASES = ['business', 'enterprise', 'scale', 'team']
 
-export function normalizeTier(value) {
+function normalizeTier(value) {
   const v = String(value || '').toLowerCase()
   if (!v || v === 'free' || v === 'none') return null
   return BUSINESS_ALIASES.includes(v) ? 'business' : 'pro'
@@ -31,7 +31,7 @@ function toDate(value) {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-export function formatShortDate(date) {
+function formatShortDate(date) {
   return date ? date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''
 }
 

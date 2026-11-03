@@ -22,14 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.pem
-*.pem
 
+# Per-machine Claude Code settings
+.claude/settings.local.json
 
-.env
-*.env
 # Environment and secrets
 .env
+*.env
 .env.*
 !.env.example
 *.pem

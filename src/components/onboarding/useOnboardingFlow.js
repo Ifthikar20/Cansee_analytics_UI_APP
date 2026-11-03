@@ -8,7 +8,7 @@
 import { ref, computed, inject, provide } from 'vue'
 import { useRouter } from 'vue-router'
 
-import onboardingApi from '@/api/onboarding'
+import api from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 
@@ -17,19 +17,12 @@ const FlowKey = Symbol('onboarding-flow')
 // welcome -> url -> scanning -> describe -> competitors.
 // `scanning` is not a user step: the visible progress collapses it
 // into the url step (see displayStep).
-export const STEPS = Object.freeze([
+const STEPS = Object.freeze([
   { id: 'welcome' },
   { id: 'url' },
   { id: 'scanning' },
   { id: 'describe' },
   { id: 'competitors' },
-])
-
-export const SCAN_TASKS = Object.freeze([
-  'Reading your homepage',
-  'Spotting products and features',
-  'Drafting your description',
-  'Finding your competitors',
 ])
 
 export function provideOnboardingFlow({ onComplete } = {}) {
@@ -60,6 +53,11 @@ export function provideOnboardingFlow({ onComplete } = {}) {
     competitors: [],
   })
 
+  // True when the scan drafted no prompts (e.g. AI drafting is not
+  // available), so the describe step can say so instead of showing an
+  // empty list.
+  const noDraftedTopics = ref(false)
+
   // "Add your own topic" input on the describe step.
   const newTopic = ref('')
 
@@ -81,24 +79,6 @@ export function provideOnboardingFlow({ onComplete } = {}) {
     () => ({ 0: 1, 1: 2, 2: 2, 3: 3, 4: 4 })[step.value] ?? 1,
   )
 
-  // Scanning checklist: ticks one task every 1700ms but never past the
-  // last row — that one keeps its spinner until the API resolves.
-  const scanPhase = ref(0)
-  let scanTimer = null
-
-  function startScanTicker() {
-    scanPhase.value = 0
-    scanTimer = setInterval(() => {
-      if (scanPhase.value < SCAN_TASKS.length - 1) scanPhase.value += 1
-    }, 1700)
-  }
-  function stopScanTicker() {
-    if (scanTimer) {
-      clearInterval(scanTimer)
-      scanTimer = null
-    }
-  }
-
   function begin() {
     direction.value = 'forward'
     step.value = 1
@@ -112,19 +92,19 @@ export function provideOnboardingFlow({ onComplete } = {}) {
     error.value = ''
     direction.value = 'forward'
     step.value = 2
-    startScanTicker()
     try {
-      const { data } = await onboardingApi.scan(url)
-      const payload = data
+      // Silent: the url step shows the failure inline.
+      const { data: payload } = await api.post('/onboarding/scan/', { url }, { _silentError: true })
       if (!payload?.success) {
-        throw new Error(payload?.error || 'Could not read this site.')
+        throw new Error(payload?.error || "We couldn't read this site.")
       }
+      const topics = (payload.topics || []).slice(0, 8)
       form.value = {
         url: payload.url || url,
         business_name: payload.business_name || '',
         industry: payload.industry || '',
         description: payload.description_short || payload.description_raw || '',
-        keywords: (payload.topics || []).slice(0, 8),
+        keywords: topics,
         topic_brands: (payload.topic_brands || []).slice(0, 8),
         competitors: (payload.competitors || []).slice(0, 12).map(c => ({
           name: c.name || c.domain || '',
@@ -132,14 +112,16 @@ export function provideOnboardingFlow({ onComplete } = {}) {
           selected: true,
         })),
       }
+      noDraftedTopics.value = topics.length === 0
       direction.value = 'forward'
       step.value = 3
     } catch (e) {
-      error.value = e.message || e.response?.data?.error?.message || 'Scan failed.'
+      // displayMessage is set for HTTP failures; a plain Error carries the
+      // scanner's own message.
+      error.value = e.displayMessage || e.message || "We couldn't read this site. Please try again."
       direction.value = 'back'
       step.value = 1
     } finally {
-      stopScanTicker()
       loading.value = false
     }
   }
@@ -235,7 +217,8 @@ export function provideOnboardingFlow({ onComplete } = {}) {
   async function finish() {
     saving.value = true
     try {
-      await onboardingApi.save({
+      // Silent: the one toast below reports the failure.
+      await api.post('/onboarding/save/', {
         url: form.value.url,
         business_name: form.value.business_name,
         industry: form.value.industry,
@@ -244,9 +227,9 @@ export function provideOnboardingFlow({ onComplete } = {}) {
         competitors: form.value.competitors
           .filter(c => c.selected)
           .map(c => ({ name: c.name, domain: c.domain })),
-      })
-      // Hand the paywall its personalization line ("We found N
-      // competitors for {domain}") — the session payload carries no
+      }, { _silentError: true })
+      // Hand the paywall its personalization line ("{domain} is set up
+      // with N competitors") — the session payload carries no
       // domains, and /paywall renders outside the app store's website
       // loading, so a same-tab handoff is the cheapest exact source.
       try {
@@ -269,7 +252,7 @@ export function provideOnboardingFlow({ onComplete } = {}) {
       }
       onComplete?.()
     } catch (e) {
-      toast.error(e.response?.data?.error?.message || 'Could not save. Try again.')
+      toast.error(e.displayMessage || "We couldn't save your project. Please try again.")
     } finally {
       saving.value = false
     }
@@ -277,7 +260,6 @@ export function provideOnboardingFlow({ onComplete } = {}) {
 
   const flow = {
     steps: STEPS,
-    scanTasks: SCAN_TASKS,
     step,
     direction,
     displayStep,
@@ -286,11 +268,11 @@ export function provideOnboardingFlow({ onComplete } = {}) {
     saving,
     error,
     form,
+    noDraftedTopics,
     newTopic,
     newCompetitorName,
     newCompetitorDomain,
     urlHostname,
-    scanPhase,
     begin,
     startScan,
     back,
@@ -301,7 +283,6 @@ export function provideOnboardingFlow({ onComplete } = {}) {
     removeKeyword,
     addCustomTopic,
     finish,
-    stopScanTicker,
   }
   provide(FlowKey, flow)
   return flow

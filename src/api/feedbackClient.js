@@ -6,7 +6,10 @@
  * feedback vendor must never receive our JWTs. Plain fetch, absolute
  * URL, zero coupling.
  */
-const BASE = import.meta.env.VITE_FEEDBACK_API_URL || 'http://localhost:8900'
+const BASE = (import.meta.env.VITE_FEEDBACK_API_URL || '').replace(/\/$/, '')
+
+/** False when the build has no feedback service; the widget is not mounted. */
+export const FEEDBACK_ENABLED = Boolean(BASE)
 
 const TOKENS_KEY = 'cs-feedback-tokens'
 
@@ -26,6 +29,7 @@ export function rememberToken(token) {
 }
 
 async function request(path, options = {}) {
+    if (!FEEDBACK_ENABLED) throw new Error('Feedback is not available.')
     const res = await fetch(`${BASE}${path}`, {
         headers: { 'Content-Type': 'application/json' },
         ...options,

@@ -41,11 +41,12 @@
 
     <h2>Contact</h2>
     <p>
-      Questions about this policy: <a href="mailto:privacy@cansee.ai">privacy@cansee.ai</a>.
+      Questions about this policy: <a :href="`mailto:${PRIVACY_EMAIL}`">{{ PRIVACY_EMAIL }}</a>.
     </p>
   </InfoPage>
 </template>
 
 <script setup>
 import InfoPage from './InfoPage.vue'
+import { PRIVACY_EMAIL } from '@/constants/support'
 </script>

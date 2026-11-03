@@ -14,7 +14,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 const props = defineProps({
   // { available: {gsc, pixel}, buckets: [{key, title, items: []}] }
   opportunities: { type: Object, default: null },
-  websiteId: { type: String, default: '' },
 })
 const emit = defineEmits(['open-url'])
 
@@ -28,7 +27,7 @@ const BUCKET_META = {
   winning: {
     icon: Trophy,
     hintWhenUnavailable:
-      'Connect Search Console or install the tracking pixel to see which cited pages earn visits.',
+      'Connect Search Console to see which cited pages earn visits.',
   },
 }
 
@@ -77,9 +76,9 @@ const buckets = computed(() => {
           {{ bucket.hintWhenUnavailable }}
           <router-link
             v-if="bucket.key === 'seo_gap' || bucket.key === 'winning'"
-            to="/app/integrations"
+            to="/settings/connections"
             class="font-medium text-foreground hover:underline"
-          >Open integrations</router-link>
+          >Open Connections</router-link>
         </p>
         <p v-else class="px-2 py-3 text-xs text-muted-foreground">
           Nothing here yet.

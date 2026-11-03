@@ -6,9 +6,9 @@
     <header class="ov-head">
       <div>
         <p class="ov-eyebrow">Search vs AI</p>
-        <h1 class="ov-title">{{ activeName || 'Your project' }}</h1>
+        <h1 class="ov-title">{{ activeName || 'Overview' }}</h1>
       </div>
-      <div class="ov-actions">
+      <div v-if="activeWebsiteId" class="ov-actions">
         <Button
           v-if="uncheckedCount && data?.serp_configured"
           variant="outline"
@@ -26,7 +26,23 @@
       </div>
     </header>
 
-    <div v-if="loading && !data" class="ov-skeleton">
+    <!-- No active project: the list may still be loading, may have
+         failed, or nothing is picked in the header's project switcher. -->
+    <section v-if="!activeWebsiteId && projectsState === 'failed'" class="ov-state">
+      <p class="ov-state-title">We couldn't load your projects.</p>
+      <Button variant="outline" class="ov-state-btn rounded-full" @click="loadProjects">Try again</Button>
+    </section>
+
+    <section v-else-if="!activeWebsiteId && projectsState === 'ready'" class="ov-state">
+      <p class="ov-state-title">No project selected.</p>
+      <p class="ov-state-sub">Add a project to start tracking prompts.</p>
+      <Button class="ov-state-btn rounded-full" @click="showAddProject = true">
+        <Plus class="size-4" />
+        Add project
+      </Button>
+    </section>
+
+    <div v-else-if="!activeWebsiteId || (loading && !data)" class="ov-skeleton">
       <Skeleton class="h-40 rounded-3xl" />
       <div class="ov-kpis">
         <Skeleton v-for="n in 5" :key="n" class="h-24 rounded-2xl" />
@@ -34,13 +50,29 @@
       <Skeleton class="h-80 rounded-2xl" />
     </div>
 
+    <section v-else-if="loadFailed && !data" class="ov-state">
+      <p class="ov-state-title">We couldn't load this overview.</p>
+      <Button variant="outline" class="ov-state-btn rounded-full" @click="load">Try again</Button>
+    </section>
+
     <template v-else-if="data">
+      <!-- A refresh failed: the numbers below are from the last good load. -->
+      <Alert v-if="loadFailed" variant="destructive" class="ov-alert">
+        <CircleX />
+        <AlertTitle>We couldn't refresh this overview.</AlertTitle>
+        <AlertDescription>
+          <button type="button" class="ov-retry" @click="load">Try again</button>
+        </AlertDescription>
+      </Alert>
+
       <Alert v-if="!data.serp_configured" class="ov-alert">
         <Info />
-        <AlertTitle>Google checks are off</AlertTitle>
-        <AlertDescription>
-          The server has no SerpAPI key, so Google positions can't be looked up yet. AI answers still update on schedule.
-        </AlertDescription>
+        <AlertTitle>Google rank checks aren't available yet.</AlertTitle>
+      </Alert>
+
+      <Alert v-if="enginesUnavailable" class="ov-alert">
+        <Info />
+        <AlertTitle>AI engines aren't available yet.</AlertTitle>
       </Alert>
 
       <!-- Empty project: nothing to compare until prompts exist. -->
@@ -49,7 +81,7 @@
           <p class="ov-banner-title">Start with the questions your buyers ask.</p>
           <p class="ov-banner-sub">
             Add a few prompts and Cansee checks where Google ranks you for each one, then asks
-            ChatGPT, Claude, Gemini, Grok and Perplexity the same question.
+            the AI engines the same question.
           </p>
           <div class="ov-banner-ctas">
             <button type="button" class="ov-btn-solid" @click="showAdd = true">Add prompts</button>
@@ -118,16 +150,19 @@
     </template>
 
     <AddPromptsDialog v-if="activeWebsiteId" v-model:open="showAdd" :website-id="activeWebsiteId" @added="load" />
+    <AddProjectDialog v-model:open="showAddProject" />
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Info, Plus, RefreshCw } from '@lucide/vue'
+import { CircleX, Info, Plus, RefreshCw } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
+import api from '@/api/client'
 import searchGapApi from '@/api/searchGap'
+import websitesApi from '@/api/websites'
 import { useToast } from '@/composables/useToast'
 import { GAP } from '@/lib/gap'
 import OnboardingFlow from '@/components/onboarding/OnboardingFlow.vue'
@@ -137,6 +172,7 @@ import GapMap from '@/components/gap/GapMap.vue'
 import GapTable from '@/components/gap/GapTable.vue'
 import Leaderboard from '@/components/gap/Leaderboard.vue'
 import AddPromptsDialog from '@/components/gap/AddPromptsDialog.vue'
+import AddProjectDialog from '@/components/projects/AddProjectDialog.vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -155,11 +191,35 @@ const activeName = computed(() => appStore.activeWebsite?.name || '')
 
 const data = ref(null)
 const loading = ref(false)
+const loadFailed = ref(false)
 const showAdd = ref(false)
+const showAddProject = ref(false)
 const filter = ref('all')
 const tableRef = ref(null)
 
 const k = computed(() => data.value?.kpis || {})
+
+// loading | ready | failed. On a cold load the shell fetches the project
+// list too; until a list is known, the page shows a skeleton rather than
+// "No project selected".
+const projectsState = ref(appStore.websites.length ? 'ready' : 'loading')
+
+async function loadProjects() {
+  projectsState.value = 'loading'
+  try {
+    const { data: list } = await websitesApi.list({ _silentError: true })
+    appStore.setWebsites(list || [])
+    projectsState.value = 'ready'
+  } catch {
+    projectsState.value = 'failed'
+  }
+}
+
+// Every engine reports whether the server holds its API key.
+const enginesUnavailable = computed(() => {
+  const engines = data.value?.engines || []
+  return engines.length > 0 && !engines.some((e) => e.configured)
+})
 
 function plural(n, one, many) {
   return `${n} ${n === 1 ? one : many}`
@@ -178,15 +238,20 @@ const subline = computed(() => {
 })
 
 async function load() {
-  if (!activeWebsiteId.value) return
+  const websiteId = activeWebsiteId.value
+  if (!websiteId) return
   loading.value = true
+  loadFailed.value = false
   try {
-    const res = await searchGapApi.overview(activeWebsiteId.value)
+    // Silent: the page shows the failure inline.
+    const res = await api.get(`/search-gap/websites/${websiteId}/overview/`, { _silentError: true })
+    // A late answer for a project the user has switched away from.
+    if (websiteId !== activeWebsiteId.value) return
     data.value = res.data
   } catch {
-    // The client interceptor already toasts; keep the last good data.
+    if (websiteId === activeWebsiteId.value) loadFailed.value = true
   } finally {
-    loading.value = false
+    if (websiteId === activeWebsiteId.value) loading.value = false
   }
 }
 
@@ -210,18 +275,26 @@ const uncheckedCount = computed(() =>
 async function checkUnchecked() {
   const pending = data.value.prompts.filter((p) => p.google.status !== 'ok')
   checking.value = true
-  let done = 0
+  let queued = 0
+  let failed = 0
+  let unavailable = false
   try {
-    for (const p of pending) {
-      checkProgress.value = `${done + 1} of ${pending.length}`
+    for (const [i, p] of pending.entries()) {
+      checkProgress.value = `${i + 1} of ${pending.length}`
       try {
         await searchGapApi.checkGoogle(activeWebsiteId.value, p.prompt_id)
+        queued += 1
       } catch (err) {
-        if (err.response?.data?.error === 'serpapi_not_configured') break
+        if (err.response?.data?.error === 'serpapi_not_configured') {
+          unavailable = true
+          break
+        }
+        failed += 1
       }
-      done += 1
     }
-    toast.success(`Google checks queued for ${plural(done, 'prompt', 'prompts')}.`)
+    if (queued) toast.success(`Google checks queued for ${plural(queued, 'prompt', 'prompts')}.`)
+    if (unavailable) toast.error("Google rank checks aren't available yet.")
+    else if (failed) toast.error(`We couldn't queue Google checks for ${plural(failed, 'prompt', 'prompts')}.`)
   } finally {
     checking.value = false
     checkProgress.value = ''
@@ -229,7 +302,14 @@ async function checkUnchecked() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  if (!showOnboarding.value && !appStore.websites.length) loadProjects()
+  load()
+})
+// Finishing onboarding creates the first project; pick it up.
+watch(showOnboarding, (now, before) => {
+  if (before && !now) loadProjects()
+})
 // The overview carries no :websiteId; follow the header's project switcher.
 watch(activeWebsiteId, (next, prev) => {
   if (next && next !== prev) {
@@ -287,6 +367,43 @@ watch(activeWebsiteId, (next, prev) => {
 
 .ov-alert {
   border-radius: 14px;
+}
+
+.ov-retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.ov-state {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  padding: 28px 30px;
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  background: var(--card);
+}
+
+.ov-state-title {
+  color: var(--foreground);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ov-state-sub {
+  color: var(--muted-foreground);
+  font-size: 14px;
+}
+
+.ov-state-btn {
+  margin-top: 8px;
 }
 
 .ov-banner-inner {

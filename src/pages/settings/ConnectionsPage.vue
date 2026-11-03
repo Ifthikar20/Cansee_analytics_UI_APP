@@ -7,8 +7,12 @@
     >
       <p v-if="!websiteId" class="cn-muted">Pick a project in the header first.</p>
       <p v-else-if="loading" class="cn-muted">Checking the connection...</p>
+      <div v-else-if="statusFailed" class="cn-failed">
+        <p class="cn-muted">We couldn't check the Search Console connection.</p>
+        <Button variant="outline" class="cn-btn" @click="loadStatus">Try again</Button>
+      </div>
       <div v-else-if="gsc && !gsc.configured" class="cn-muted">
-        Search Console sign-in isn't set up on this server yet (Google OAuth client missing).
+        Search Console isn't available yet.
       </div>
       <div v-else-if="gsc?.connected" class="cn-status">
         <span class="cn-dot is-on" aria-hidden="true"></span>
@@ -26,7 +30,7 @@
         </div>
       </div>
 
-      <template v-if="websiteId && gsc?.configured" #footer>
+      <template v-if="websiteId && !loading && !statusFailed && gsc?.configured" #footer>
         <template v-if="gsc.connected">
           <Button variant="outline" class="cn-btn" :disabled="busy" @click="openPicker">Change property</Button>
           <Button variant="ghost" class="cn-btn" :disabled="busy" @click="disconnect">Disconnect</Button>
@@ -38,9 +42,9 @@
     </SettingsSection>
 
     <SettingsSection
-      label="Alerts"
-      title="Where alerts go"
-      description="Send reports and alerts to the tools your team already uses."
+      label="Reports"
+      title="Where reports go"
+      description="Send the daily report to the tools your team already uses."
     >
       <AlertChannels />
     </SettingsSection>
@@ -62,6 +66,7 @@ import SettingsSection from '@/components/settings/SettingsSection.vue'
 import AlertChannels from '@/components/settings/AlertChannels.vue'
 import PropertyPickerModal from '@/components/search_console/PropertyPickerModal.vue'
 import { Button } from '@/components/ui/button'
+import api from '@/api/client'
 import searchConsoleApi from '@/api/searchConsole'
 import { useAppStore } from '@/stores/app'
 import { useToast } from '@/composables/useToast'
@@ -77,6 +82,7 @@ const activeName = computed(() => appStore.activeWebsite?.name || 'this project'
 
 const gsc = ref(null)
 const loading = ref(false)
+const statusFailed = ref(false)
 const busy = ref(false)
 const showPicker = ref(false)
 const properties = ref([])
@@ -88,12 +94,15 @@ function displaySite(siteUrl) {
 async function loadStatus() {
   if (!websiteId.value) return
   loading.value = true
+  statusFailed.value = false
   try {
-    const { data } = await searchConsoleApi.status(websiteId.value)
+    // Silent: the section shows the failure inline.
+    const { data } = await api.get(`/search-console/${websiteId.value}/status/`, { _silentError: true })
     gsc.value = data
     if (data.pending_property_selection) await openPicker()
   } catch {
     gsc.value = null
+    statusFailed.value = true
   } finally {
     loading.value = false
   }
@@ -163,6 +172,13 @@ watch(websiteId, loadStatus, { immediate: true })
 .cn-muted {
   color: var(--muted-foreground);
   font-size: 13.5px;
+}
+
+.cn-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .cn-status {

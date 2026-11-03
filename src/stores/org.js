@@ -20,7 +20,6 @@ export const useOrgStore = defineStore('org', () => {
     const domains = ref([])
 
     const membersLoading = ref(false)
-    const invitationsLoading = ref(false)
     const domainsLoading = ref(false)
 
     function hasOrg() {
@@ -58,13 +57,8 @@ export const useOrgStore = defineStore('org', () => {
     // ── Invitations ──
     async function loadInvitations() {
         if (!hasOrg()) return
-        invitationsLoading.value = true
-        try {
-            const { data } = await orgsApi.listInvitations()
-            invitations.value = Array.isArray(data) ? data : []
-        } finally {
-            invitationsLoading.value = false
-        }
+        const { data } = await orgsApi.listInvitations()
+        invitations.value = Array.isArray(data) ? data : []
     }
 
     async function createInvitation(payload) {
@@ -127,20 +121,16 @@ export const useOrgStore = defineStore('org', () => {
 
     // ── Usage (admin-only rollup: seats + per-member prompt/AI usage) ──
     const usage = ref(null)
-    const usageLoading = ref(false)
 
     async function loadUsage() {
         // The endpoint is admin-gated; skip entirely for members so the
         // Team page never fires a guaranteed 403.
         if (!hasOrg() || !useAuthStore().isOrgAdmin) return
-        usageLoading.value = true
         try {
             const { data } = await orgsApi.getUsage()
             usage.value = data || null
         } catch {
             usage.value = null
-        } finally {
-            usageLoading.value = false
         }
     }
 
@@ -159,9 +149,7 @@ export const useOrgStore = defineStore('org', () => {
         domains,
         usage,
         membersLoading,
-        invitationsLoading,
         domainsLoading,
-        usageLoading,
         loadUsage,
         loadMembers,
         changeMemberRole,

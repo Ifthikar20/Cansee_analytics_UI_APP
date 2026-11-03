@@ -2,6 +2,14 @@
   <SettingsShell active="project">
     <p v-if="!websiteId" class="ps-muted">Pick a project in the header, or add one, to edit its settings.</p>
 
+    <p v-else-if="loadState === 'loading'" class="ps-muted">Loading project settings...</p>
+
+    <!-- Without the saved values the form would overwrite them with blanks. -->
+    <div v-else-if="loadState === 'failed'" class="ps-failed">
+      <p class="ps-muted">We couldn't load this project's settings.</p>
+      <Button variant="outline" class="ps-btn" @click="load">Try again</Button>
+    </div>
+
     <template v-else>
       <SettingsSection
         label="Project"
@@ -42,6 +50,7 @@
         description="Brands you compete with. Cansee flags them when they outrank you on Google or are recommended ahead of you."
       >
         <div class="ps-comps">
+          <p v-if="!competitors.length" class="ps-muted">No competitors yet.</p>
           <div v-for="(c, i) in competitors" :key="i" class="ps-comp">
             <input v-model="c.name" class="ps-input" placeholder="Brand name" :aria-label="`Competitor ${i + 1} name`" />
             <input v-model="c.domain" class="ps-input" placeholder="domain.com" :aria-label="`Competitor ${i + 1} domain`" />
@@ -84,6 +93,7 @@ import { Plus, X } from '@lucide/vue'
 import SettingsShell from '@/components/settings/SettingsShell.vue'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
 import { Button } from '@/components/ui/button'
+import api from '@/api/client'
 import websitesApi from '@/api/websites'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -98,6 +108,7 @@ const websiteId = computed(() => appStore.activeWebsite?.id || '')
 
 const details = ref({ name: '', url: '', industry: '', description: '' })
 const competitors = ref([])
+const loadState = ref('loading') // loading | ready | failed
 const savingDetails = ref(false)
 const savingComps = ref(false)
 const detailsState = ref('')
@@ -106,10 +117,14 @@ const deleting = ref(false)
 const confirmDelete = ref(false)
 
 async function load() {
-  if (!websiteId.value) return
+  const id = websiteId.value
+  if (!id) return
   confirmDelete.value = false
+  loadState.value = 'loading'
   try {
-    const { data } = await websitesApi.get(websiteId.value)
+    // Silent: the page shows the failure inline.
+    const { data } = await api.get(`/websites/${id}/`, { _silentError: true })
+    if (id !== websiteId.value) return
     details.value = {
       name: data.name || '',
       url: data.url || '',
@@ -119,9 +134,15 @@ async function load() {
     competitors.value = (data.competitors || []).map((c) =>
       typeof c === 'string' ? { name: c, domain: '' } : { name: c.name || '', domain: c.domain || '' },
     )
+    loadState.value = 'ready'
   } catch {
-    /* the client interceptor toasts */
+    if (id === websiteId.value) loadState.value = 'failed'
   }
+}
+
+// Saves report their outcome next to the button, so they are silent.
+function saveProject(payload) {
+  return api.put(`/websites/${websiteId.value}/`, payload, { _silentError: true })
 }
 
 function syncStore(project) {
@@ -135,7 +156,7 @@ async function saveDetails() {
   detailsState.value = ''
   try {
     const { name, industry, description } = details.value
-    const { data } = await websitesApi.update(websiteId.value, { name, industry, description })
+    const { data } = await saveProject({ name, industry, description })
     syncStore(data)
     detailsState.value = 'saved'
   } catch {
@@ -152,7 +173,7 @@ async function saveCompetitors() {
     const rows = competitors.value
       .map((c) => ({ name: c.name.trim(), domain: c.domain.trim() }))
       .filter((c) => c.name)
-    const { data } = await websitesApi.update(websiteId.value, { competitors: rows })
+    const { data } = await saveProject({ competitors: rows })
     competitors.value = (data.competitors || []).map((c) => ({ ...c }))
     syncStore(data)
     compState.value = 'saved'
@@ -275,5 +296,12 @@ watch([details, competitors], () => {
 .ps-muted {
   color: var(--muted-foreground);
   font-size: 14px;
+}
+
+.ps-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
 }
 </style>

@@ -25,13 +25,15 @@
       <div class="info-footer-links">
         <router-link to="/terms">Terms</router-link>
         <router-link to="/privacy">Privacy</router-link>
-        <a href="mailto:hello@cansee.ai">hello@cansee.ai</a>
+        <a :href="`mailto:${GENERAL_EMAIL}`">{{ GENERAL_EMAIL }}</a>
       </div>
     </footer>
   </div>
 </template>
 
 <script setup>
+import { GENERAL_EMAIL } from '@/constants/support'
+
 defineProps({
   title: { type: String, required: true },
   eyebrow: { type: String, default: '' },
@@ -136,12 +138,6 @@ h1 {
 :slotted(li) { margin-bottom: 6px; color: #4b5563; }
 :slotted(a) { color: #ff6b35; text-decoration: underline; text-underline-offset: 2px; }
 :slotted(strong) { color: #1a1a2e; }
-:slotted(.info-card) {
-  background: #f3f4f6;
-  border-radius: 12px;
-  padding: 20px 24px;
-  margin: 12px 0;
-}
 :slotted(.info-grid) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -161,32 +157,7 @@ h1 {
   color: #1a1a2e;
 }
 :slotted(.info-grid p) { font-size: 0.9rem; margin: 0; }
-:slotted(.status-row) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  background: #ffffff;
-  margin-bottom: 8px;
-}
-:slotted(.status-pill) {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #047857;
-}
-:slotted(.status-pill::before) {
-  content: '';
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
-}
+:slotted(.info-grid p + p) { margin-top: 6px; }
 
 .info-footer {
   border-top: 1px solid #e5e7eb;

@@ -1,10 +1,18 @@
 <template>
-  <!-- Alert channels (Slack, Discord, Teams, SMS). Formerly the standalone
+  <!-- Report channels (Slack, Discord, Teams, SMS). Formerly the standalone
        Integrations page; now a section of Settings > Connections. -->
   <div class="integrations-page">
 
+    <p v-if="loadState === 'loading'" class="channels-note">Loading your channels...</p>
+
+    <!-- Without the saved state every tile would read "Not connected". -->
+    <div v-else-if="loadState === 'failed'" class="channels-failed">
+      <p class="channels-note">We couldn't load your channels.</p>
+      <Button variant="outline" size="sm" @click="loadAll">Try again</Button>
+    </div>
+
     <!-- Integrations directory -->
-    <div class="integrations-grid">
+    <div v-else class="integrations-grid">
       <!-- Working integrations -->
       <div v-for="intg in integrations" :key="intg.id" class="intg-tile" :class="{ connected: intg.connected }">
         <div class="intg-tile-main">
@@ -45,10 +53,10 @@
           </div>
         </div>
 
-        <p class="intg-tile-desc">Get the Brand Pulse digest and high-severity brand-security alerts as texts, and reply to ask questions &mdash; straight from your phone's Messages app.</p>
+        <p class="intg-tile-desc">Text Cansee a question from your phone and get an answer from your account data.</p>
 
         <!-- available=false → muted note, no Connect -->
-        <p v-if="smsState === 'unavailable'" class="sms-unavailable">Not available on this deployment yet.</p>
+        <p v-if="smsState === 'unavailable'" class="sms-unavailable">Text messages aren't available yet.</p>
 
         <!-- Phone entry (after Connect) -->
         <div v-else-if="smsState === 'phone'" class="sms-form">
@@ -58,7 +66,7 @@
               type="tel"
               autocomplete="tel"
               class="min-w-0 flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              placeholder="+1 415 555 0134"
+              placeholder="Phone number with country code"
               @keyup.enter="sendSmsCode"
             />
             <Button size="sm" :disabled="!smsPhone.trim() || smsSending" @click="sendSmsCode">
@@ -122,7 +130,6 @@
           <Button size="sm" class="flex-1" @click="openSmsConnect">Connect</Button>
         </div>
 
-        <!-- smsState === 'loading' (initial fetch, or a failed GET): no body -->
       </div>
 
     </div>
@@ -132,10 +139,7 @@
       <h2 class="section-title">What gets sent to your teams</h2>
       <ul class="sent-list">
         <li v-for="(item, idx) in sentItems" :key="item.title" class="sent-row" :class="sentRevealed ? 'sent-row-revealed' : 'sent-row-hidden'" :style="{ '--reveal-delay': (idx * 70) + 'ms' }">
-          <span class="sent-row-title">
-            {{ item.title }}
-            <span v-if="item.soon" class="soon-badge">Coming soon</span>
-          </span>
+          <span class="sent-row-title">{{ item.title }}</span>
           <span class="sent-row-desc">{{ item.desc }}</span>
         </li>
       </ul>
@@ -247,7 +251,7 @@
 
       <!-- Notification Preferences -->
       <div class="notif-prefs">
-        <h4 class="prefs-title">Notifications to send</h4>
+        <h4 class="prefs-title">What to send</h4>
         <label class="pref-check" v-for="pref in notifPrefs" :key="pref.key">
           <input type="checkbox" v-model="pref.enabled" class="modern-check" />
           <div>
@@ -281,6 +285,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import { Button } from '@/components/ui/button'
+import api from '@/api/client'
 import integrationsApi from '@/api/integrations'
 
 const showConnectModal = ref(false)
@@ -292,16 +297,15 @@ const connecting = ref(false)
 const showSuccessToast = ref(false)
 const successMessage = ref('')
 const toastKind = ref('success')
-const loading = ref(true)
+const loadState = ref('loading') // loading | ready | failed
 
+// Only what the backend actually sends. The daily report goes out at
+// 09:00 (apps.notifications.tasks.send_daily_growth_reports).
 const notifPrefs = reactive([
-  { key: 'daily', label: 'Daily Growth Report', desc: 'Morning summary of visitors, leads, and trends', enabled: true },
-  { key: 'hotlead', label: 'Hot Lead Alerts', desc: 'Instant alert when a lead scores 80+', enabled: true },
-  { key: 'trends', label: 'Weekly Trend Digest', desc: 'Top trending topics relevant to your business', enabled: true },
-  { key: 'milestones', label: 'Growth Milestones', desc: 'Team celebrations when targets are hit', enabled: false },
+  { key: 'daily', label: 'Daily report', desc: 'A morning summary of AI visibility and open brand-security findings.', enabled: true },
 ])
 
-const prefDefaults = { daily: true, hotlead: true, trends: true, milestones: false }
+const prefDefaults = { daily: true }
 
 // Apply a per-connection {key: boolean} map to the shared checkboxes;
 // pass null to reset them to the defaults for a fresh connection.
@@ -321,7 +325,7 @@ const integrations = reactive([
   {
     id: 'slack',
     name: 'Slack',
-    description: 'Deliver the daily report and brand-security alerts to a Slack channel, and bring Cansee into the conversation with @Cansee mentions and the /cansee command.',
+    description: 'Get the daily report in a Slack channel, and ask Cansee questions with @Cansee mentions and the /cansee command.',
     bgColor: 'linear-gradient(135deg, #4A154B15, #E01E5A08)',
     connected: false,
     connectionId: null,
@@ -335,7 +339,7 @@ const integrations = reactive([
   {
     id: 'discord',
     name: 'Discord',
-    description: 'Deliver the daily report and brand-security alerts to a Discord channel, and work with Cansee from your server through the /cansee command.',
+    description: 'Get the daily report in a Discord channel, and work with Cansee from your server through the /cansee command.',
     bgColor: 'linear-gradient(135deg, #5865F215, #5865F208)',
     connected: false,
     connectionId: null,
@@ -349,7 +353,7 @@ const integrations = reactive([
   {
     id: 'teams',
     name: 'Microsoft Teams',
-    description: 'Deliver the daily report, brand-security alerts, and hot-lead alerts to a Microsoft Teams channel through an incoming webhook.',
+    description: 'Get the daily report in a Microsoft Teams channel through an incoming webhook.',
     bgColor: 'linear-gradient(135deg, #6264A715, #6264A708)',
     connected: false,
     connectionId: null,
@@ -362,52 +366,46 @@ const integrations = reactive([
   },
 ])
 
-// Directory entries for platforms on the roadmap. Rendered as neutral,
-// non-interactive monogram tiles; no click handlers, no brand artwork.
-
-// "What gets sent" list. The backend stores the trend and milestone
-// toggles but does not send those notifications yet, hence the chips.
+// "What gets sent" list: only messages the backend delivers today.
 const sentItems = [
-  { title: 'Daily Growth Report', desc: 'Visitor count, lead score changes, and conversion trends delivered every morning.' },
-  { title: 'Brand-Security Alerts', desc: 'A heads-up when a new brand-security finding is opened, with the recommended fix.' },
-  { title: 'Hot Lead Alerts', desc: 'Instant notification when a lead reaches 80+ score or visits your pricing page.' },
-  { title: 'Brand Pulse Digest', desc: 'A daily brand summary: new alerts, sentiment watchouts, and conversations to join.' },
-  { title: 'Trend Intelligence', desc: 'Weekly trending keywords and market shifts relevant to your business posture.', soon: true },
-  { title: 'Growth Milestones', desc: 'Celebrate when your team hits traffic goals, lead targets, or SEO improvements.', soon: true },
+  { title: 'Daily report', desc: 'Every morning: AI visibility for your projects and any open brand-security findings.' },
 ]
 
 // ── Load saved connections from the API ──
 async function loadConnections() {
-  try {
-    const res = await integrationsApi.list()
-    // Notifications endpoints double-wrap: the unwrapped payload is
-    // itself {data: [...]}, so res.data?.data is the connection list.
-    const saved = res.data?.data || []
-    for (const conn of saved) {
-      const intg = integrations.find(i => i.id === conn.platform)
-      if (!intg) continue
-      intg.connected = conn.is_active
-      intg.connectionId = conn.id
-      // The webhook URL is write-only server-side (a secret we never read
-      // back). Track only whether one is configured; leave the input
-      // blank — submitting it blank keeps the stored webhook.
-      intg.webhookConfigured = !!conn.webhook_configured
-      intg.webhookUrl = ''
-      intg.channelName = conn.channel_name || ''
-      intg.externalTeamId = conn.external_team_id || ''
-      // TimeFields may serialize as HH:MM:SS; the API expects HH:MM back.
-      intg.scheduleTime = (conn.schedule_time || '').slice(0, 5)
-      intg.notifPrefs = {
-        daily: typeof conn.notify_daily_report === 'boolean' ? conn.notify_daily_report : prefDefaults.daily,
-        hotlead: typeof conn.notify_hot_leads === 'boolean' ? conn.notify_hot_leads : prefDefaults.hotlead,
-        trends: typeof conn.notify_trend_digest === 'boolean' ? conn.notify_trend_digest : prefDefaults.trends,
-        milestones: typeof conn.notify_milestones === 'boolean' ? conn.notify_milestones : prefDefaults.milestones,
-      }
+  // Silent: a failure renders inline (see loadAll).
+  const res = await api.get('/notifications/integrations/', { _silentError: true })
+  // Notifications endpoints double-wrap: the unwrapped payload is
+  // itself {data: [...]}, so res.data?.data is the connection list.
+  const saved = res.data?.data || []
+  for (const conn of saved) {
+    const intg = integrations.find(i => i.id === conn.platform)
+    if (!intg) continue
+    intg.connected = conn.is_active
+    intg.connectionId = conn.id
+    // The webhook URL is write-only server-side (a secret we never read
+    // back). Track only whether one is configured; leave the input
+    // blank — submitting it blank keeps the stored webhook.
+    intg.webhookConfigured = !!conn.webhook_configured
+    intg.webhookUrl = ''
+    intg.channelName = conn.channel_name || ''
+    intg.externalTeamId = conn.external_team_id || ''
+    // TimeFields may serialize as HH:MM:SS; the API expects HH:MM back.
+    intg.scheduleTime = (conn.schedule_time || '').slice(0, 5)
+    intg.notifPrefs = {
+      daily: typeof conn.notify_daily_report === 'boolean' ? conn.notify_daily_report : prefDefaults.daily,
     }
-  } catch (e) {
-    console.warn('Failed to load integrations:', e)
-  } finally {
-    loading.value = false
+  }
+}
+
+// Both lists must load before any tile can say whether it is connected.
+async function loadAll() {
+  loadState.value = 'loading'
+  try {
+    await Promise.all([loadConnections(), loadSms()])
+    loadState.value = 'ready'
+  } catch {
+    loadState.value = 'failed'
   }
 }
 
@@ -427,15 +425,14 @@ const smsResending = ref(false)
 const smsDisconnecting = ref(false)
 const smsToggleBusy = ref(null)   // key of the preference currently PATCHing
 
+// Only preferences the backend acts on today: replies are answered by
+// the inbound SMS webhook.
 const smsToggles = [
-  { key: 'alert_security', label: 'High-severity security alerts' },
-  { key: 'alert_visibility_drop', label: 'Sharp visibility drops' },
-  { key: 'pulse_digest', label: 'Brand Pulse digest', desc: 'Recurring summary texts — off unless you turn it on.' },
   { key: 'allow_replies', label: 'Allow replies (ask questions by text)' },
 ]
 
-// Card state machine. 'loading' covers both the initial fetch and a failed
-// GET: the tile renders with no body so the webhook tiles are unaffected.
+// Card state machine. The grid only renders after the status loaded, so
+// 'loading' is a fallback that renders no body.
 const smsState = computed(() => {
   if (!smsLoaded.value) return 'loading'
   if (!smsAvailable.value) return 'unavailable'
@@ -454,22 +451,17 @@ function smsPayload(res) {
   return d?.data ?? d
 }
 
+// Rejects on failure; loadAll turns that into the inline error.
 async function loadSms() {
-  try {
-    const res = await integrationsApi.smsList()
-    const payload = smsPayload(res) || {}
-    smsAvailable.value = !!payload.available
-    const subs = payload.subscriptions || []
-    // opted_out rows count as not connected, so the number can be re-added.
-    smsSub.value = subs.find(s => s.status === 'verified')
-      || subs.find(s => s.status === 'pending')
-      || null
-    smsLoaded.value = true
-  } catch (e) {
-    // Leave smsLoaded false — the card body stays hidden and the
-    // Slack/Discord/Teams tiles are unaffected.
-    console.warn('Failed to load SMS status:', e)
-  }
+  const res = await integrationsApi.smsList()
+  const payload = smsPayload(res) || {}
+  smsAvailable.value = !!payload.available
+  const subs = payload.subscriptions || []
+  // opted_out rows count as not connected, so the number can be re-added.
+  smsSub.value = subs.find(s => s.status === 'verified')
+    || subs.find(s => s.status === 'pending')
+    || null
+  smsLoaded.value = true
 }
 
 function openSmsConnect() {
@@ -614,8 +606,7 @@ function setupSentReveal() {
 }
 
 onMounted(() => {
-  loadConnections()
-  loadSms()
+  loadAll()
   setupSentReveal()
 })
 
@@ -648,8 +639,9 @@ async function disconnect(intg) {
   if (intg.connectionId) {
     try {
       await integrationsApi.disconnect(intg.connectionId)
-    } catch (e) {
-      console.error('Disconnect failed:', e)
+    } catch {
+      // Still connected server-side; the client interceptor toasts.
+      return
     }
   }
   intg.connected = false
@@ -671,7 +663,7 @@ async function confirmConnect() {
 
   try {
     // Map notification prefs to API fields
-    const prefMap = { daily: 'notify_daily_report', hotlead: 'notify_hot_leads', trends: 'notify_trend_digest', milestones: 'notify_milestones' }
+    const prefMap = { daily: 'notify_daily_report' }
     const notifData = {}
     for (const p of notifPrefs) {
       if (prefMap[p.key]) notifData[prefMap[p.key]] = p.enabled
@@ -683,14 +675,15 @@ async function confirmConnect() {
     const scheduleTime = intg.scheduleTime || '09:00'
 
     // Save to backend (upsert). Backend sends a test message server-side.
-    const res = await integrationsApi.connect({
+    // Silent: the specific reason is shown in this component's own toast.
+    const res = await api.post('/notifications/integrations/', {
       platform: intg.id,
       webhook_url: webhookUrl.value.trim(),
       channel_name: channelName.value.trim(),
       external_team_id: externalTeamId.value.trim(),
       schedule_time: scheduleTime,
       ...notifData,
-    })
+    }, { _silentError: true })
 
     const saved = res.data?.data
     intg.connected = true
@@ -705,14 +698,13 @@ async function confirmConnect() {
     showConnectModal.value = false
     showToast(`${intg.name} connected. A test message was sent to your channel.`)
   } catch (err) {
-    console.error('Connect failed:', err)
     connecting.value = false
     // The notifications endpoints return {"error": "..."} with the
     // specific reason (invalid platform, malformed webhook URL, ...).
     const backendError = err.response?.data?.error
     const message = typeof backendError === 'string' && backendError
       ? backendError
-      : `Failed to connect ${intg.name}. Please check the webhook URL.`
+      : err.displayMessage || `We couldn't connect ${intg.name}. Please check the webhook URL.`
     showToast(message, 'error')
   }
 }
@@ -853,20 +845,22 @@ function showToast(msg, kind = 'success') {
 .sms-quiet-link:hover { color: var(--foreground); }
 .sms-quiet-link:disabled { opacity: 0.6; cursor: default; }
 
-/* .soon-badge is still used by the "What gets sent" list below. */
-.soon-badge {
-  font-size: 0.65rem;
-  font-weight: 600;
+/* ── Load states ── */
+.channels-note {
+  font-size: 13px;
   color: var(--muted-foreground);
-  background: var(--muted);
-  border: 1px solid var(--border);
-  border-radius: 9999px;
-  padding: 2px 8px;
-  white-space: nowrap;
-  flex-shrink: 0;
+  margin: 0 0 24px;
 }
 
-.intg-tile-main .soon-badge { margin-left: auto; }
+.channels-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.channels-failed .channels-note { margin: 0; }
 
 /* ═══════════════════════════════════════
    What Gets Sent

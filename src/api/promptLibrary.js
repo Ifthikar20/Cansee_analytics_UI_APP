@@ -1,47 +1,8 @@
 import api from './client'
 
-// REST client for the demand-side prompt library. The backend mounts
-// these routes at /api/v1/prompt-library/ — see config/urls.py.
+// REST client for the prompt library. The backend mounts these routes at
+// /api/v1/prompt-library/ — see config/urls.py.
 export default {
-    getIndustries: () => api.get('/prompt-library/industries/'),
-
-    getRegions: () => api.get('/prompt-library/regions/'),
-
-    getIndustryTrends: (slug) => api.get(`/prompt-library/industries/${slug}/trends/`),
-
-    getPrompts: (params) => api.get('/prompt-library/prompts/', { params }),
-
-    previewSample: (payload) =>
-        api.post('/prompt-library/prompts/preview-sample/', payload),
-
-    useLibrarySample: (auditId, payload) =>
-        api.post(`/prompt-library/audits/${auditId}/use-library-sample/`, payload),
-
-    getAuditSample: (auditId) =>
-        api.get(`/prompt-library/audits/${auditId}/sample/`),
-
-    listBrandPrompts: (websiteId) =>
-        api.get(`/prompt-library/websites/${websiteId}/brand-prompts/`),
-
-    // params: { run?: <audit_id>, period?: '7d'|'30d'|'90d'|'1y'|'all' }
-    // for the time-series Overview (trend + single-run drill-in).
-    promptDetailAgg: (websiteId, promptId, params = {}) =>
-        api.get(`/prompt-library/websites/${websiteId}/prompts/${promptId}/detail/`, { params }),
-
-    promptFanouts: (websiteId, promptId) =>
-        api.get(`/prompt-library/websites/${websiteId}/prompts/${promptId}/fanouts/`),
-
-    // payload: { mode: 'missing' } queries only models that never answered
-    // (silent gap-fill); omit for a full re-run of every configured model.
-    crawlPrompt: (websiteId, promptId, payload = {}) =>
-        api.post(`/prompt-library/websites/${websiteId}/prompts/${promptId}/crawl/`, payload),
-
-    // Page-level sentiment: fetch + analyze the URLs this prompt's answers
-    // cited (explicit trigger — spends AI credits). Poll promptDetailAgg's
-    // page_scan for progress.
-    scanPromptSources: (websiteId, promptId) =>
-        api.post(`/prompt-library/websites/${websiteId}/prompts/${promptId}/scan-sources/`),
-
     // ── Per-prompt run schedule (daily/weekly/monthly) ──
     getPromptSchedule: (websiteId, promptId) =>
         api.get(`/prompt-library/websites/${websiteId}/prompts/${promptId}/schedule/`),
@@ -52,118 +13,12 @@ export default {
     deletePromptSchedule: (websiteId, promptId) =>
         api.delete(`/prompt-library/websites/${websiteId}/prompts/${promptId}/schedule/`),
 
-    reextractPrompt: (websiteId, promptId) =>
-        api.post(`/prompt-library/websites/${websiteId}/prompts/${promptId}/reextract/`),
-
     brandLogo: (domain) =>
         api.get('/prompt-library/logo/', { params: { domain } }),
-
-    savedPromptsAgg: (websiteId) =>
-        api.get(`/prompt-library/websites/${websiteId}/saved-prompts/agg/`),
-
-    suggestedPrompts: (websiteId) =>
-        api.get(`/prompt-library/websites/${websiteId}/saved-prompts/suggested/`),
-
-    actSuggestion: (websiteId, action, promptId) =>
-        api.post(`/prompt-library/websites/${websiteId}/saved-prompts/${action}/${promptId}/`),
-
-    bulkSuggestion: (websiteId, action, promptIds) =>
-        api.post(`/prompt-library/websites/${websiteId}/saved-prompts/bulk/${action}/`, {
-            prompt_ids: promptIds,
-        }),
-
-    addBrandPrompt: (websiteId, promptId, notes = '') =>
-        api.post(`/prompt-library/websites/${websiteId}/brand-prompts/`, {
-            prompt_id: promptId,
-            notes,
-        }),
-
-    removeBrandPrompt: (brandPromptId) =>
-        api.delete(`/prompt-library/brand-prompts/${brandPromptId}/`),
-
-    // Prompt Library v2: redesigned card grid surface.
-    createWebsitePrompt: (websiteId, payload) =>
-        api.post(`/prompt-library/websites/${websiteId}/prompts/`, payload),
-
-    // Deterministic starter set: ~10 intent-diverse prompts generated
-    // from the project's name/industry and saved to its list directly.
-    generateSamples: (websiteId, payload) =>
-        api.post(`/prompt-library/websites/${websiteId}/prompts/generate-samples/`, payload || {}),
-
-    preview: (promptId, websiteId) =>
-        api.get(`/prompt-library/prompts/${promptId}/preview/`, {
-            params: websiteId ? { website: websiteId } : {},
-        }),
-
-    effectiveness: (promptId) =>
-        api.get(`/prompt-library/prompts/${promptId}/effectiveness/`),
-
-    autoTemplate: (rawText) =>
-        api.post('/prompt-library/prompts/auto-template/', { raw_text: rawText }),
-
-    searchSources: (query) =>
-        api.post('/prompt-library/prompts/search-sources/', { query }),
-
-    smokeTest: (promptId, payload) =>
-        api.post(`/prompt-library/prompts/${promptId}/smoke-test/`, payload),
-
-    synthesize: (payload) =>
-        api.post('/prompt-library/prompts/synthesize/', payload),
-
-    generateFromContext: (payload) =>
-        api.post('/prompt-library/prompts/generate-from-context/', payload),
-
-    // Recommend prompts related to an existing one (AI-generated). Used by
-    // the create-prompt modal to surface follow-on suggestions.
-    generateRelated: (payload) =>
-        api.post('/prompt-library/prompts/generate-related/', payload),
-
-    savePromptToWebsite: (websiteId, payload) =>
-        api.post(`/prompt-library/websites/${websiteId}/prompts/`, payload),
-
-    getVariables: (websiteId) =>
-        api.get(`/prompt-library/websites/${websiteId}/variables/`),
-
-    updateVariables: (websiteId, variables) =>
-        api.put(`/prompt-library/websites/${websiteId}/variables/`, { variables }),
 
     // Per-website archive of a saved prompt (tenant-scoped on the
     // BrandPrompt row). Replaces the old enable/disable, which flipped
     // the shared catalog flag across every tenant.
     setArchived: (brandPromptId, archived) =>
         api.patch(`/prompt-library/brand-prompts/${brandPromptId}/`, { is_archived: archived }),
-
-    // ── Test environments ─────────────────────────────────────────
-    // Named buckets of BrandPrompts. Shared surface between the Saved
-    // view (group by env, bulk-move prompts) and the Model Test page
-    // (load an env's prompts into the run builder).
-    listTestEnvironments: (websiteId) =>
-        api.get(`/prompt-library/websites/${websiteId}/test-environments/`),
-
-    createTestEnvironment: (websiteId, name, promptIds = []) =>
-        api.post(`/prompt-library/websites/${websiteId}/test-environments/`, {
-            name,
-            prompt_ids: promptIds,
-        }),
-
-    renameTestEnvironment: (websiteId, envId, name) =>
-        api.patch(
-            `/prompt-library/websites/${websiteId}/test-environments/${envId}/`,
-            { name },
-        ),
-
-    deleteTestEnvironment: (websiteId, envId) =>
-        api.delete(`/prompt-library/websites/${websiteId}/test-environments/${envId}/`),
-
-    addPromptsToEnv: (websiteId, envId, brandPromptIds) =>
-        api.post(
-            `/prompt-library/websites/${websiteId}/test-environments/${envId}/prompts/`,
-            { brand_prompt_ids: brandPromptIds },
-        ),
-
-    removePromptsFromEnv: (websiteId, envId, brandPromptIds) =>
-        api.delete(
-            `/prompt-library/websites/${websiteId}/test-environments/${envId}/prompts/`,
-            { data: { brand_prompt_ids: brandPromptIds } },
-        ),
 }

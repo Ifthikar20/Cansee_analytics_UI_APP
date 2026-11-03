@@ -84,24 +84,6 @@ const routes = [
         meta: { public: true }
     },
     {
-        path: '/blog',
-        name: 'blog',
-        component: () => import('@/pages/info/BlogPage.vue'),
-        meta: { public: true }
-    },
-    {
-        path: '/changelog',
-        name: 'changelog',
-        component: () => import('@/pages/info/ChangelogPage.vue'),
-        meta: { public: true }
-    },
-    {
-        path: '/status',
-        name: 'status',
-        component: () => import('@/pages/info/StatusPage.vue'),
-        meta: { public: true }
-    },
-    {
         path: '/docs',
         name: 'docs',
         component: () => import('@/pages/DocsPage.vue'),
@@ -183,12 +165,6 @@ const routes = [
         name: 'invite',
         component: () => import('@/pages/auth/InviteAcceptPage.vue'),
         meta: { layout: 'auth', public: true }
-    },
-    {
-        path: '/verify-email',
-        name: 'verify-email',
-        component: () => import('@/pages/auth/VerifyEmailPage.vue'),
-        meta: { layout: 'auth', guest: true }
     },
 
     /* ── App (signed in; each renders inside AppShell) ──
@@ -275,7 +251,7 @@ let sessionRestored = false
 // about the new subscription — bouncing that load to /paywall would
 // drop the checkout_id and strand the activation.
 const GATE_EXEMPT = new Set([
-    'login', 'register', 'forgot-password', 'verify-email',
+    'login', 'register', 'forgot-password',
     'landing', 'terms', 'privacy', 'support',
     'dashboard', 'paywall', 'billing', 'not-found',
 ])

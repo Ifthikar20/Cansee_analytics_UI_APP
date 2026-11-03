@@ -17,13 +17,17 @@
         <span class="gc-rank-value gc-rank-none">Not ranked</span>
         <span class="gc-rank-meta">Not in Google's top {{ google.depth }} results</span>
       </template>
+      <template v-else-if="!available">
+        <span class="gc-rank-value gc-rank-none">Not checked</span>
+        <span class="gc-rank-meta">Google rank checks aren't available yet.</span>
+      </template>
       <template v-else-if="google.status === 'error'">
         <span class="gc-rank-value gc-rank-none">Check failed</span>
-        <span class="gc-rank-meta">Run the check again.</span>
+        <span class="gc-rank-meta">Use Check now to try again.</span>
       </template>
       <template v-else>
         <span class="gc-rank-value gc-rank-none">Not checked</span>
-        <span class="gc-rank-meta">Run a check to compare Google with the AI answers.</span>
+        <span class="gc-rank-meta">Use Check now to compare Google with the AI answers.</span>
       </template>
     </div>
 
@@ -65,9 +69,8 @@
         <div><dt>Avg. position</dt><dd>{{ google.gsc.avg_position }}</dd></div>
       </dl>
       <p v-else class="gc-line">
-        No data for this exact query.
-        <router-link to="/settings/connections" class="gc-link">Connect Search Console</router-link>
-        for real clicks and impressions.
+        No Search Console data for this exact query.
+        <router-link to="/settings/connections" class="gc-link">Search Console settings</router-link>
       </p>
     </div>
   </section>
@@ -80,6 +83,8 @@ import { timeAgo } from '@/utils/timeAgo'
 
 const props = defineProps({
   google: { type: Object, required: true },
+  // False when the server cannot run Google rank checks (no SerpAPI key).
+  available: { type: Boolean, default: true },
 })
 
 const aiOverview = computed(() => props.google.ai_overview || {})

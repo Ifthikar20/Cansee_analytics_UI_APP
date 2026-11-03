@@ -21,8 +21,7 @@
           <h1 class="sp-title">How can we help?</h1>
           <p class="sp-sub">
             Stuck during setup, a billing question, or something that just
-            looks wrong — write to us and a human will get back to you,
-            usually within one business day.
+            looks wrong? Write to us.
           </p>
 
           <a class="sp-cta" :href="`mailto:${SUPPORT_EMAIL}`">
@@ -52,9 +51,9 @@
             <div class="sp-faq-item">
               <dt>The setup scan got my business details wrong.</dt>
               <dd>
-                Everything from onboarding is editable afterwards — your
-                description in Settings, and the measured prompts in the
-                Prompt Library.
+                Everything from onboarding is editable afterwards: your
+                description and competitors in Settings, and your prompts
+                from the Overview.
               </dd>
             </div>
           </dl>

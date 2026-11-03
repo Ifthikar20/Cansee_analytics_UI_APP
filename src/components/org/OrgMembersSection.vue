@@ -21,7 +21,7 @@
           v-model="inviteEmails"
           type="text"
           class="om-input"
-          placeholder="jane@company.com, sam@company.com"
+          placeholder="name@company.com"
           :disabled="inviteBusy"
           @keydown.enter.prevent="sendInvites"
         />
@@ -47,6 +47,11 @@
     <div v-if="orgStore.membersLoading && !orgStore.members.length" class="om-loading">
       Loading members…
     </div>
+    <div v-else-if="membersFailed && !orgStore.members.length" class="om-failed">
+      <p class="om-loading">We couldn't load your team.</p>
+      <Button variant="outline" size="sm" class="om-btn" @click="loadTeam">Try again</Button>
+    </div>
+    <p v-else-if="!orgStore.members.length" class="om-loading">No members yet.</p>
     <div v-else class="om-table-wrap">
       <Table>
         <TableHeader>
@@ -209,6 +214,18 @@ const inviteRole = ref('member')
 const inviteBusy = ref(false)
 const inviteErrors = ref([]) // [{email, message}]
 
+// ── Loading ──
+const membersFailed = ref(false)
+
+async function loadTeam() {
+  membersFailed.value = false
+  try {
+    await orgStore.loadMembers()
+  } catch {
+    membersFailed.value = true
+  }
+}
+
 // ── Row actions ──
 const roleBusyId = ref(null)
 const actionBusyId = ref(null)
@@ -290,7 +307,7 @@ async function onRoleChange(member, event) {
   } catch {
     // Global interceptor already toasted; put the select back in sync.
     event.target.value = member.role
-    await orgStore.loadMembers()
+    await loadTeam()
   } finally {
     roleBusyId.value = null
   }
@@ -337,8 +354,9 @@ async function revoke(inv) {
 }
 
 onMounted(() => {
-  orgStore.loadMembers()
-  orgStore.loadInvitations()
+  loadTeam()
+  // Pending invitations are optional extras; the interceptor reports a failure.
+  orgStore.loadInvitations().catch(() => {})
   orgStore.loadUsage()
 })
 </script>
@@ -431,6 +449,13 @@ onMounted(() => {
   font-size: 13px;
   color: var(--muted-foreground);
 }
+.om-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-bottom: 18px;
+}
+.om-failed .om-loading { padding-bottom: 10px; }
 .om-table-wrap { overflow-x: auto; }
 
 .om-subhead {

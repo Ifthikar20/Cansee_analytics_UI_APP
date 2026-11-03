@@ -15,36 +15,9 @@ export const CHART_COLORS = {
   slate: '#64748b',     // "other" / remainder buckets
 }
 
-// Ordered series palette. Index 0/1 are the hero pair the user asked for.
-export const SERIES = [
-  CHART_COLORS.blue,
-  CHART_COLORS.orange,
-  CHART_COLORS.sky,
-  CHART_COLORS.navy,
-  CHART_COLORS.amberDark,
-  CHART_COLORS.slate,
-]
-
-export function seriesColor(i) {
-  return SERIES[i % SERIES.length]
-}
-
-export function withAlpha(hex, alpha) {
+function withAlpha(hex, alpha) {
   if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return hex
   return hex + Math.round(alpha * 255).toString(16).padStart(2, '0')
-}
-
-// Vertical-gradient area fill for line charts (blue/orange fade to clear).
-export function gradientFill(color, alphaTop = 0.18) {
-  return (ctx) => {
-    const { chart } = ctx
-    const { ctx: c, chartArea } = chart
-    if (!chartArea) return withAlpha(color, alphaTop / 2)
-    const g = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom)
-    g.addColorStop(0, withAlpha(color, alphaTop))
-    g.addColorStop(1, withAlpha(color, 0))
-    return g
-  }
 }
 
 function cssVar(name, fallback) {
@@ -115,26 +88,6 @@ export function barDataset(label, data, color, overrides = {}) {
     borderRadius: 5,
     borderSkipped: false,
     maxBarThickness: 28,
-    ...overrides,
-  }
-}
-
-// Smooth line/area in the house style.
-export function lineDataset(label, data, color, overrides = {}) {
-  return {
-    label,
-    data,
-    borderColor: color,
-    backgroundColor: gradientFill(color),
-    fill: true,
-    tension: 0.4,
-    cubicInterpolationMode: 'monotone',
-    borderWidth: 2.5,
-    pointRadius: 0,
-    pointHoverRadius: 5,
-    pointHoverBorderWidth: 2.5,
-    pointHoverBorderColor: '#fff',
-    pointHoverBackgroundColor: color,
     ...overrides,
   }
 }

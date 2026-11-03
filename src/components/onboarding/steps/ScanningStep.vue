@@ -22,38 +22,7 @@
       </div>
 
       <h1 class="ob-title" tabindex="-1">Reading {{ urlHostname }}</h1>
-
-      <ul class="ob-scan-list" aria-live="polite">
-        <li
-          v-for="(task, i) in scanTasks"
-          :key="task"
-          class="ob-scan-task"
-          :class="{
-            'is-done': i < scanPhase,
-            'is-active': i === scanPhase,
-          }"
-        >
-          <span class="ob-scan-task-icon">
-            <svg
-              v-if="i < scanPhase"
-              class="ob-scan-check"
-              width="13"
-              height="13"
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M3 8.5l3.5 3.5L13 4.5"/>
-            </svg>
-            <span v-else-if="i === scanPhase" class="ob-spinner ob-scan-spinner" aria-hidden="true"></span>
-            <span v-else class="ob-scan-pending"></span>
-          </span>
-          <span class="ob-scan-task-label">{{ task }}</span>
-        </li>
-      </ul>
+      <p class="ob-sub" aria-live="polite">This usually takes under a minute.</p>
     </div>
   </section>
 </template>
@@ -63,6 +32,6 @@ import { ref } from 'vue'
 
 import { useOnboardingFlow } from '../useOnboardingFlow'
 
-const { urlHostname, scanPhase, scanTasks } = useOnboardingFlow()
+const { urlHostname } = useOnboardingFlow()
 const faviconErr = ref(false)
 </script>

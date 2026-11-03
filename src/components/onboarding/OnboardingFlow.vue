@@ -145,7 +145,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.body.style.overflow = ''
-  flow.stopScanTicker()
 })
 </script>
 
@@ -463,7 +462,7 @@ onBeforeUnmount(() => {
 }
 .ob-dot-sep { opacity: 0.5; }
 
-/* ── Scanning: favicon scanner + checklist ───────────────────────── */
+/* ── Scanning: favicon scanner ───────────────────────────────────── */
 .ob-scanner { position: relative; width: 120px; height: 120px; margin: 0 auto 24px; }
 .ob-orbit-ring {
   position: absolute;
@@ -513,51 +512,6 @@ onBeforeUnmount(() => {
   background: var(--ob-accent);
   box-shadow: 0 0 24px var(--ob-accent);
   animation: ob-pulse 1.6s ease-in-out infinite;
-}
-
-.ob-scan-list {
-  list-style: none;
-  margin: 4px auto 0;
-  padding: 0;
-  display: inline-flex;
-  flex-direction: column;
-  gap: 10px;
-  text-align: left;
-}
-.ob-scan-task {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  color: var(--ob-muted);
-  opacity: 0.4;
-  padding: 7px 14px 7px 10px;
-  border-radius: 999px;
-  transition: opacity 0.3s ease, color 0.3s ease, background 0.35s var(--ob-spring), transform 0.35s var(--ob-spring);
-}
-/* The soft pill visually "travels" down the list as phases tick. */
-.ob-scan-task.is-active {
-  opacity: 1;
-  color: var(--ob-fg);
-  background: var(--ob-accent-soft);
-  transform: translateX(2px);
-}
-.ob-scan-task.is-done { opacity: 1; color: var(--ob-fg); }
-.ob-scan-task-icon {
-  width: 18px;
-  height: 18px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.ob-scan-check { color: var(--ob-accent); animation: ob-pop 0.35s var(--ob-spring-pop) both; }
-.ob-scan-spinner { width: 13px; height: 13px; color: var(--ob-accent); }
-.ob-scan-pending {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--ob-border);
 }
 
 /* ── Inner surface card (describe + competitors) ─────────────────── */
@@ -833,10 +787,6 @@ onBeforeUnmount(() => {
   to   { transform: translate(-50%, -50%) rotate(360deg); }
 }
 @keyframes ob-spin-cw { to { transform: rotate(360deg); } }
-@keyframes ob-pop {
-  from { transform: scale(0.4); opacity: 0; }
-  to   { transform: scale(1); opacity: 1; }
-}
 @keyframes ob-shake {
   20%, 60% { transform: translateX(-5px); }
   40%, 80% { transform: translateX(5px); }

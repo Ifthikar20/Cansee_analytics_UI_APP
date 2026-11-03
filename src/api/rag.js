@@ -5,12 +5,6 @@ import api from './client'
 // against (user, website) — the retrieve endpoint later queries these
 // chunks to check LLM answers against what your brand actually says.
 export default {
-  // GET /rag/{websiteId}/sources/
-  // params: { page, page_size, status, kind, domain, search }
-  // Returns res.data as the array, res.meta.count/next/previous/stats.
-  listSources: (websiteId, params = {}) =>
-    api.get(`/rag/${websiteId}/sources/`, { params }),
-
   addSource: (websiteId, payload) =>
     // payload accepts:
     //   { url, kind?, title?, crawl?, page_cap?, depth? }
@@ -37,9 +31,6 @@ export default {
   // Consent switch: may the Cansee agent crawl this site for knowledge?
   // Enabling queues a seed crawl of the site's own domain (the response
   // carries seeded: true when one was queued).
-  getAgentCrawl: (websiteId) =>
-    api.get(`/rag/${websiteId}/agent-crawl/`),
-
   setAgentCrawl: (websiteId, enabled) =>
     api.post(`/rag/${websiteId}/agent-crawl/`, { enabled }),
 

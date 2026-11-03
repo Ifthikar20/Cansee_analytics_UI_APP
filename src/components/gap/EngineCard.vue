@@ -49,7 +49,7 @@
     </template>
 
     <p v-else class="ec-empty">
-      {{ engine.configured ? 'No answers yet. Run a check to ask this engine.' : 'This engine is not configured on the server.' }}
+      {{ engine.configured ? 'No answers yet. Use Check now to ask this engine.' : "This engine isn't available yet." }}
     </p>
   </article>
 </template>

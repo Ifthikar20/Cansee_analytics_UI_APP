@@ -13,7 +13,7 @@ export const ENGINES = [
 
 const ALIASES = { gpt4: 'chatgpt', openai: 'chatgpt', anthropic: 'claude', xai: 'grok' }
 
-export function engineKey(key) {
+function engineKey(key) {
   const k = String(key || '').toLowerCase()
   return ALIASES[k] || k
 }

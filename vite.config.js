@@ -5,7 +5,6 @@ import { fileURLToPath, URL } from 'node:url'
 
 // Build-time env vars (set in .env / .env.local / CI):
 //   VITE_API_URL          - backend origin for the dev proxy (default http://localhost:8000)
-//   VITE_WS_URL           - websocket origin for the dev proxy
 //   VITE_GOOGLE_CLIENT_ID - Google OAuth web client ID for "Continue with
 //                           Google" sign-in. Public by design; the client
 //                           secret stays on the backend. The same client
@@ -25,11 +24,6 @@ export default defineConfig({
       '/api': {
         target: process.env.VITE_API_URL || 'http://localhost:8000',
         changeOrigin: true,
-        secure: false,
-      },
-      '/ws': {
-        target: process.env.VITE_WS_URL || 'wss://cansee.ai',
-        ws: true,
         secure: false,
       }
     }

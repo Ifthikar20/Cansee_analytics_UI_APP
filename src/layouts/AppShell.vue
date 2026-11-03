@@ -72,7 +72,7 @@
 
         <div class="shell-actions">
           <span class="shell-tools">
-            <FeedbackWidget />
+            <FeedbackWidget v-if="FEEDBACK_ENABLED" />
             <HelpButton />
           </span>
           <button
@@ -165,6 +165,7 @@ import websitesApi from '@/api/websites'
 import billingApi from '@/api/billing'
 import HelpButton from '@/components/HelpButton.vue'
 import FeedbackWidget from '@/components/feedback/FeedbackWidget.vue'
+import { FEEDBACK_ENABLED } from '@/api/feedbackClient'
 import ToastContainer from '@/components/ToastContainer.vue'
 import AddProjectDialog from '@/components/projects/AddProjectDialog.vue'
 import {
@@ -239,7 +240,7 @@ onMounted(async () => {
   // (trial-aware); never re-derive it from the plan name here.
   try {
     const { data } = await billingApi.getCurrent({ _silentError: true })
-    appStore.setPlanInfo(data?.plan || 'free', data?.limits?.projects ?? -1)
+    appStore.setProjectLimit(data?.limits?.projects ?? -1)
   } catch { /* plan info is optional */ }
 })
 </script>

@@ -80,7 +80,7 @@
         <div class="ob-add-competitor">
           <input
             v-model="newCompetitorName"
-            placeholder="Competitor name (e.g. Stripe)"
+            placeholder="Competitor name"
             class="ob-text-input ob-add-input"
             @keydown.enter.prevent="addCustomCompetitor"
           />

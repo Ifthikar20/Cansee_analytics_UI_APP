@@ -11,7 +11,7 @@
         v-model="text"
         class="apd-text"
         rows="6"
-        placeholder="best crm for small business&#10;crm with built-in email automation&#10;hubspot alternatives for startups"
+        placeholder="One question per line"
       ></textarea>
 
       <div class="apd-row">
@@ -29,7 +29,7 @@
       <div class="apd-footer">
         <Button variant="ghost" :disabled="busy" @click="suggest">
           <Sparkles class="size-4" />
-          {{ suggesting ? 'Generating...' : 'Suggest 10 from my site' }}
+          {{ suggesting ? 'Suggesting...' : 'Suggest from my site' }}
         </Button>
         <div class="apd-footer-right">
           <Button variant="outline" :disabled="busy" @click="open = false">Cancel</Button>
@@ -45,7 +45,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { Sparkles } from '@lucide/vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import { Button } from '@/components/ui/button'
-import promptLibrary from '@/api/promptLibrary'
+import api from '@/api/client'
 import { useToast } from '@/composables/useToast'
 
 const props = defineProps({
@@ -93,20 +93,41 @@ watch(open, async (isOpen) => {
   textareaRef.value?.focus()
 })
 
+// The API answers some failures with a bare code ({"error": "code"}) and
+// others with {"error": {"code", "message"}}.
+function errorCode(err) {
+  const e = err?.response?.data?.error
+  return typeof e === 'string' ? e : e?.code || ''
+}
+
+function plural(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+// Requests are silent: every failure renders inline in the dialog.
 async function save() {
   saving.value = true
   error.value = ''
   try {
-    await promptLibrary.savePromptToWebsite(props.websiteId, {
-      text: lines.value.join('\n'),
-      location: location.value,
-    })
-    toast.success(`Added ${lines.value.length} ${lines.value.length === 1 ? 'prompt' : 'prompts'}. The AI engines are being asked now.`)
+    const res = await api.post(
+      `/prompt-library/websites/${props.websiteId}/prompts/`,
+      { text: lines.value.join('\n'), location: location.value },
+      { _silentError: true },
+    )
+    const added = `Added ${plural(res.data?.created_count ?? lines.value.length, 'prompt', 'prompts')}.`
+    // A run is only queued when the API returns its id.
+    toast.success(res.data?.scan_audit_id ? `${added} The AI engines are being asked now.` : added)
     text.value = ''
     open.value = false
     emit('added')
   } catch (err) {
-    error.value = err.displayMessage || "We couldn't add those prompts. Please try again."
+    if (errorCode(err) === 'no_llm_provider_configured') {
+      error.value = "AI engines aren't available yet."
+      // Refresh the list in case the prompts were saved before the run was refused.
+      emit('added')
+    } else {
+      error.value = err.displayMessage || "We couldn't add those prompts. Please try again."
+    }
   } finally {
     saving.value = false
   }
@@ -117,12 +138,20 @@ async function suggest() {
   suggesting.value = true
   error.value = ''
   try {
-    await promptLibrary.generateSamples(props.websiteId, { count: 10 })
-    toast.success('Added 10 suggested prompts from your site.')
+    const res = await api.post(
+      `/prompt-library/websites/${props.websiteId}/prompts/generate-samples/`,
+      { count: 10 },
+      { _silentError: true },
+    )
+    const n = res.data?.total ?? res.data?.generated?.length ?? 0
+    toast.success(`Added ${plural(n, 'suggested prompt', 'suggested prompts')}.`)
     open.value = false
     emit('added')
   } catch (err) {
-    error.value = err.displayMessage || "We couldn't generate suggestions right now."
+    const code = errorCode(err)
+    if (code === 'synthesis_not_configured') error.value = "Suggestions aren't available yet."
+    else if (code === 'synthesis_failed') error.value = "We couldn't suggest prompts right now."
+    else error.value = err.displayMessage || "We couldn't suggest prompts right now."
   } finally {
     suggesting.value = false
   }

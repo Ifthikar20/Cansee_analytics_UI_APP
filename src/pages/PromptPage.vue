@@ -16,7 +16,17 @@
       <router-link :to="{ name: 'dashboard' }">Back to the overview</router-link>
     </p>
 
+    <section v-else-if="loadFailed && !detail" class="pp-state">
+      <p class="pp-state-title">We couldn't load this prompt.</p>
+      <Button variant="outline" class="rounded-full" @click="load">Try again</Button>
+    </section>
+
     <template v-else-if="detail">
+      <p v-if="loadFailed" class="pp-refresh-error">
+        We couldn't refresh this prompt.
+        <button type="button" class="pp-retry" @click="load">Try again</button>
+      </p>
+
       <header class="pp-head">
         <div class="pp-head-text">
           <p class="pp-eyebrow">Prompt</p>
@@ -68,8 +78,10 @@
           <p class="pp-section-sub">Same question, same day. The badge on each engine is its gap against Google.</p>
         </header>
         <div class="pp-compare">
-          <GoogleCard :google="detail.google" />
-          <div class="pp-engines">
+          <GoogleCard :google="detail.google" :available="detail.serp_configured" />
+          <p v-if="!anyEngineConfigured" class="pp-engines-empty">AI engines aren't available yet.</p>
+          <p v-else-if="!anyEngineAnswered" class="pp-engines-empty">No engine results yet. Use Check now.</p>
+          <div v-else class="pp-engines">
             <EngineCard v-for="e in detail.engines" :key="e.key" :engine="e" @read="openAnswer" />
           </div>
         </div>
@@ -101,9 +113,10 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Archive, CalendarClock, RefreshCw } from '@lucide/vue'
+import api from '@/api/client'
 import searchGapApi from '@/api/searchGap'
 import promptLibrary from '@/api/promptLibrary'
 import { useToast } from '@/composables/useToast'
@@ -130,6 +143,7 @@ const toast = useToast()
 
 const detail = ref(null)
 const loading = ref(false)
+const loadFailed = ref(false)
 const notFound = ref(false)
 const checking = ref(false)
 const archiving = ref(false)
@@ -137,14 +151,24 @@ const showSchedule = ref(false)
 const answerId = ref('')
 let refreshTimer = null
 
+// Each engine says whether the server holds its API key.
+const anyEngineConfigured = computed(() => (detail.value?.engines || []).some((e) => e.configured))
+const anyEngineAnswered = computed(() => (detail.value?.engines || []).some((e) => e.answers))
+
 async function load() {
   loading.value = true
+  loadFailed.value = false
   try {
-    const res = await searchGapApi.prompt(props.websiteId, props.promptId)
+    // Silent: the page shows the failure inline.
+    const res = await api.get(
+      `/search-gap/websites/${props.websiteId}/prompts/${props.promptId}/`,
+      { _silentError: true },
+    )
     detail.value = res.data
     notFound.value = false
   } catch (err) {
     if (err.response?.status === 404) notFound.value = true
+    else loadFailed.value = true
   } finally {
     loading.value = false
   }
@@ -156,36 +180,71 @@ function refreshSoon() {
   refreshTimer = setTimeout(load, 8000)
 }
 
+// The API answers some failures with a bare code ({"error": "code"}) and
+// others with {"error": {"code", "message"}}.
+function errorCode(err) {
+  const e = err?.response?.data?.error
+  return typeof e === 'string' ? e : e?.code || ''
+}
+
+// Queue AI engine answers for this prompt. Silent: callers report the
+// outcome in a single toast.
+function askEngines(payload = {}) {
+  return api.post(
+    `/prompt-library/websites/${props.websiteId}/prompts/${props.promptId}/crawl/`,
+    payload,
+    { _silentError: true },
+  )
+}
+
+const CHECK_NOTES = {
+  engines: { off: "AI engines aren't available yet.", failed: "We couldn't ask the AI engines." },
+  google: { off: "Google rank checks aren't available yet.", failed: "We couldn't start the Google check." },
+}
+
+function outcome(result, offCode) {
+  if (result.status === 'fulfilled') return 'queued'
+  return errorCode(result.reason) === offCode ? 'off' : 'failed'
+}
+
 // Google (forced fresh) plus any engine that has not answered yet. A full
 // re-run of every engine is the schedule dialog's "Run now".
 async function checkNow() {
   checking.value = true
-  const calls = [promptLibrary.crawlPrompt(props.websiteId, props.promptId, { mode: 'missing' })]
-  if (detail.value?.serp_configured) {
-    calls.push(searchGapApi.checkGoogle(props.websiteId, props.promptId, { force: true }))
-  }
-  const results = await Promise.allSettled(calls)
+  const googleOn = Boolean(detail.value?.serp_configured)
+  const [enginesResult, googleResult] = await Promise.allSettled([
+    askEngines({ mode: 'missing' }),
+    googleOn ? searchGapApi.checkGoogle(props.websiteId, props.promptId, { force: true }) : Promise.resolve(),
+  ])
   checking.value = false
-  if (results.every((r) => r.status === 'rejected')) {
-    toast.error("We couldn't start the check. Please try again.")
+
+  const engines = outcome(enginesResult, 'no_llm_provider_configured')
+  const google = googleOn ? outcome(googleResult, 'serpapi_not_configured') : 'off'
+  const started = []
+  if (google === 'queued') started.push('Google')
+  if (engines === 'queued') started.push('any engine without an answer')
+  const notes = [CHECK_NOTES.engines[engines], CHECK_NOTES.google[google]].filter(Boolean)
+
+  if (!started.length) {
+    toast.error(notes.join(' '))
     return
   }
-  toast.success(
-    detail.value?.serp_configured
-      ? 'Checking Google and any engine without an answer.'
-      : 'Asking the engines without an answer. Google checks are off on this server.',
-  )
+  toast.success([`Checking ${started.join(' and ')}.`, ...notes].join(' '))
   await load()
   refreshSoon()
 }
 
 async function rerunEngines() {
   try {
-    await promptLibrary.crawlPrompt(props.websiteId, props.promptId)
-    toast.success('Asking every engine again.')
+    await askEngines()
+    toast.success('Asking the AI engines again.')
     refreshSoon()
-  } catch {
-    /* the client interceptor toasts */
+  } catch (err) {
+    toast.error(
+      errorCode(err) === 'no_llm_provider_configured'
+        ? "AI engines aren't available yet."
+        : "We couldn't start the run. Please try again.",
+    )
   }
 }
 
@@ -204,7 +263,14 @@ function openAnswer(engine) {
   answerId.value = engine.latest_result_public_id
 }
 
-watch(() => [props.websiteId, props.promptId], load, { immediate: true })
+// A different prompt starts from a clean slate, so a failed load never
+// shows the previous prompt's data.
+watch(() => [props.websiteId, props.promptId], () => {
+  clearTimeout(refreshTimer)
+  detail.value = null
+  notFound.value = false
+  load()
+}, { immediate: true })
 onBeforeUnmount(() => clearTimeout(refreshTimer))
 </script>
 
@@ -241,6 +307,48 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
 
 .pp-missing a {
   text-decoration: underline;
+}
+
+.pp-state {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 28px 30px;
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  background: var(--card);
+}
+
+.pp-state-title {
+  color: var(--foreground);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pp-refresh-error {
+  color: var(--destructive);
+  font-size: 13.5px;
+}
+
+.pp-retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--foreground);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.pp-engines-empty {
+  align-self: start;
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: 18px;
+  color: var(--muted-foreground);
+  font-size: 14px;
 }
 
 .pp-head {
