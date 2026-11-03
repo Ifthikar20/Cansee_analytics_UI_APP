@@ -22,7 +22,7 @@ vi.mock('@/api/agent', () => ({
         agents: vi.fn(),
         listChats: vi.fn(),
         getContext: vi.fn(),
-        putContext: vi.fn(),
+        createContextEntry: vi.fn(),
     },
 }))
 
@@ -69,11 +69,19 @@ beforeEach(() => {
     agentApi.status.mockResolvedValue(ok({ enabled: true, live_available: true }))
     agentApi.agents.mockResolvedValue(ok([]))
     agentApi.listChats.mockResolvedValue(ok({ results: [], next_cursor: null }))
-    agentApi.getContext.mockImplementation(async (wid) =>
-        ok({ website_id: wid, audience: '', voice: '', offerings: [], rules: [], revision: 0 })
+    agentApi.getContext.mockImplementation(async () =>
+        ok({
+            sections: [],
+            entries: [],
+            documents: [],
+            competitors: [],
+            totals: { entries: 0, suggested: 0, references: 0 },
+            build: { available: false, reason: 'insights_disabled', active_run: null, last_run: null },
+            can_edit: true,
+        })
     )
-    agentApi.putContext.mockReset()
-    agentApi.putContext.mockImplementation(async (wid, body) => ok({ ...body, website_id: wid, revision: 1 }))
+    agentApi.createContextEntry.mockReset()
+    agentApi.createContextEntry.mockImplementation(async (wid, body) => ok({ id: 'e1', ...body, revision: 1 }))
 })
 
 afterEach(() => {
@@ -108,14 +116,16 @@ describe('the active project follows confirmed navigations', () => {
         expect(app.activeWebsite.id).toBe(1)
     })
 
-    it('keeps saving the Context form to its own project after "Keep editing"', async () => {
+    it('keeps saving a Context entry to its own project after "Keep editing"', async () => {
         const app = useAppStore()
         const agent = useAgentStore()
         await router.push('/test-context/1')
         // AgentShell scopes the store to the project in the URL.
         await agent.init('1')
         const wrapper = await open('/test-context/1')
-        await wrapper.find('#ag-ctx-audience').setValue('Alpha audience')
+        await wrapper.findAll('button').find((b) => b.text() === 'Add an entry').trigger('click')
+        await flushPromises()
+        await wrapper.find('form.ag-cef input[type="text"]').setValue('Alpha audience')
 
         // Choose project Beta from the switcher: the page asks first.
         await router.push('/test-context/2')
@@ -130,10 +140,10 @@ describe('the active project follows confirmed navigations', () => {
         expect(app.activeWebsite.id).toBe(1)
         expect(agent.websiteId).toBe('1')
 
-        await wrapper.findAll('.ag-ctx-bar button').find((b) => b.text() === 'Save').trigger('click')
+        await wrapper.find('form.ag-cef').trigger('submit')
         await flushPromises()
-        expect(agentApi.putContext).toHaveBeenCalledTimes(1)
-        expect(agentApi.putContext.mock.calls[0][0]).toBe('1')
-        expect(agentApi.putContext.mock.calls[0][1]).toMatchObject({ audience: 'Alpha audience', revision: 0 })
+        expect(agentApi.createContextEntry).toHaveBeenCalledTimes(1)
+        expect(agentApi.createContextEntry.mock.calls[0][0]).toBe('1')
+        expect(agentApi.createContextEntry.mock.calls[0][1]).toMatchObject({ section: 'company', title: 'Alpha audience' })
     })
 })

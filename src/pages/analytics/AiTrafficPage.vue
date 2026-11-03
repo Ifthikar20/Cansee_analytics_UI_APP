@@ -140,7 +140,7 @@
             </VizChart>
             <VizChart :spec="crawlerDaysSpec" :loading="loading" :heading-level="3" />
             <VizChart :spec="purposesChart" :loading="loading" :heading-level="3" />
-            <CrawlerPathsTable :paths="crawlers.paths || []" :bots="crawlers.bots || []" />
+            <CrawlerPathsTable :paths="topPaths" :bots="crawlers.bots || []" />
           </template>
 
           <footer class="an-foot">
@@ -245,6 +245,9 @@ const botRows = computed(() => crawlerRows(crawlers.value))
 const crawlerDaysSpec = computed(() => crawlerSeries(crawlers.value))
 const purposesChart = computed(() => purposesSpec(crawlers.value))
 const crawlerNotes = computed(() => crawlerFootnotes(crawlers.value))
+// The report keeps the 50 most crawled paths (the Pages tab joins them all);
+// this page lists the first 10.
+const topPaths = computed(() => (crawlers.value.paths || []).slice(0, 10))
 
 const integer = new Intl.NumberFormat('en-US')
 

@@ -21,8 +21,19 @@
         <AgentSidebar variant="drawer" />
       </AgDrawer>
 
-      <main id="ag-main" ref="mainEl" class="ag-shell-main" tabindex="-1">
-        <router-view />
+      <main id="ag-main" ref="mainEl" class="ag-shell-main" :class="{ 'is-page': isPage }" tabindex="-1">
+        <!-- Analytics and settings pages: the main app's look, one scrolling
+             column, and a page bar while the sidebar is out of view. Keyed by
+             path like the old app shell, so another project's page mounts fresh. -->
+        <div v-if="isPage" class="ws-page">
+          <WorkspacePageBar v-if="ui.showSidebarToggle" :title="pageBarTitle" />
+          <div class="ws-page-body">
+            <router-view v-slot="{ Component, route: viewRoute }">
+              <component :is="Component" :key="viewRoute.path" />
+            </router-view>
+          </div>
+        </div>
+        <router-view v-else />
       </main>
 
       <AgentAnnouncer />
@@ -34,14 +45,16 @@
 </template>
 
 <script setup>
-// The agent workspace frame: a fixed, full-viewport grid with the sidebar
-// (docked or a drawer) and the routed page. The router-view is neither keyed
-// nor wrapped in a transition, so a chat page survives /agent -> /agent/c/:id
-// and its stream keeps running; streams live in the store either way.
+// The frame of every signed-in page: a fixed, full-viewport grid with the
+// sidebar (docked or a drawer) and the routed page. Agent pages render as
+// they are: that router-view is neither keyed nor wrapped in a transition,
+// so a chat page survives /agent -> /agent/c/:id and its stream keeps
+// running; streams live in the store either way. Analytics and settings
+// pages (route meta.analytics / meta.settings) render in the page area.
 import '@/assets/agent/tokens.css'
 import '@/assets/agent/base.css'
 import '@/assets/agent/portal.css'
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -51,6 +64,8 @@ import AgentSidebar from '@/components/agent/sidebar/AgentSidebar.vue'
 import AgDrawer from '@/components/agent/common/AgDrawer.vue'
 import AgentAnnouncer from '@/components/agent/common/AgentAnnouncer.vue'
 import ShortcutsDialog from '@/components/agent/common/ShortcutsDialog.vue'
+import WorkspacePageBar from '@/components/agent/workspace/WorkspacePageBar.vue'
+import { rememberAnalyticsSection, rememberSidebarSide, sectionLabel } from '@/lib/analyticsNav'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentUiStore } from '@/stores/agentUi'
 import { useAppStore } from '@/stores/app'
@@ -66,7 +81,7 @@ const agent = useAgentStore()
 const ui = useAgentUiStore()
 const mainEl = ref(null)
 
-// fetchMe, the website list and plan limits on mount, shared with AppShell.
+// fetchMe, the website list and plan limits on mount.
 useShellBootstrap()
 ensureAgentFont()
 useAgentHotkeys()
@@ -118,6 +133,58 @@ watch(
     if (value) document.title = value
   },
   { immediate: true },
+)
+
+/* ── Analytics and settings pages ── */
+
+const isPage = computed(() => Boolean(route.meta?.analytics || route.meta?.settings))
+const pageBarTitle = computed(() =>
+  route.meta?.settings ? 'Settings' : `Analytics · ${sectionLabel(route.meta?.analytics)}`,
+)
+
+// The tab last used per project, for the Analytics switch.
+watch(
+  () => [route.meta?.analytics, websiteId.value],
+  ([key, wid]) => {
+    if (key && wid) rememberAnalyticsSection(wid, key)
+  },
+  { immediate: true },
+)
+
+// The side last used, for routes of neither side (Settings).
+watch(
+  () => (route.meta?.analytics ? 'analytics' : String(route.name || '').startsWith('agent') ? 'agent' : ''),
+  (side) => {
+    if (side) rememberSidebarSide(side)
+  },
+  { immediate: true },
+)
+
+function scrollToHash(hash) {
+  let target = null
+  try {
+    target = document.getElementById(decodeURIComponent(hash.slice(1)))
+  } catch {
+    // Not a valid anchor: nothing to scroll to.
+  }
+  if (target && mainEl.value?.contains(target)) target.scrollIntoView({ block: 'start' })
+}
+
+// The document no longer scrolls (the body is locked), so the router's
+// scrollBehavior does nothing here and the kept <main> would carry one
+// page's scroll into the next: a new page starts at the top, a hash
+// scrolls its target into view, a filter (query) change keeps the place.
+watch(
+  () => [route.path, route.hash],
+  ([path, hash], before) => {
+    if (!isPage.value) return
+    const [prevPath, prevHash] = before || []
+    if (path === prevPath && hash === prevHash) return
+    nextTick(() => {
+      if (hash) scrollToHash(hash)
+      else if (path !== prevPath && mainEl.value) mainEl.value.scrollTop = 0
+    })
+  },
 )
 
 function focusMain() {
@@ -179,6 +246,38 @@ function focusMain() {
   min-height: 0;
 }
 
+/* Analytics and settings pages scroll in <main>, on the main app's surface. */
+.ag-shell-main.is-page {
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-family);
+  font-feature-settings: normal;
+  line-height: 1.6;
+}
+
+.ag-shell-main.is-page > .ws-page {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.ws-page-body {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+@media (max-width: 767px) {
+  .ws-page-body {
+    padding: 16px;
+  }
+}
+
 .ag-skip {
   position: absolute;
   top: 8px;
@@ -204,5 +303,25 @@ function focusMain() {
   .ag-root.is-docked {
     transition: none;
   }
+}
+</style>
+
+<!-- Unscoped on purpose: the agent base layer (assets/agent/base.css) gives
+     every link and focus ring inside the shell the agent look; the pages of
+     the page area keep the main app's (assets/css/base.css). :where() keeps
+     these at the specificity of the rules they replace, so a page's own
+     classes still win. -->
+<style>
+:where(.ag-shell-main.is-page) a {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+:where(.ag-shell-main.is-page) a:hover {
+  opacity: 0.7;
+}
+
+:where(.ag-shell-main.is-page) :focus-visible {
+  outline-color: var(--brand-accent, #7232e0);
 }
 </style>

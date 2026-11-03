@@ -1,6 +1,6 @@
 <script setup>
 // Project switcher and account menu: organisation, projects, add project,
-// project settings, appearance, account, billing, sign out.
+// project settings, appearance, account, usage dashboard, billing, sign out.
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ChevronsUpDown,
   CreditCard,
+  Gauge,
   LogOut,
   Monitor,
   Moon,
@@ -158,6 +159,10 @@ async function signOut() {
       <AgMenuItem @select="router.push('/settings')">
         <UserRound aria-hidden="true" />
         Account
+      </AgMenuItem>
+      <AgMenuItem @select="router.push({ name: 'settings-command-center' })">
+        <Gauge aria-hidden="true" />
+        Usage dashboard
       </AgMenuItem>
       <AgMenuItem @select="router.push('/billing')">
         <CreditCard aria-hidden="true" />

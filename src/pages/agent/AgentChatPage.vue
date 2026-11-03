@@ -2,6 +2,7 @@
   <AgentWorkspaceSplit class="ag-chat-page">
     <template #chat>
       <ChatPane
+        ref="chatPane"
         :key="chatPaneKey"
         :website-id="websiteId"
         :chat-id="chatId || null"
@@ -10,6 +11,14 @@
         :pane-dom-id="PANE_PANEL_ID"
         @created="onCreated"
       />
+      <!-- "Drafted from {tab}": shown above the composer, placed inside the
+           chat column's composer dock once it is there. -->
+      <Teleport v-if="draftNotice" :to="noticeTarget" :disabled="!noticeTarget">
+        <div class="ag-drafted" :class="{ 'is-docked': noticeTarget }" role="status">
+          <p class="ag-drafted-line">{{ draftNotice.line }}</p>
+          <p v-if="draftNotice.limits" class="ag-drafted-limits">{{ draftNotice.limits }}</p>
+        </div>
+      </Teleport>
       <AgConfirmDialog
         v-model:open="firstResearchOpen"
         title="Run your first research?"
@@ -42,16 +51,25 @@
 // The first research from onboarding waits in useFirstResearch. A new chat
 // opened with ?start=first-research sends it at once with the research
 // agent; without the query (after the paywall, say) the page offers it.
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+//
+// Ask the agent (lib/agent/askAgent.js) saves a drafted message as the new
+// chat's draft and opens it with ?from=<tab>: the chat column mounts again
+// so its composer reads the draft, the composer gets focus, and a status
+// line says where the draft came from and what a reply may spend, until
+// the user sends or leaves. Nothing is sent by itself.
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AgentWorkspaceSplit from '@/components/agent/workspace/AgentWorkspaceSplit.vue'
 import BrowserPane from '@/components/agent/browser/BrowserPane.vue'
 import ChatPane from '@/components/agent/chat/ChatPane.vue'
 import AgConfirmDialog from '@/components/agent/common/AgConfirmDialog.vue'
 import { PANE_PANEL_ID } from '@/components/agent/browser/ids'
+import { pathMessages } from '@/components/agent/chat/thread'
 import { errorInfo } from '@/components/agent/message/parts'
 import { useFirstResearch } from '@/composables/agent/useFirstResearch'
 import { useToast } from '@/composables/useToast'
+import { ASK_FROM_LABELS } from '@/lib/agent/askAgent'
+import { writerUnavailable } from '@/lib/agent/agentsMeta'
 import { saveDraft } from '@/lib/agent/storage'
 import { AGENT_KEY_LIST, NEW_CHAT_KEY } from '@/lib/agent/types'
 import { useAgentStore } from '@/stores/agent'
@@ -178,6 +196,84 @@ function onCreated(chatId) {
   router.replace({ name: 'agent-chat', params: { websiteId: String(props.websiteId), chatId: String(chatId) } })
 }
 
+/* ── A draft handed over by Ask the agent (?from=<tab>) ── */
+
+// The tab the shown draft came from, or '' when there is no notice.
+const draftFrom = ref('')
+const chatPane = ref(null)
+const noticeTarget = ref(null)
+
+function usd(value) {
+  const n = Number(value)
+  if (value === null || value === undefined || value === '' || !Number.isFinite(n)) return ''
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// "Drafted from Pages. Review it, then send." and, muted, what one reply may
+// spend (GET status/ limits and allowance; cap 0 = unlimited), plus why the
+// preselected writer cannot start when the allowance does not cover it.
+const draftNotice = computed(() => {
+  if (!draftFrom.value) return null
+  const status = store.status || null
+  const parts = []
+  const cap = usd(status?.limits?.run_cost_usd)
+  if (cap) {
+    parts.push(`A reply stops once it has used ${cap} of AI allowance; the request already running finishes.`)
+    const capUsd = Number(status?.allowance?.cap_usd)
+    const spent = Number(status?.allowance?.spent_usd)
+    if (capUsd > 0 && Number.isFinite(spent)) parts.push(`${usd(Math.max(0, capUsd - spent))} left this month.`)
+  }
+  const unavailable = initialAgent.value ? writerUnavailable(initialAgent.value, status) : ''
+  if (unavailable) parts.push(unavailable)
+  return {
+    line: `Drafted from ${ASK_FROM_LABELS[draftFrom.value]}. Review it, then send.`,
+    limits: parts.join(' '),
+  }
+})
+
+// Place the notice in the chat column's composer dock, right above the
+// composer; until the dock is there it renders after the chat column.
+async function placeNotice() {
+  await nextTick()
+  const root = chatPane.value?.$el
+  noticeTarget.value = (root && typeof root.querySelector === 'function' && root.querySelector('.ag-dock-inner')) || null
+}
+
+function clearDraftNotice() {
+  draftFrom.value = ''
+  noticeTarget.value = null
+}
+
+watch(
+  () => route.query.from,
+  (from) => {
+    if (typeof from !== 'string' || !from) return
+    if (!props.chatId && Object.prototype.hasOwnProperty.call(ASK_FROM_LABELS, from)) {
+      draftFrom.value = from
+      // Mount the chat column again: its composer reads the saved draft on mount.
+      chatPaneKey.value += 1
+      ui.focusComposer()
+      placeNotice()
+    }
+    dropQuery('from')
+  },
+  { immediate: true }
+)
+
+// The notice stays for this visit of the new chat: sending (the first
+// message shows in the thread), a chat id or another project ends it.
+watch(
+  () => [props.chatId || '', props.websiteId, pathMessages(store, 'new').length > 0],
+  ([cid, , sent], before) => {
+    if (!draftFrom.value) return
+    if (cid || sent || (before && before[1] !== props.websiteId)) clearDraftNotice()
+  }
+)
+
+watch(chatPaneKey, () => {
+  if (draftFrom.value) placeNotice()
+})
+
 /* ── First research (from onboarding) ── */
 
 const firstResearchOpen = ref(false)
@@ -276,6 +372,39 @@ onBeforeUnmount(() => {
 .ag-chat-page {
   height: 100%;
   min-height: 0;
+}
+
+/* The drafted-from notice sits in the composer dock, before the banner and
+   the composer. Browsers without :has() show it under the composer. */
+.ag-chat-page :deep(.ag-dock-inner:has(> .ag-drafted)) {
+  display: flex;
+  flex-direction: column;
+}
+
+.ag-drafted {
+  margin: 0 16px 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--ag-card-border);
+  border-radius: 12px;
+  background: var(--ag-composer-bg);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.ag-drafted.is-docked {
+  order: -1;
+  margin: 0 0 8px;
+}
+
+.ag-drafted-line {
+  margin: 0;
+  color: var(--ag-fg-1);
+  font-weight: 500;
+}
+
+.ag-drafted-limits {
+  margin: 2px 0 0;
+  color: var(--ag-fg-3);
 }
 
 .ag-first-research-prompts {

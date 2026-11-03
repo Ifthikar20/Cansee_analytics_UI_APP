@@ -1,9 +1,14 @@
 import { isNavigationFailure, useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { ANALYTICS_SECTIONS } from '@/lib/analyticsNav'
 
-// Switching project from the agent workspace. Project-scoped list pages keep
-// their section; a chat, an artifact or the projects list land on the new
-// project's agent home, because chats and artifacts belong to one project.
+// Switching project from the workspace sidebar. Project-scoped list pages
+// keep their section; a chat, an artifact or the projects list land on the
+// new project's agent home, because chats and artifacts belong to one
+// project. An analytics tab stays the same tab for the new project; a
+// prompt's page and a source's detail belong to the old project's records,
+// so they fall back to their tab, and the query keys that name records of
+// one project are dropped. The Overview and Settings stay where they are.
 //
 // Navigation comes first: the router makes the project active once the
 // navigation is confirmed, and the shell's agent.init(newId) resets the old
@@ -13,10 +18,44 @@ import { useAppStore } from '@/stores/app'
 
 const KEEP_SECTION = new Set(['agent-context', 'agent-agents', 'agent-reports', 'agent-documents', 'agent-sheets'])
 
-export function projectTarget(routeName, websiteId) {
+// Analytics tabs addressed by a project (the Overview follows the active project).
+const ANALYTICS_PROJECT_ROUTES = new Set(
+  ANALYTICS_SECTIONS.flatMap((s) => s.match).filter((name) => name !== 'dashboard'),
+)
+const ANALYTICS_FALLBACK = Object.freeze({ prompt: { name: 'dashboard' }, 'sources-url-detail': { name: 'sources-urls' } })
+
+// Routes without a project in the URL that stay as they are.
+const STAY = new Set([
+  'dashboard',
+  'settings',
+  'settings-project',
+  'settings-connections',
+  'settings-brand-facts',
+  'settings-command-center',
+  'billing',
+])
+
+// Filters that name records of one project; they do not carry over.
+export const PROJECT_QUERY_KEYS = Object.freeze(['prompt', 'check', 'product', 'verdict', 'topic', 'filter'])
+
+function carriedQuery(query) {
+  const out = { ...(query || {}) }
+  for (const key of PROJECT_QUERY_KEYS) delete out[key]
+  return out
+}
+
+/**
+ * Where switching to `websiteId` goes from route `routeName`, or null when
+ * the page stays as it is (the Overview, Settings, Billing).
+ */
+export function projectTarget(routeName, websiteId, query = {}) {
   const name = String(routeName || '')
   const params = { websiteId: String(websiteId) }
+  if (STAY.has(name)) return null
   if (KEEP_SECTION.has(name)) return { name, params }
+  const fallback = ANALYTICS_FALLBACK[name]
+  if (fallback) return fallback.name === 'dashboard' ? { name: 'dashboard' } : { name: fallback.name, params }
+  if (ANALYTICS_PROJECT_ROUTES.has(name)) return { name, params, query: carriedQuery(query) }
   return { name: 'agent-home', params }
 }
 
@@ -31,18 +70,27 @@ export function useProjectSwitch() {
   }
 
   /**
-   * Navigate into `websiteId`. Resolves true when the navigation happened,
-   * false for an unknown id, the project already open on a project page, or
-   * a navigation a guard cancelled.
+   * Switch to `websiteId`. Resolves true when the project changed (by a
+   * navigation, or in place on a page without a project in its URL), false
+   * for an unknown id, the project already open, or a navigation a guard
+   * cancelled.
    */
   async function switchProject(websiteId) {
     const id = websiteId === undefined || websiteId === null ? '' : String(websiteId)
     const website = app.websites.find((w) => String(w.id) === id)
     if (!website) return false
     if (route.params?.websiteId && currentProjectId() === id) return false
+    const target = route.meta?.settings ? null : projectTarget(route.name, id, route.query)
+    if (!target) {
+      // Nothing to navigate to: a push to the route already shown would be a
+      // duplicated navigation, so the project changes in place.
+      if (String(app.activeWebsite?.id ?? '') === id) return false
+      app.setActiveWebsite(website)
+      return true
+    }
     let result
     try {
-      result = await router.push(projectTarget(route.name, id))
+      result = await router.push(target)
     } catch {
       return false
     }

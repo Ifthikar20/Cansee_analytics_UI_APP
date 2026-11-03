@@ -25,10 +25,9 @@ vi.mock('@/api/agent', () => ({
         listVersions: vi.fn(),
         getVersion: vi.fn(),
         saveReport: vi.fn(),
-        getContext: vi.fn(),
-        putContext: vi.fn(),
         suggestions: vi.fn(),
         activity: vi.fn(),
+        listReviews: vi.fn(),
         getSwarm: vi.fn(),
         getSwarmVersion: vi.fn(),
         sendMessage: vi.fn(),
@@ -264,31 +263,45 @@ describe('agent store: loading', () => {
         expect(agentApi.listChats).toHaveBeenCalledTimes(1)
     })
 
-    it('context calls refuse a project the store is not on', async () => {
-        await initProject()
-        agentApi.putContext.mockResolvedValue(ok({ audience: 'Alpha', revision: 1 }))
-        await expect(store.saveContext({ audience: 'Alpha' }, { websiteId: '6' })).rejects.toMatchObject({
-            code: 'project_changed',
-        })
-        await expect(store.loadContext({ websiteId: '6' })).rejects.toMatchObject({ code: 'project_changed' })
-        expect(agentApi.putContext).not.toHaveBeenCalled()
-        expect(agentApi.getContext).not.toHaveBeenCalled()
-
-        await store.saveContext({ audience: 'Alpha' }, { websiteId: '5' })
-        expect(agentApi.putContext).toHaveBeenCalledWith('5', expect.objectContaining({ audience: 'Alpha' }), {
-            _silentError: true,
-        })
+    it('keeps no brand context of its own: the Context page reads and writes it', () => {
+        expect(store.context).toBeUndefined()
+        expect(store.loadContext).toBeUndefined()
+        expect(store.saveContext).toBeUndefined()
     })
 
-    it('an unscoped store takes the project the page names over the active website', async () => {
-        useAppStore().setActiveWebsite({ id: 6, name: 'Other' })
-        agentApi.status.mockResolvedValue(ok({ enabled: true }))
-        agentApi.listChats.mockResolvedValue(ok({ results: [], next_cursor: null }))
-        agentApi.agents.mockResolvedValue(ok([]))
-        agentApi.getContext.mockResolvedValue(ok({ revision: 0 }))
-        await store.loadContext({ websiteId: '5' })
-        expect(store.websiteId).toBe('5')
-        expect(agentApi.getContext).toHaveBeenCalledWith('5', { _silentError: true })
+    it('loads the review count with the activity and drops it on a project switch', async () => {
+        await initProject()
+        agentApi.activity.mockResolvedValue(ok([{ type: 'run_completed', at: '2026-11-02T10:00:00Z', chat_id: CHAT_ID }]))
+        agentApi.listReviews.mockResolvedValue(ok([{ id: 'a1' }, { id: 'a2' }]))
+        await store.loadActivity()
+        await flush()
+        expect(agentApi.listReviews).toHaveBeenCalledWith('5', 'waiting')
+        expect(store.reviewsWaiting).toBe(2)
+
+        // A failed count is unknown, never zero.
+        agentApi.listReviews.mockRejectedValueOnce(axiosError(500, { code: 'server_error', message: 'Down.' }))
+        await store.loadActivity()
+        await flush()
+        expect(store.reviewsWaiting).toBeNull()
+
+        agentApi.listReviews.mockResolvedValue(ok([]))
+        await store.loadReviewsWaiting()
+        expect(store.reviewsWaiting).toBe(0)
+        store.resetProjectScope()
+        expect(store.reviewsWaiting).toBeNull()
+    })
+
+    it('follows a review action on the artifact it knows', async () => {
+        await initProject()
+        agentApi.getArtifact.mockResolvedValue(
+            ok({ id: 'a1', kind: 'document', title: 'Draft', latest_version: 2, version: 2, content: '# Draft', review: { state: 'draft', effective_state: 'draft', version: 0, reviewer_name: '', updated_at: null } })
+        )
+        await store.loadArtifact('a1')
+        store.setArtifactReview('a1', { state: 'approved', effective_state: 'approved', version: 2, reviewer_name: 'Ana' })
+        expect(store.artifact('a1').review).toMatchObject({ state: 'approved', effective_state: 'approved', version: 2 })
+        // An artifact the store has not loaded is left alone.
+        store.setArtifactReview('zz', { state: 'approved' })
+        expect(store.artifacts.zz).toBeUndefined()
     })
 
     it('openChat keeps a 404 out of the last-chat memory', async () => {

@@ -3,11 +3,12 @@
  * Sources > URLs — the AI answer sources page.
  *
  * Every row is a web page an AI assistant pulled up while answering the
- * prompts this brand tracks. The page tells that story in order: what
- * happened (header facts), what to do about it (opportunities), then the
- * evidence (retrievals chart, movers, types, and the URL table with
- * Google clicks for the brand's own pages). Every metric has a tooltip
- * definition; there are no dead controls.
+ * prompts this brand tracks. The page tells that story in order: citation
+ * analytics (which sources the engines list, and where you and your
+ * competitors are cited), what happened (header facts), what to do about
+ * it (opportunities), then the evidence (retrievals chart, movers, types,
+ * and the URL table with Google clicks for the brand's own pages). Every
+ * metric has a tooltip definition; there are no dead controls.
  */
 import { ENGINES, engineMeta } from '@/lib/engines'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
@@ -26,6 +27,7 @@ import {
   Card, CardHeader, CardContent,
 } from '@/components/ui/card'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import CitationAnalytics from '@/components/analytics/CitationAnalytics.vue'
 import VizChart from '@/components/charts/VizChart.vue'
 import MetricInfo from '@/components/sources/MetricInfo.vue'
 import OpportunitiesRow from '@/components/sources/OpportunitiesRow.vue'
@@ -358,6 +360,9 @@ const headerFacts = computed(() => {
         <span class="font-semibold text-foreground">URLs</span>
       </div>
     </div>
+
+    <!-- ── Citation analytics: its own period and engine filters ── -->
+    <CitationAnalytics v-if="websiteId" :website-id="String(websiteId)" />
 
     <!-- ── Header strip: what this page is ── -->
     <div>

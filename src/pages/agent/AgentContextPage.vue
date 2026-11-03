@@ -1,34 +1,37 @@
 <script setup>
-// Brand context every agent writes with: audience, voice, offerings and
-// rules. Saves with the context's revision; a stale revision means someone
-// else saved first, and the page offers to reload. Leaving with unsaved
-// edits asks first.
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+// The Context Manager (p2_contract.md 11): what the agents know about the
+// project in six sections, each entry with the sources it comes from, plus
+// documents people add. Build from my site reads the site and suggests
+// entries a person accepts; the agents use active entries only. Leaving
+// with an unsaved entry form asks first.
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
-import { Plus, RotateCcw, X } from '@lucide/vue'
-import { useAgentStore } from '@/stores/agent'
-import { useAgentUiStore } from '@/stores/agentUi'
+import { Check, FilePlus, Hammer } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
+import { useAgentUiStore } from '@/stores/agentUi'
 import { useToast } from '@/composables/useToast'
+import { useBrandContext } from '@/composables/agent/useBrandContext'
+import { useInsightRun } from '@/composables/analytics/useInsightRun'
 import AgPage from '@/components/agent/common/AgPage.vue'
 import AgButton from '@/components/agent/common/AgButton.vue'
 import AgConfirmDialog from '@/components/agent/common/AgConfirmDialog.vue'
 import AgEmptyState from '@/components/agent/common/AgEmptyState.vue'
-import AgIconButton from '@/components/agent/common/AgIconButton.vue'
 import AgSpinner from '@/components/agent/common/AgSpinner.vue'
+import AgTooltip from '@/components/agent/common/AgTooltip.vue'
 import { IconContext } from '@/components/agent/icons'
-import { errorCode, errorMessage, errorStatus, relativeTime } from '@/components/agent/common/agentText'
+import ContextBuildDialog from '@/components/agent/context/ContextBuildDialog.vue'
+import ContextBuildProgress from '@/components/agent/context/ContextBuildProgress.vue'
+import ContextDocumentDialog from '@/components/agent/context/ContextDocumentDialog.vue'
+import ContextDocuments from '@/components/agent/context/ContextDocuments.vue'
+import ContextEntryForm from '@/components/agent/context/ContextEntryForm.vue'
+import ContextSection from '@/components/agent/context/ContextSection.vue'
+import ContextSectionNav from '@/components/agent/context/ContextSectionNav.vue'
+import ReferencePicker from '@/components/agent/context/ReferencePicker.vue'
+import { CONTEXT_LIMITS, contextSections, domainOf, plural } from '@/lib/agent/contextSections'
 
-// Same caps as the backend's BrandContextWriteSerializer.
-const LIMITS = {
-  audience: 4000,
-  voice: 2000,
-  offeringName: 120,
-  offeringDescription: 1000,
-  offeringUrl: 500,
-  offerings: 20,
-  rule: 500,
-  rules: 30,
+const BUILD_REASONS = {
+  insights_disabled: "Building from your site isn't available on this server.",
+  ai_not_configured: "The analysis model isn't configured on this server.",
 }
 
 const props = defineProps({
@@ -37,205 +40,280 @@ const props = defineProps({
 
 const route = useRoute()
 const router = useRouter()
-const agent = useAgentStore()
-const ui = useAgentUiStore()
 const app = useAppStore()
+const ui = useAgentUiStore()
 const toast = useToast()
 
 const wid = computed(() => props.websiteId || (route.params?.websiteId ? String(route.params.websiteId) : null))
-const projectName = computed(
-  () => app.websites.find((w) => String(w.id) === wid.value)?.name || app.activeWebsite?.name || 'this project',
+const website = computed(() => app.websites.find((w) => String(w.id) === wid.value) || null)
+const projectName = computed(() => website.value?.name || app.activeWebsite?.name || 'this project')
+const domain = computed(() => domainOf(website.value?.url || ''))
+
+const ctx = useBrandContext(wid)
+const builder = useInsightRun('context_build', {
+  websiteId: wid,
+  onFinished: () => ctx.reload({ quiet: true }),
+})
+
+const overview = computed(() => ctx.overview.value)
+const canEdit = computed(() => ctx.canEdit.value)
+const sections = computed(() => contextSections(overview.value?.sections))
+const entries = computed(() => ctx.entries.value)
+const documents = computed(() => ctx.documents.value)
+const competitors = computed(() => (Array.isArray(overview.value?.competitors) ? overview.value.competitors : []))
+const totals = computed(() => overview.value?.totals || {})
+const suggested = computed(() => entries.value.filter((e) => e.status === 'suggested'))
+const empty = computed(() => Boolean(overview.value) && !entries.value.length)
+
+const buildInfo = computed(() => overview.value?.build || null)
+const buildAvailable = computed(() => buildInfo.value?.available !== false)
+const buildReason = computed(() => BUILD_REASONS[buildInfo.value?.reason] || '')
+
+// A build running (from another tab or an earlier visit) shows its progress
+// even before the run options answer.
+watch(
+  () => buildInfo.value?.active_run,
+  (active) => {
+    if (active && !builder.run.value) builder.track(active)
+  },
 )
 
-const status = ref('loading')
-const loadError = ref('')
-const saving = ref(false)
-const saveError = ref('')
-const conflict = ref(false)
-const fieldErrors = ref({})
-const revision = ref(0)
-const updatedAt = ref('')
-const updatedBy = ref('')
+const intro = computed(
+  () =>
+    `What the agents know about ${projectName.value}, and where each piece comes from. Agents use active entries; suggestions wait for you.`,
+)
 
-const form = reactive({ audience: '', voice: '', offerings: [], rules: [] })
-const baseline = ref('')
-let rowSeq = 0
-
-function nextKey() {
-  rowSeq += 1
-  return `row-${rowSeq}`
+function entriesOf(key) {
+  return entries.value.filter((e) => e.section === key)
 }
 
-function snapshot() {
-  return JSON.stringify({
-    audience: form.audience,
-    voice: form.voice,
-    offerings: form.offerings.map(({ name, description, url }) => ({ name, description, url })),
-    rules: form.rules.map((r) => r.text),
-  })
+/* ── Loading ── */
+
+const status = computed(() => {
+  if (overview.value) return 'ready'
+  if (ctx.error.value) return 'error'
+  return 'loading'
+})
+
+/* ── Entry forms (one open at a time) ── */
+
+// {id: entry id | 'new', section}
+const editing = ref(null)
+const formDirty = ref(false)
+
+function closeForm() {
+  editing.value = null
+  formDirty.value = false
 }
 
-const dirty = computed(() => status.value === 'ready' && snapshot() !== baseline.value)
+// Another project: its context replaces this one, and no form stays open.
+watch(
+  wid,
+  (id) => {
+    closeForm()
+    if (id) ctx.reload()
+  },
+  { immediate: true },
+)
 
-function adopt(ctx) {
-  const data = ctx && typeof ctx === 'object' ? ctx : {}
-  form.audience = typeof data.audience === 'string' ? data.audience : ''
-  form.voice = typeof data.voice === 'string' ? data.voice : ''
-  form.offerings = (Array.isArray(data.offerings) ? data.offerings : [])
-    .filter((o) => o && typeof o === 'object')
-    .map((o) => ({
-      key: nextKey(),
-      name: String(o.name ?? ''),
-      description: String(o.description ?? ''),
-      url: String(o.url ?? ''),
-    }))
-  form.rules = (Array.isArray(data.rules) ? data.rules : [])
-    .filter((r) => typeof r === 'string')
-    .map((text) => ({ key: nextKey(), text }))
-  revision.value = Number.isFinite(Number(data.revision)) ? Number(data.revision) : 0
-  updatedAt.value = data.updated_at || ''
-  updatedBy.value = data.updated_by_name || ''
-  baseline.value = snapshot()
-  fieldErrors.value = {}
-  conflict.value = false
-  saveError.value = ''
-}
-
-// Loads and saves name the page's own project, so the store never reads or
-// writes another project's context for this form, and an answer that comes
-// back after the page moved to another project is dropped.
-async function load() {
-  const id = wid.value
-  if (!id || typeof agent.loadContext !== 'function') return
-  status.value = 'loading'
-  loadError.value = ''
-  try {
-    const ctx = await agent.loadContext({ websiteId: id })
-    if (wid.value !== id) return
-    adopt(ctx ?? agent.context)
-    status.value = 'ready'
-  } catch (err) {
-    if (wid.value !== id) return
-    loadError.value = errorMessage(err, "Couldn't load the context.")
-    status.value = 'error'
-  }
-}
-
-/* ── Editing ── */
-
-function addOffering() {
-  if (form.offerings.length >= LIMITS.offerings) return
-  const row = { key: nextKey(), name: '', description: '', url: '' }
-  form.offerings.push(row)
-  nextTick(() => document.getElementById(`${row.key}-name`)?.focus())
-}
-
-function removeOffering(index) {
-  form.offerings.splice(index, 1)
-}
-
-/** Add an empty rule (after `afterIndex` when given) and focus it. */
-function addRule(afterIndex) {
-  if (form.rules.length >= LIMITS.rules) return
-  const at = Number.isInteger(afterIndex) ? afterIndex + 1 : form.rules.length
-  if (Number.isInteger(afterIndex) && !form.rules[afterIndex]?.text.trim()) return
-  const row = { key: nextKey(), text: '' }
-  form.rules.splice(at, 0, row)
-  nextTick(() => document.getElementById(`${row.key}-text`)?.focus())
-}
-
-function removeRule(index) {
-  form.rules.splice(index, 1)
-}
-
-function discard() {
-  const saved = JSON.parse(baseline.value || '{}')
-  adopt({ ...saved, revision: revision.value, updated_at: updatedAt.value, updated_by_name: updatedBy.value })
-}
-
-/* ── Saving ── */
-
-function normalizeUrl(raw) {
-  const value = String(raw || '').trim()
-  if (!value) return { value: '' }
-  if (/^https?:\/\//i.test(value)) return { value }
-  if (/^[a-z0-9.-]+\.[a-z]{2,}(\/\S*)?$/i.test(value)) return { value: `https://${value}` }
-  return { error: 'Use a full web address, like https://…' }
-}
-
-function validate() {
-  const errors = {}
-  const offerings = []
-  form.offerings.forEach((o, index) => {
-    const name = o.name.trim()
-    const description = o.description.trim()
-    const url = normalizeUrl(o.url)
-    if (!name && !description && !url.value && !url.error) return
-    if (!name) errors[`offering-${o.key}-name`] = 'Give this offering a name.'
-    if (url.error) errors[`offering-${o.key}-url`] = url.error
-    offerings.push({ name, description, url: url.value || '', index })
-  })
-  const rules = form.rules.map((r) => r.text.trim()).filter(Boolean)
-  fieldErrors.value = errors
-  return { ok: Object.keys(errors).length === 0, offerings, rules }
-}
-
-async function save() {
-  if (saving.value || status.value !== 'ready') return
-  saveError.value = ''
-  const { ok, offerings, rules } = validate()
-  if (!ok) {
-    saveError.value = 'Fix the highlighted fields, then save again.'
-    ui.announce(saveError.value, 'assertive')
+function guardForm(next) {
+  if (!formDirty.value) {
+    next()
     return
   }
-  const id = wid.value
-  saving.value = true
+  pendingAction = next
+  leaveOpen.value = true
+}
+
+function startAdd(sectionKey = 'company') {
+  guardForm(() => {
+    editing.value = { id: 'new', section: sectionKey }
+    formDirty.value = false
+    nextTick(() => document.getElementById(`ctx-${sectionKey}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
+  })
+}
+
+function startEdit(entry) {
+  guardForm(() => {
+    editing.value = { id: entry.id, section: entry.section }
+    formDirty.value = false
+  })
+}
+
+function editingIn(key) {
+  const e = editing.value
+  if (!e) return ''
+  if (e.id === 'new') return e.section === key ? 'new' : ''
+  return entriesOf(key).some((x) => x.id === e.id) ? e.id : ''
+}
+
+async function saveForm(entry, fields, changes) {
+  const saved = await ctx.saveEntry(entry, fields, changes)
+  ui.announce(entry ? 'Entry saved' : 'Entry added')
+  return saved
+}
+
+async function reloadConflict(entry) {
+  await ctx.resolveConflict(entry.id)
+  // Their version replaces the form.
+  closeForm()
+}
+
+/* ── Suggestions ── */
+
+const busyIds = ref([])
+
+async function decide(entry, accept) {
+  busyIds.value = [...busyIds.value, entry.id]
   try {
-    const saved = await agent.saveContext(
-      {
-        audience: form.audience.trim(),
-        voice: form.voice.trim(),
-        offerings: offerings.map(({ name, description, url }) => ({ name, description, url })),
-        rules,
-        revision: revision.value,
-      },
-      { websiteId: id },
-    )
-    if (wid.value === id) adopt(saved ?? agent.context)
-    toast.success('Context saved')
-    ui.announce('Context saved')
+    await ctx.review(accept ? { accept: [entry.id] } : { dismiss: [entry.id] })
+    ui.announce(accept ? 'Suggestion accepted' : 'Suggestion dismissed')
   } catch (err) {
-    if (wid.value !== id) return
-    if (errorCode(err) === 'revision_conflict' || errorStatus(err) === 409) {
-      conflict.value = true
-      ui.announce('Someone else saved this context first.', 'assertive')
-    } else {
-      saveError.value = errorMessage(err, "Couldn't save the context. Try again.")
-      ui.announce(saveError.value, 'assertive')
-    }
+    toast.error(err?.message || "Couldn't update the suggestions. Try again.")
   } finally {
-    saving.value = false
+    busyIds.value = busyIds.value.filter((id) => id !== entry.id)
   }
 }
 
-function onKeydown(event) {
-  const mod = event.metaKey || event.ctrlKey
-  if (mod && !event.altKey && !event.shiftKey && String(event.key).toLowerCase() === 's') {
-    event.preventDefault()
-    save()
+const acceptingAll = ref(false)
+
+async function acceptAll() {
+  if (acceptingAll.value || !suggested.value.length) return
+  acceptingAll.value = true
+  try {
+    await ctx.review({ accept: suggested.value.map((e) => e.id) })
+    ui.announce('Suggestions accepted')
+  } catch (err) {
+    toast.error(err?.message || "Couldn't update the suggestions. Try again.")
+  } finally {
+    acceptingAll.value = false
   }
 }
 
-/* ── Leaving with unsaved edits ── */
+function reviewFirst() {
+  const first = suggested.value[0]
+  if (!first) return
+  const el = document.querySelector(`[data-entry="${first.id}"]`)
+  if (!el) return
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  const button = el.querySelector('button')
+  if (button) button.focus({ preventScroll: true })
+}
+
+const suggestionLine = computed(() => {
+  const n = Number(totals.value.suggested) || suggested.value.length
+  return n === 1 ? '1 suggestion waits for your review.' : `${plural(n, 'suggestion', 'suggestions')} wait for your review.`
+})
+
+/* ── Sources added from an entry's menu ── */
+
+const pickerEntry = ref(null)
+const pickerOpen = ref(false)
+const pickerBusy = ref(false)
+const pickerError = ref('')
+
+function openPicker(entry) {
+  pickerEntry.value = entry
+  pickerError.value = ''
+  pickerOpen.value = true
+}
+
+async function addSource({ input }) {
+  if (!pickerEntry.value || pickerBusy.value) return
+  pickerBusy.value = true
+  pickerError.value = ''
+  try {
+    await ctx.addReference(pickerEntry.value, input)
+    pickerOpen.value = false
+    ui.announce('Source added')
+  } catch (err) {
+    pickerError.value = err?.message || "Couldn't add the source. Try again."
+  } finally {
+    pickerBusy.value = false
+  }
+}
+
+/* ── Deleting (entries and documents) ── */
+
+// {type: 'entry' | 'document', target}
+const deleting = ref(null)
+const deleteOpen = ref(false)
+const deleteBusy = ref(false)
+const deleteError = ref('')
+
+const deleteCopy = computed(() => {
+  const d = deleting.value
+  if (d?.type === 'document') {
+    return {
+      title: `Delete ${d.target.title || 'this document'}?`,
+      description: 'Entries that cite it lose that source; their text stays.',
+    }
+  }
+  return { title: 'Delete this entry?', description: 'The agents stop using it.' }
+})
+
+function askDelete(type, target) {
+  deleting.value = { type, target }
+  deleteError.value = ''
+  deleteOpen.value = true
+}
+
+async function confirmDelete() {
+  const d = deleting.value
+  if (!d || deleteBusy.value) return
+  deleteBusy.value = true
+  deleteError.value = ''
+  try {
+    if (d.type === 'document') await ctx.deleteDocument(d.target.id)
+    else await ctx.deleteEntry(d.target)
+    deleteOpen.value = false
+    ui.announce(d.type === 'document' ? 'Document deleted' : 'Entry deleted')
+  } catch (err) {
+    deleteError.value = err?.message || "Couldn't delete it. Try again."
+  } finally {
+    deleteBusy.value = false
+  }
+}
+
+/* ── Documents ── */
+
+const documentOpen = ref(false)
+const documentTarget = ref(null)
+const documentsFull = computed(() => documents.value.length >= CONTEXT_LIMITS.documents)
+
+function openDocument(doc = null) {
+  documentTarget.value = doc
+  documentOpen.value = true
+}
+
+async function saveDocument(fields, doc) {
+  if (doc) await ctx.updateDocument(doc.id, fields)
+  else await ctx.createDocument(fields)
+  ui.announce('Document saved')
+}
+
+/* ── Build from my site ── */
+
+function openBuild() {
+  if (!buildAvailable.value) return
+  builder.open({
+    synthesize: buildInfo.value?.reason !== 'ai_not_configured',
+    extra_urls: [],
+    document_ids: null,
+  })
+}
+
+/* ── Leaving with an unsaved form ── */
 
 const leaveOpen = ref(false)
 let pendingRoute = null
+let pendingAction = null
 let bypass = false
 
 function guard(to) {
-  if (bypass || !dirty.value) return true
+  if (bypass || !formDirty.value) return true
   pendingRoute = to
+  pendingAction = null
   leaveOpen.value = true
   return false
 }
@@ -248,8 +326,15 @@ onBeforeRouteUpdate((to, from) => {
 
 function leave() {
   const to = pendingRoute
+  const action = pendingAction
   leaveOpen.value = false
   pendingRoute = null
+  pendingAction = null
+  if (action) {
+    formDirty.value = false
+    action()
+    return
+  }
   if (!to) return
   bypass = true
   router.push(to.fullPath).finally(() => {
@@ -257,44 +342,35 @@ function leave() {
   })
 }
 
+function stay() {
+  pendingRoute = null
+  pendingAction = null
+}
+
 function onBeforeUnload(event) {
-  if (!dirty.value) return
+  if (!formDirty.value) return
   event.preventDefault()
   event.returnValue = ''
 }
 
 onMounted(() => window.addEventListener('beforeunload', onBeforeUnload))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload))
-
-// Another project: hide this one's form until the new context arrives.
-watch(wid, () => {
-  status.value = 'loading'
-})
-
-// Load once the store is scoped to this project (the shell runs init()).
-watch(
-  () => [wid.value, String(agent.websiteId ?? '')],
-  ([id, storeId]) => {
-    if (!id || storeId !== id || dirty.value) return
-    load()
-  },
-  { immediate: true },
-)
-
-const savedLine = computed(() => {
-  if (!updatedAt.value) return 'Not saved yet'
-  const when = relativeTime(updatedAt.value)
-  return updatedBy.value ? `Saved by ${updatedBy.value} ${when}` : `Saved ${when}`
-})
 </script>
 
 <template>
-  <AgPage
-    title="Context"
-    :intro="`What the agents use when they write for ${projectName}. They read it before they write a page, an article or an ad campaign.`"
-    :busy="status === 'loading'"
-    @keydown="onKeydown"
-  >
+  <AgPage title="Context" :intro="intro" :busy="status === 'loading'">
+    <template v-if="canEdit" #actions>
+      <!-- Unavailable, the button stays focusable so its tooltip says why. -->
+      <AgTooltip v-if="!buildAvailable" :text="buildReason" :disabled="!buildReason">
+        <button type="button" class="ag-ctx-build-off" aria-disabled="true">
+          <Hammer :size="16" aria-hidden="true" />
+          Build from my site
+        </button>
+      </AgTooltip>
+      <AgButton v-else size="sm" variant="primary" :icon="Hammer" @click="openBuild">Build from my site</AgButton>
+      <AgButton size="sm" :icon="FilePlus" :disabled="documentsFull" @click="openDocument()">Add document</AgButton>
+    </template>
+
     <template #intro>
       <p class="ag-ctx-links">
         Facts about the brand itself live in
@@ -314,168 +390,121 @@ const savedLine = computed(() => {
       :icon="IconContext"
       tone="error"
       title="Couldn't load the context."
-      :body="loadError"
+      :body="ctx.error.value"
     >
-      <AgButton size="sm" @click="load">Try again</AgButton>
+      <AgButton size="sm" @click="ctx.reload()">Try again</AgButton>
     </AgEmptyState>
 
-    <form v-else class="ag-ctx" novalidate @submit.prevent="save">
-      <div v-if="conflict" class="ag-ctx-banner" role="alert">
-        <span>Someone else saved this context after you opened it. Reload to see their version; your edits here will be replaced.</span>
-        <AgButton size="xs" :icon="RotateCcw" @click="load">Reload</AgButton>
-      </div>
+    <div v-else class="ag-ctx">
+      <p v-if="!canEdit" class="ag-ctx-readonly">You can read this context. Editing needs member access.</p>
 
-      <section class="ag-ctx-field">
-        <label class="ag-ctx-label" for="ag-ctx-audience">Audience</label>
-        <p id="ag-ctx-audience-help" class="ag-ctx-help">Who you sell to, what they need and how they decide.</p>
-        <textarea
-          id="ag-ctx-audience"
-          v-model="form.audience"
-          class="ag-ctx-input ag-ctx-area"
-          rows="4"
-          :maxlength="LIMITS.audience"
-          aria-describedby="ag-ctx-audience-help"
-          placeholder="Describe your customers"
-        />
-      </section>
+      <ContextBuildProgress
+        v-if="builder.run.value"
+        :run="builder.run.value"
+        :stopping="builder.stopping.value"
+        :stop-error="builder.stopError.value"
+        @stop="builder.stop()"
+        @dismiss="builder.dismiss()"
+      />
 
-      <section class="ag-ctx-field">
-        <label class="ag-ctx-label" for="ag-ctx-voice">Voice</label>
-        <p id="ag-ctx-voice-help" class="ag-ctx-help">How {{ projectName }} sounds: tone, words to use and words to avoid.</p>
-        <textarea
-          id="ag-ctx-voice"
-          v-model="form.voice"
-          class="ag-ctx-input ag-ctx-area"
-          rows="4"
-          :maxlength="LIMITS.voice"
-          aria-describedby="ag-ctx-voice-help"
-          placeholder="Describe the brand voice"
-        />
-      </section>
-
-      <section class="ag-ctx-field" aria-labelledby="ag-ctx-offerings-label">
-        <h2 id="ag-ctx-offerings-label" class="ag-ctx-label">Offerings</h2>
-        <p class="ag-ctx-help">Products, plans or services the agent may mention, each with the page that describes it.</p>
-        <p v-if="!form.offerings.length" class="ag-ctx-none">No offerings added.</p>
-        <ul v-else class="ag-ctx-rows" role="list">
-          <li v-for="(o, index) in form.offerings" :key="o.key" class="ag-ctx-offering">
-            <div class="ag-ctx-offering-grid">
-              <div class="ag-ctx-cell">
-                <label class="ag-ctx-sublabel" :for="`${o.key}-name`">Name</label>
-                <input
-                  :id="`${o.key}-name`"
-                  v-model="o.name"
-                  class="ag-ctx-input"
-                  type="text"
-                  :maxlength="LIMITS.offeringName"
-                  :aria-invalid="fieldErrors[`offering-${o.key}-name`] ? 'true' : undefined"
-                  :aria-describedby="fieldErrors[`offering-${o.key}-name`] ? `${o.key}-name-err` : undefined"
-                />
-                <p v-if="fieldErrors[`offering-${o.key}-name`]" :id="`${o.key}-name-err`" class="ag-ctx-error">
-                  {{ fieldErrors[`offering-${o.key}-name`] }}
-                </p>
-              </div>
-              <div class="ag-ctx-cell">
-                <label class="ag-ctx-sublabel" :for="`${o.key}-url`">Page URL</label>
-                <input
-                  :id="`${o.key}-url`"
-                  v-model="o.url"
-                  class="ag-ctx-input"
-                  type="url"
-                  inputmode="url"
-                  :maxlength="LIMITS.offeringUrl"
-                  placeholder="https://"
-                  :aria-invalid="fieldErrors[`offering-${o.key}-url`] ? 'true' : undefined"
-                  :aria-describedby="fieldErrors[`offering-${o.key}-url`] ? `${o.key}-url-err` : undefined"
-                />
-                <p v-if="fieldErrors[`offering-${o.key}-url`]" :id="`${o.key}-url-err`" class="ag-ctx-error">
-                  {{ fieldErrors[`offering-${o.key}-url`] }}
-                </p>
-              </div>
-              <div class="ag-ctx-cell is-wide">
-                <label class="ag-ctx-sublabel" :for="`${o.key}-desc`">Description</label>
-                <textarea
-                  :id="`${o.key}-desc`"
-                  v-model="o.description"
-                  class="ag-ctx-input ag-ctx-area is-short"
-                  rows="2"
-                  :maxlength="LIMITS.offeringDescription"
-                />
-              </div>
-            </div>
-            <AgIconButton
-              class="ag-ctx-remove"
-              :label="o.name.trim() ? `Remove ${o.name.trim()}` : `Remove offering ${index + 1}`"
-              :size="28"
-              muted
-              @click="removeOffering(index)"
-            >
-              <X />
-            </AgIconButton>
-          </li>
-        </ul>
-        <AgButton
-          class="ag-ctx-add"
-          variant="ghost"
-          size="xs"
-          :icon="Plus"
-          :disabled="form.offerings.length >= LIMITS.offerings"
-          @click="addOffering"
-        >
-          Add offering
-        </AgButton>
-      </section>
-
-      <section class="ag-ctx-field" aria-labelledby="ag-ctx-rules-label">
-        <h2 id="ag-ctx-rules-label" class="ag-ctx-label">Rules</h2>
-        <p class="ag-ctx-help">Things every agent must always or never do, one per line.</p>
-        <p v-if="!form.rules.length" class="ag-ctx-none">No rules added.</p>
-        <ul v-else class="ag-ctx-rows" role="list">
-          <li v-for="(r, index) in form.rules" :key="r.key" class="ag-ctx-rule">
-            <span class="ag-ctx-rule-n ag-tnum" aria-hidden="true">{{ index + 1 }}</span>
-            <input
-              :id="`${r.key}-text`"
-              v-model="r.text"
-              class="ag-ctx-input"
-              type="text"
-              :maxlength="LIMITS.rule"
-              :aria-label="`Rule ${index + 1}`"
-              enterkeyhint="next"
-              @keydown.enter.prevent="addRule(index)"
-            />
-            <AgIconButton :label="`Remove rule ${index + 1}`" :size="28" muted @click="removeRule(index)">
-              <X />
-            </AgIconButton>
-          </li>
-        </ul>
-        <AgButton
-          class="ag-ctx-add"
-          variant="ghost"
-          size="xs"
-          :icon="Plus"
-          :disabled="form.rules.length >= LIMITS.rules"
-          @click="addRule"
-        >
-          Add rule
-        </AgButton>
-      </section>
-    </form>
-
-    <template v-if="status === 'ready'" #footer>
-      <div class="ag-ctx-bar">
-        <p class="ag-ctx-state" :class="{ 'is-dirty': dirty, 'is-error': saveError }" aria-live="polite">
-          <template v-if="saveError">{{ saveError }}</template>
-          <template v-else-if="dirty">Unsaved changes</template>
-          <template v-else>{{ savedLine }}</template>
-        </p>
-        <div class="ag-ctx-bar-actions">
-          <AgButton v-if="dirty" variant="ghost" size="sm" :disabled="saving" @click="discard">Discard</AgButton>
-          <AgButton variant="primary" size="sm" :loading="saving" :disabled="!dirty || conflict" @click="save">
-            {{ saving ? 'Saving' : 'Save' }}
+      <div v-if="suggested.length" class="ag-ctx-banner" role="status">
+        <span>{{ suggestionLine }}</span>
+        <div v-if="canEdit" class="ag-ctx-banner-actions">
+          <AgButton size="xs" variant="primary" :icon="Check" :loading="acceptingAll" @click="acceptAll">
+            Accept all
           </AgButton>
+          <AgButton size="xs" @click="reviewFirst">Review</AgButton>
         </div>
       </div>
-    </template>
+
+      <AgEmptyState
+        v-if="empty && !editing"
+        :icon="IconContext"
+        title="No context yet."
+        body="Build it from your site: Cansee reads up to 8 pages and suggests entries with their sources. You see the cost first."
+      >
+        <template v-if="canEdit">
+          <AgButton size="sm" variant="primary" :disabled="!buildAvailable" @click="openBuild">Build from my site</AgButton>
+          <AgButton size="sm" @click="startAdd('company')">Add an entry</AgButton>
+        </template>
+      </AgEmptyState>
+
+      <ContextSectionNav v-else :sections="sections" />
+
+      <ContextSection
+        v-for="s in sections"
+        :key="s.key"
+        :section="s"
+        :entries="entriesOf(s.key)"
+        :can-edit="canEdit"
+        :editing="editingIn(s.key)"
+        :busy-ids="busyIds"
+        @add="startAdd"
+        @accept="decide($event, true)"
+        @dismiss="decide($event, false)"
+        @edit="startEdit"
+        @add-source="openPicker"
+        @delete="askDelete('entry', $event)"
+      >
+        <template #form="{ entry }">
+          <ContextEntryForm
+            :key="entry ? entry.id : `new-${s.key}`"
+            :entry="entry"
+            :section="s.key"
+            :sections="sections"
+            :website-id="wid"
+            :domain="domain"
+            :documents="documents"
+            :competitors="competitors"
+            :conflict="Boolean(entry && ctx.conflicts.value[entry.id])"
+            :save="saveForm"
+            @dirty="formDirty = $event"
+            @done="closeForm"
+            @cancel="closeForm"
+            @reload="reloadConflict(entry)"
+          />
+        </template>
+      </ContextSection>
+
+      <ContextDocuments
+        :documents="documents"
+        :can-edit="canEdit"
+        @edit="openDocument"
+        @delete="askDelete('document', $event)"
+      />
+    </div>
+
+    <ContextBuildDialog :builder="builder" :build="buildInfo" :domain="domain" />
+
+    <ContextDocumentDialog
+      v-model:open="documentOpen"
+      :document="documentTarget"
+      :load="ctx.loadDocument"
+      :save="saveDocument"
+    />
+
+    <ReferencePicker
+      v-model:open="pickerOpen"
+      :website-id="wid"
+      :domain="domain"
+      :documents="documents"
+      :competitors="competitors"
+      :busy="pickerBusy"
+      :error="pickerError"
+      @add="addSource"
+    />
+
+    <AgConfirmDialog
+      v-model:open="deleteOpen"
+      :title="deleteCopy.title"
+      :description="deleteCopy.description"
+      confirm-label="Delete"
+      busy-label="Deleting"
+      destructive
+      :busy="deleteBusy"
+      :error="deleteError"
+      @confirm="confirmDelete"
+    />
 
     <AgConfirmDialog
       v-model:open="leaveOpen"
@@ -485,6 +514,7 @@ const savedLine = computed(() => {
       cancel-label="Keep editing"
       destructive
       @confirm="leave"
+      @cancel="stay"
     />
   </AgPage>
 </template>
@@ -525,6 +555,13 @@ const savedLine = computed(() => {
   gap: 28px;
 }
 
+.ag-ctx-readonly {
+  margin: 0;
+  color: var(--ag-fg-3);
+  font-size: 13px;
+  line-height: 19px;
+}
+
 .ag-ctx-banner {
   display: flex;
   flex-wrap: wrap;
@@ -532,200 +569,42 @@ const savedLine = computed(() => {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--ag-warning) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ag-accent) 35%, transparent);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--ag-warning) 8%, transparent);
+  background: color-mix(in srgb, var(--ag-accent) 6%, transparent);
   color: var(--ag-fg-1);
   font-size: 14px;
   line-height: 20px;
 }
 
-.ag-ctx-field {
+.ag-ctx-banner-actions {
   display: flex;
-  flex-direction: column;
+  gap: 8px;
+}
+
+.ag-ctx-build-off {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-}
-
-.ag-ctx-label {
-  margin: 0;
-  color: var(--ag-fg-1);
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 20px;
-}
-
-.ag-ctx-help {
-  margin: 0 0 4px;
-  color: var(--ag-fg-3);
-  font-size: 13px;
-  line-height: 19px;
-}
-
-.ag-ctx-none {
-  margin: 0;
-  color: var(--ag-fg-4);
-  font-size: 13px;
-  line-height: 19px;
-}
-
-.ag-ctx-input {
   box-sizing: border-box;
-  width: 100%;
-  min-height: 36px;
-  padding: 7px 11px;
-  border: 1px solid var(--ag-composer-border);
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--ag-send-bg);
   border-radius: 8px;
-  background: var(--ag-composer-bg);
-  color: var(--ag-fg-1);
+  background: var(--ag-send-bg);
+  color: var(--ag-send-fg);
   font: inherit;
   font-size: 14px;
-  line-height: 20px;
-  outline: none;
-  transition: border-color 120ms ease;
-}
-
-.ag-ctx-input::placeholder {
-  color: var(--ag-placeholder);
-}
-
-.ag-ctx-input:focus-visible {
-  border-color: var(--ag-ring);
-  border-radius: 8px;
-  outline: none;
-}
-
-.ag-ctx-input[aria-invalid='true'] {
-  border-color: var(--ag-danger);
-}
-
-.ag-ctx-area {
-  min-height: 96px;
-  resize: vertical;
-}
-
-.ag-ctx-area.is-short {
-  min-height: 60px;
-}
-
-.ag-ctx-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.ag-ctx-offering {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
-}
-
-.ag-ctx-offering-grid {
-  display: grid;
-  flex: 1 1 auto;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 10px 12px;
-  min-width: 0;
-}
-
-.ag-ctx-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.ag-ctx-cell.is-wide {
-  grid-column: 1 / -1;
-}
-
-.ag-ctx-sublabel {
-  color: var(--ag-fg-2);
-  font-size: 12px;
   font-weight: 500;
-  line-height: 16px;
-}
-
-.ag-ctx-error {
-  margin: 0;
-  color: var(--ag-danger);
-  font-size: 12px;
-  line-height: 16px;
-}
-
-.ag-ctx-rule {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.ag-ctx-rule-n {
-  flex-shrink: 0;
-  width: 18px;
-  color: var(--ag-fg-4);
-  font-size: 13px;
-  text-align: right;
-}
-
-.ag-ctx-field :deep(.ag-ctx-add) {
-  align-self: flex-start;
-  margin-top: 4px;
-  margin-left: -8px;
-}
-
-.ag-ctx-bar {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  box-sizing: border-box;
-  min-height: 56px;
-  padding: 10px max(16px, calc((100% - 720px) / 2));
-  border-top: 1px solid var(--ag-divider-subtle);
-  background: var(--ag-pane-bg);
-}
-
-.ag-ctx-state {
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  color: var(--ag-fg-3);
-  font-size: 13px;
-  line-height: 18px;
-  text-overflow: ellipsis;
+  line-height: 20px;
   white-space: nowrap;
+  opacity: 0.5;
+  cursor: default;
 }
 
-.ag-ctx-state.is-dirty {
-  color: var(--ag-fg-1);
-}
-
-.ag-ctx-state.is-error {
-  color: var(--ag-danger);
-  white-space: normal;
-}
-
-.ag-ctx-bar-actions {
-  display: flex;
-  flex-shrink: 0;
-  gap: 8px;
-}
-
-@media (max-width: 560px) {
-  .ag-ctx-offering-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (pointer: coarse) {
-  .ag-ctx-input {
-    font-size: 16px;
-  }
+.ag-ctx-build-off:focus-visible {
+  border-radius: 8px;
+  outline: 2px solid var(--ag-ring);
+  outline-offset: 2px;
 }
 </style>

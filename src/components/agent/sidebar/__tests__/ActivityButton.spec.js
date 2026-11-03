@@ -57,7 +57,23 @@ describe('ActivityPopover', () => {
   it('has a real empty state', async () => {
     const { wrapper } = await mountWith(ActivityPopover, { items: [], websiteId: 'w1' })
     expect(wrapper.text()).toContain('Nothing new yet.')
+    expect(wrapper.text()).toContain('Finished agent runs, new drafts and review requests in this project show up here.')
     expect(wrapper.find('ul').exists()).toBe(false)
+  })
+
+  it.each([
+    ['review_requested', { version: 3 }, 'Sam asked you to review · v3'],
+    ['review_approved', { version: 3, excerpt: 'Ship it' }, 'Sam approved it · v3'],
+    ['review_changes_requested', { version: 2, excerpt: 'Fix the price' }, 'Sam asked for changes · v2'],
+    ['review_comment', { version: 2, excerpt: 'One typo in the FAQ' }, 'Sam commented: One typo in the FAQ'],
+  ])('shows a %s item with its icon and a link to the draft', async (type, extra, meta) => {
+    const item = { type, at: '2026-11-02T12:00:00Z', artifact_id: 'a7', title: 'Pricing page', kind: 'document', actor_name: 'Sam', ...extra }
+    const { wrapper } = await mountWith(ActivityPopover, { items: [item], websiteId: 'w1' })
+    const link = wrapper.find('a.ag-act-item')
+    expect(link.find('.ag-act-item-title').text()).toBe('Pricing page')
+    expect(link.find('.ag-act-meta').text()).toContain(meta)
+    expect(link.attributes('href')).toBe('/projects/w1/agent/artifacts/a7')
+    expect(link.find('.ag-act-icon svg').exists()).toBe(true)
   })
 
   it('lists runs and artifact versions with links into the project', async () => {
@@ -92,6 +108,18 @@ describe('ActivityButton', () => {
     await flushPromises()
     expect(fakeAgent.loadActivity).toHaveBeenCalled()
     expect(document.body.querySelector('.ag-portal.ag-popover').textContent).toContain('Nothing new yet.')
+  })
+
+  it('refreshes the review count with the quiet prefetch', async () => {
+    vi.useFakeTimers()
+    fakeAgent.loadActivity = vi.fn(async () => [])
+    await mountWith(ActivityButton, { websiteId: 'w1' })
+    expect(fakeAgent.loadActivity).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1500)
+    vi.useRealTimers()
+    await flushPromises()
+    // The store's loadActivity also reads GET reviews/?box=waiting (agent store spec).
+    expect(fakeAgent.loadActivity).toHaveBeenCalledTimes(1)
   })
 
   it('marks new items until the inbox is opened', async () => {

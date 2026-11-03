@@ -78,7 +78,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
-  /** Key of the active nav item: account | subscription | notifications | project | connections | brand-facts | usage | appearance | contact | team | domains */
+  /** Key of the active nav item: account | subscription | notifications | project | connections | brand-facts | usage | command-center | appearance | contact | team | domains */
   active: { type: String, required: true },
 })
 
@@ -164,6 +164,11 @@ const NAV_BASE = [
         key: 'usage', label: 'AI Usage',
         to: { path: '/settings', query: { section: 'usage' } },
         icon: ['M22 12h-4l-3 9L9 3l-3 9H2'],
+      },
+      {
+        key: 'command-center', label: 'Usage dashboard',
+        to: { name: 'settings-command-center' },
+        icon: ['m12 14 4-4', 'M3.34 19a10 10 0 1 1 17.32 0'],
       },
       {
         key: 'appearance', label: 'Appearance',

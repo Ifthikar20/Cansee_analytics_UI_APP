@@ -38,7 +38,11 @@
         :warnings="source.warnings.value"
         :live="live"
       />
-      <DocumentArtifactView v-else :markdown="text" :live="live" :title="title" />
+      <StructuredDocumentView v-else-if="kind === 'document' && structured" :source="source" :live="live" />
+      <template v-else>
+        <p v-if="llmsOrigin" class="ag-artv-note">Publish this file at {{ llmsOrigin }}/llms.txt. Cansee doesn't publish it.</p>
+        <DocumentArtifactView :markdown="documentText" :live="live" :title="title" />
+      </template>
     </template>
   </div>
 </template>
@@ -52,6 +56,8 @@ import DocumentArtifactView from './DocumentArtifactView.vue'
 import PageArtifactView from './PageArtifactView.vue'
 import ReportArtifactView from './ReportArtifactView.vue'
 import SheetArtifactView from './SheetArtifactView.vue'
+import StructuredDocumentView from './structured/StructuredDocumentView.vue'
+import { hasStructuredView, structuredType } from '@/lib/agent/structured'
 
 // Picks the view for an artifact tab and owns its loading, failure and
 // version notices. `source` comes from useArtifactSource.
@@ -69,6 +75,23 @@ const selected = computed(() => props.source.selected.value)
 const text = computed(() => {
   const value = props.source.content.value
   return typeof value === 'string' ? value : ''
+})
+
+// A document whose version keeps structured parts (p2_contract.md 12d) has
+// its own view; while drafting, `data` is the latest snapshot, which names
+// its type from the first one. A press release has no view of its own: its
+// Markdown streams inside the snapshot until the saved copy arrives.
+const dataType = computed(() => (kind.value === 'document' ? structuredType(props.source.data.value) : ''))
+const structured = computed(() => kind.value === 'document' && hasStructuredView(props.source.data.value))
+const documentText = computed(() => {
+  const data = props.source.data.value
+  if (dataType.value === 'press' && live.value && !text.value && typeof data?.markdown === 'string') return data.markdown
+  return text.value
+})
+const llmsOrigin = computed(() => {
+  if (dataType.value !== 'llms_txt') return ''
+  const origin = props.source.data.value?.origin
+  return typeof origin === 'string' ? origin.replace(/\/+$/, '') : ''
 })
 
 const failureText = computed(() => {
@@ -206,6 +229,16 @@ function retry() {
   border-radius: 6px;
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
+}
+
+.ag-artv-note {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--ag-divider-subtle);
+  color: var(--ag-fg-2);
+  font-size: 13px;
+  line-height: 19px;
 }
 
 .ag-artv-state {

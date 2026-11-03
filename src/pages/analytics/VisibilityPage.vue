@@ -63,6 +63,9 @@
           <VizChart :spec="specs.sov" :loading="loading" :empty="sovEmpty" :heading-level="2" />
           <VizChart :spec="specs.sovTotal" :loading="loading" :empty="sovEmpty" selected="you" :heading-level="2" />
         </div>
+        <router-link :to="{ name: 'competitors', params: { websiteId } }" class="an-compare">
+          Compare with your competitors on Google and in AI answers
+        </router-link>
 
         <VizChart :spec="specs.sentiment" :loading="loading" :empty="sentimentEmpty" :heading-level="2" />
 
@@ -249,6 +252,17 @@ function openPrompt(event) {
 
 .an-alert {
   border-radius: 14px;
+}
+
+/* Sits under the share-of-voice row, as part of it. */
+.an-compare {
+  justify-self: start;
+  margin-top: -12px;
+  color: var(--foreground);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .an-retry {

@@ -114,6 +114,47 @@
         </div>
       </section>
 
+      <section class="pp-section" aria-labelledby="pp-fanouts-title">
+        <header class="pp-section-head">
+          <h2 id="pp-fanouts-title" class="pp-section-title">What the engines searched</h2>
+          <p class="pp-section-sub">The web searches the engines ran while answering this prompt.</p>
+        </header>
+        <div class="pp-fanouts">
+          <InsightRunProgress
+            v-if="googleCheck.run.value"
+            :run="googleCheck.run.value"
+            :stopping="googleCheck.stopping.value"
+            :stop-error="googleCheck.stopError.value"
+            @stop="googleCheck.stop"
+            @dismiss="googleCheck.dismiss"
+          />
+          <Skeleton v-if="!fanouts && !fanoutsFailed" class="h-32 rounded-2xl" />
+          <VizState
+            v-else-if="!fanouts && fanoutsDisabled"
+            kind="disabled"
+            title="Insights are turned off on this server."
+          />
+          <VizState
+            v-else-if="!fanouts"
+            kind="error"
+            title="We couldn't load query fan-outs."
+            :action="{ label: 'Try again' }"
+            @action="loadFanouts"
+          />
+          <VizState v-else-if="fanoutsEmptyState" v-bind="fanoutsEmptyState" />
+          <FanoutPromptCard
+            v-else
+            :website-id="websiteId"
+            :prompt="fanoutPrompt"
+            :link-prompt="false"
+            :unreported="fanoutsUnreported"
+            :max-queries="fanoutMaxQueries"
+            :check-blocked="fanoutCheckBlocked"
+            @check="openFanoutCheck"
+          />
+        </div>
+      </section>
+
       <section class="pp-section" aria-labelledby="pp-countries-title">
         <header class="pp-section-head is-row">
           <div>
@@ -192,6 +233,7 @@
       :open="!!answerId"
       @close="answerId = ''"
     />
+    <InsightRunDialog kind="fanout_google" />
   </div>
 </template>
 
@@ -201,14 +243,17 @@ import { useRouter } from 'vue-router'
 import { ArrowLeft, Archive, CalendarClock, RefreshCw } from '@lucide/vue'
 import api from '@/api/client'
 import countriesApi from '@/api/countries'
+import insightsApi from '@/api/insights'
 import searchGapApi from '@/api/searchGap'
 import promptLibrary from '@/api/promptLibrary'
 import visibilityApi from '@/api/visibility'
 import { useToast } from '@/composables/useToast'
+import { isActiveInsightRun, useInsightRun } from '@/composables/analytics/useInsightRun'
 import { gapMeta } from '@/lib/gap'
 import { cellText, matrixEngines, promptCountryRows } from '@/lib/analytics/countrySpecs'
 import { googleHistorySpec } from '@/lib/analytics/polishSpecs'
 import { visibilityOverTime } from '@/lib/analytics/visibilitySpecs'
+import { fanoutsEmpty, unreportedSearches } from '@/lib/analytics/researchSpecs'
 import { timeAgo } from '@/utils/timeAgo'
 import GradientCard from '@/components/GradientCard.vue'
 import GapBadge from '@/components/gap/GapBadge.vue'
@@ -217,6 +262,9 @@ import GoogleCard from '@/components/gap/GoogleCard.vue'
 import EngineCard from '@/components/gap/EngineCard.vue'
 import MethodChip from '@/components/analytics/MethodChip.vue'
 import PeriodSelect from '@/components/analytics/PeriodSelect.vue'
+import FanoutPromptCard from '@/components/analytics/FanoutPromptCard.vue'
+import InsightRunDialog from '@/components/analytics/InsightRunDialog.vue'
+import InsightRunProgress from '@/components/analytics/InsightRunProgress.vue'
 import VizChart from '@/components/charts/VizChart.vue'
 import VizState from '@/components/charts/VizState.vue'
 import ChatDetailModal from '@/components/ChatDetailModal.vue'
@@ -301,6 +349,48 @@ async function loadHistory() {
 
 watch(historyPeriod, () => loadHistory())
 
+// ── What the engines searched: this prompt's query fan-outs (contract 8) ──
+const fanouts = ref(null)
+const fanoutsFailed = ref(false)
+const fanoutsDisabled = ref(false)
+
+async function loadFanouts() {
+  const key = `${props.websiteId}|${props.promptId}`
+  fanoutsFailed.value = false
+  try {
+    const res = await insightsApi.fanOuts(props.websiteId, { period: '30d', prompt_id: props.promptId })
+    if (key !== `${props.websiteId}|${props.promptId}`) return
+    fanouts.value = res.data
+  } catch (err) {
+    if (key !== `${props.websiteId}|${props.promptId}`) return
+    fanoutsFailed.value = true
+    fanoutsDisabled.value = errorCode(err) === 'insights_disabled'
+  }
+}
+
+const fanoutPrompt = computed(() => {
+  const listed = (fanouts.value?.prompts || []).find((p) => String(p.prompt_id) === String(props.promptId))
+  return listed || { prompt_id: props.promptId, text: detail.value?.prompt.text || '', answers: 0, searched: 0, queries: [] }
+})
+// The payload is this prompt's alone, so its totals are the prompt's.
+const fanoutsUnreported = computed(() => unreportedSearches(fanouts.value?.totals))
+
+const fanoutsEmptyState = computed(() => fanoutsEmpty(fanouts.value, { days: 30 }))
+
+// Searches picked on the card are checked on Google after the cost is confirmed.
+const googleCheck = useInsightRun('fanout_google', { websiteId: () => props.websiteId, onFinished: () => loadFanouts() })
+const fanoutMaxQueries = computed(() => Number(googleCheck.options.value?.limits?.max_units) || 10)
+const fanoutCheckBlocked = computed(() => {
+  const o = googleCheck.options.value
+  if (o?.configured && o.configured.google === false) return "Google results aren't configured on this server."
+  if (isActiveInsightRun(googleCheck.run.value)) return 'Fan-out Google check is already running for this project.'
+  return ''
+})
+
+function openFanoutCheck(queries) {
+  googleCheck.open({ queries })
+}
+
 // ── By country: the latest country check of this prompt ──
 const matrix = ref(null)
 const countriesFailed = ref(false)
@@ -355,6 +445,7 @@ function refreshSoon() {
   refreshTimer = setTimeout(() => {
     load()
     loadHistory()
+    loadFanouts()
   }, 8000)
 }
 
@@ -451,9 +542,12 @@ watch(() => [props.websiteId, props.promptId], () => {
   historyFailed.value = false
   matrix.value = null
   countriesFailed.value = false
+  fanouts.value = null
+  fanoutsFailed.value = false
   load()
   loadHistory()
   loadCountries()
+  loadFanouts()
 }, { immediate: true })
 onBeforeUnmount(() => clearTimeout(refreshTimer))
 </script>
@@ -622,6 +716,12 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.pp-fanouts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
 }
 
 .pp-ct-scroll {

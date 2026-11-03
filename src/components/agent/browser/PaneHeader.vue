@@ -124,6 +124,12 @@
           />
         </template>
         <template v-else-if="tab.kind === 'artifact' && source">
+          <ReviewChip
+            v-if="reviewable"
+            :review="artifactReview"
+            :website-id="reviewWebsiteId"
+            :artifact-id="String(source.id.value)"
+          />
           <VersionMenu
             v-if="(source.latestVersion.value || 0) > 1"
             :source="source"
@@ -136,6 +142,8 @@
             :context="artifactContext"
             :disabled="exportOff"
             :disabled-reason="exportOffReason"
+            :data-type="artifactDataType"
+            :approval="reviewable ? approvalLine(artifactReview) : ''"
           />
         </template>
       </div>
@@ -170,6 +178,9 @@ import { useAgentStore } from '@/stores/agent'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { useBrowse } from '@/composables/agent/useBrowse'
 import { toCsv } from '@/lib/agent/csv'
+import { approvalLine } from '@/lib/agent/review'
+import { structuredType } from '@/lib/agent/structured'
+import ReviewChip from '@/components/agent/review/ReviewChip.vue'
 import { downloadText } from '@/lib/agent/download'
 import { googleSearchUrl } from '@/lib/agent/url'
 import { safeHref } from '@/utils/safeHref'
@@ -213,6 +224,16 @@ const exportOffReason = computed(() => {
   if (props.source?.showDraft.value) return 'Export is available once the saved version has loaded.'
   return 'Export is available once this has loaded.'
 })
+
+// Reviews belong to saved drafts: the chip shows once a version exists.
+const artifactReview = computed(() => props.source?.artifact.value?.review || null)
+const reviewWebsiteId = computed(() => (agent.websiteId ? String(agent.websiteId) : ''))
+const reviewable = computed(() => {
+  const s = props.source
+  if (!s || drafting.value || !reviewWebsiteId.value || s.id.value === null) return false
+  return Number(s.artifact.value?.latest_version) > 0 || Boolean(s.artifact.value?.review)
+})
+const artifactDataType = computed(() => (props.source ? structuredType(props.source.data.value) : ''))
 
 const statusText = computed(() => {
   if (props.tab.kind !== 'artifact' || !props.source) return ''

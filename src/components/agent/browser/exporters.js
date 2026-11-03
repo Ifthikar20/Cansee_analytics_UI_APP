@@ -29,8 +29,15 @@ const ACTIONS = {
   serp: [{ key: 'serp-csv', label: 'Results as CSV', icon: FileDown }],
 }
 
-export function exportActions(kind) {
-  return ACTIONS[kind] || []
+// A document's data type (p2_contract.md 12d) can add an action of its own.
+const DATA_TYPE_ACTIONS = {
+  llms_txt: [{ key: 'llms-txt', label: 'Download llms.txt', icon: FileDown }],
+}
+
+export function exportActions(kind, dataType = '') {
+  const base = ACTIONS[kind] || []
+  const extra = kind === 'document' ? DATA_TYPE_ACTIONS[dataType] || [] : []
+  return [...extra, ...base]
 }
 
 // What to tell the user when runExport throws.
@@ -74,6 +81,10 @@ export async function runExport(key, ctx) {
       return 'HTML copied'
     case 'md':
       downloadText(ctx.content || '', safeFilename(title, 'md'), 'text/markdown;charset=utf-8')
+      return ''
+    case 'llms-txt':
+      // The file name the llms.txt convention expects at the site root.
+      downloadText(ctx.content || '', 'llms.txt', 'text/plain;charset=utf-8')
       return ''
     case 'doc-html':
       downloadText(

@@ -19,6 +19,8 @@ import { useArtifactSource } from '../useArtifactSource'
 import { useAgentStore } from '@/stores/agent'
 import { PREVIEW_CSP } from '@/lib/agent/srcdoc'
 import { serpCapture } from './__fixtures__/stores.js'
+import { pageRevisionData } from './__fixtures__/structured.js'
+import { exportActions } from '../exporters'
 
 // The artifact view, with the pane header when `header` is set. `call` is
 // what the chat knows about the agent call writing the artifact.
@@ -338,5 +340,121 @@ describe('ArtifactView', () => {
     const docs = done.findAll('iframe').map((f) => f.attributes('srcdoc'))
     expect(docs.some((d) => d.includes('Saved page'))).toBe(true)
     expect(docs.some((d) => d.includes('Half a page'))).toBe(false)
+  })
+})
+
+describe('ArtifactView: structured drafts (p2_contract.md 12d)', () => {
+  let agent
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    agent = useAgentStore()
+    document.body.innerHTML = ''
+  })
+
+  it('shows a saved page revision with its changes and the document behind a tab', async () => {
+    agent.artifacts.r1 = {
+      id: 'r1',
+      kind: 'document',
+      title: 'Pricing page',
+      version: 1,
+      latest_version: 1,
+      content: '# Notion pricing\n\nPlus costs $10.',
+      data: pageRevisionData(),
+    }
+    const wrapper = mount(Harness, { props: { artifactId: 'r1' }, attachTo: document.body })
+    await flushPromises()
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(tabs.map((t) => t.text())).toEqual(['Changes (2)', 'Document'])
+    expect(wrapper.find('.ag-prv').exists()).toBe(true)
+    expect(wrapper.find('.ag-prv-change').text()).toContain('Rewrite')
+    expect(wrapper.find('.ag-docv').exists()).toBe(false)
+    await tabs[1].trigger('mousedown')
+    await tabs[1].trigger('click')
+    await flushPromises()
+    await new Promise((r) => setTimeout(r, 20))
+    expect(wrapper.find('.ag-doc h1').text()).toBe('Notion pricing')
+    wrapper.unmount()
+  })
+
+  it('picks the structured view from the first snapshot while the writer drafts', async () => {
+    agent.artifacts.r2 = {
+      id: 'r2',
+      kind: 'document',
+      draft: {
+        status: 'drafting',
+        kind: 'document',
+        title: 'Social posts',
+        content: '',
+        data: { type: 'social_posts', drafting: true, posts: [{ channel: 'x', parts: ['First words'] }] },
+      },
+    }
+    const wrapper = mount(Harness, { props: { artifactId: 'r2' } })
+    await nextTick()
+    expect(wrapper.find('[role="tab"]').text()).toBe('Posts (1)')
+    expect(wrapper.find('.ag-spv').text()).toContain('First words')
+    expect(wrapper.find('.ag-spv').text()).toContain('Counted when the draft is saved.')
+    expect(wrapper.find('.ag-spv-drafting').text()).toContain('Drafting…')
+  })
+
+  it('streams a press release from its snapshot Markdown, then shows the saved copy', async () => {
+    agent.artifacts.r3 = {
+      id: 'r3',
+      kind: 'document',
+      draft: { status: 'drafting', kind: 'document', title: 'Release', content: '', data: { type: 'press', drafting: true, markdown: '# Series C' } },
+    }
+    const wrapper = mount(Harness, { props: { artifactId: 'r3' } })
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 30))
+    expect(wrapper.find('[role="tab"]').exists()).toBe(false)
+    expect(wrapper.find('.ag-doc').text()).toContain('Series C')
+  })
+
+  it('tells where to publish an llms.txt file and leaves the publishing to you', async () => {
+    agent.artifacts.r4 = {
+      id: 'r4',
+      kind: 'document',
+      title: 'llms.txt',
+      version: 1,
+      content: '# Notion\n\n> Notes and wikis.',
+      data: { type: 'llms_txt', origin: 'https://notion.so/', links: 24, sections: 4 },
+    }
+    const wrapper = mount(Harness, { props: { artifactId: 'r4' } })
+    await flushPromises()
+    expect(wrapper.find('.ag-artv-note').text()).toBe("Publish this file at https://notion.so/llms.txt. Cansee doesn't publish it.")
+    expect(wrapper.find('.ag-docv').exists()).toBe(true)
+  })
+
+  it('shows the review state in the header and the approval in the export menu', async () => {
+    agent.artifacts.r5 = {
+      id: 'r5',
+      kind: 'document',
+      title: 'Guide',
+      version: 3,
+      latest_version: 3,
+      content: '# Guide',
+      review: { state: 'approved', effective_state: 'approved', version: 3, reviewer_name: 'Ana', updated_at: null },
+    }
+    const wrapper = mount(Harness, { props: { artifactId: 'r5', header: true }, attachTo: document.body })
+    await flushPromises()
+    const chip = wrapper.find('button.ag-rchip')
+    expect(chip.text()).toBe('Approved v3')
+    expect(chip.attributes('aria-haspopup')).toBe('dialog')
+    await wrapper.find('button.ag-export').trigger('keydown', { key: 'Enter' })
+    await flushPromises()
+    const menu = document.body.querySelector('.ag-portal.ag-menu')
+    expect(menu.textContent).toContain('Approved: version 3')
+
+    agent.artifacts.r6 = { id: 'r6', kind: 'document', title: 'Older', version: 4, latest_version: 4, content: '# Older', review: { state: 'approved', effective_state: 'draft', version: 3 } }
+    const older = mount(Harness, { props: { artifactId: 'r6', header: true } })
+    await flushPromises()
+    expect(older.find('button.ag-rchip').text()).toBe('Draft')
+    wrapper.unmount()
+  })
+
+  it('offers the llms.txt download for an llms.txt draft only', () => {
+    expect(exportActions('document', 'llms_txt')[0]).toMatchObject({ key: 'llms-txt', label: 'Download llms.txt' })
+    expect(exportActions('document', 'page_revision').some((a) => a.key === 'llms-txt')).toBe(false)
+    expect(exportActions('report', 'llms_txt').some((a) => a.key === 'llms-txt')).toBe(false)
   })
 })

@@ -1,25 +1,45 @@
 <script setup>
-// "Agent | Analytics": two links drawn as the segmented control. The agent
-// workspace is always the current product here. Analytics returns to the
-// section last used for this project (lib/analyticsNav.js), else the Overview.
+// "Agent | Analytics": two links drawn as the segmented control; the side
+// the sidebar shows is the current one. Analytics returns to the tab last
+// used for this project (lib/analyticsNav.js), else the Overview.
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { analyticsHomeRoute } from '@/lib/analyticsNav'
 
 const props = defineProps({
   websiteId: { type: String, default: null },
+  // 'agent' | 'analytics'
+  side: { type: String, default: 'agent' },
 })
+
+const route = useRoute()
 
 const agentTo = computed(() =>
   props.websiteId ? { name: 'agent-home', params: { websiteId: props.websiteId } } : { name: 'agent' },
 )
-// Read when the sidebar renders; the memory changes only on Analytics pages.
-const analyticsTo = computed(() => analyticsHomeRoute(props.websiteId))
+// The tab memory lives in sessionStorage and changes only on analytics
+// routes, so the link is read again on every navigation.
+const analyticsTo = computed(() => {
+  void route.fullPath
+  return analyticsHomeRoute(props.websiteId)
+})
+const analytics = computed(() => props.side === 'analytics')
 </script>
 
 <template>
   <div class="ag-ps" role="group" aria-label="Product">
-    <router-link :to="agentTo" class="ag-ps-item is-active" aria-current="true">Agent</router-link>
-    <router-link :to="analyticsTo" class="ag-ps-item">Analytics</router-link>
+    <router-link
+      :to="agentTo"
+      class="ag-ps-item"
+      :class="{ 'is-active': !analytics }"
+      :aria-current="analytics ? undefined : 'true'"
+    >Agent</router-link>
+    <router-link
+      :to="analyticsTo"
+      class="ag-ps-item"
+      :class="{ 'is-active': analytics }"
+      :aria-current="analytics ? 'true' : undefined"
+    >Analytics</router-link>
   </div>
 </template>
 

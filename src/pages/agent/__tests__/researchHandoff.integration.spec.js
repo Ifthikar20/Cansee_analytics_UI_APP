@@ -27,7 +27,7 @@ vi.mock('@/api/agent', () => ({
     deleteChat: vi.fn(),
     saveReport: vi.fn(),
     getContext: vi.fn(),
-    putContext: vi.fn(),
+    createContextEntry: vi.fn(),
     suggestions: vi.fn(),
     activity: vi.fn(),
     getSwarm: vi.fn(),
@@ -263,8 +263,8 @@ describe('first research: onboarding to the agent chat', () => {
       if (url === '/websites/') return Promise.resolve({ data: [{ id: WID, name: 'Notion' }] })
       return Promise.reject(new Error(`unexpected GET ${url}`))
     })
-    agentApi.getContext.mockResolvedValue(ok({ revision: 0, audience: '', voice: '', offerings: [], rules: [] }))
-    agentApi.putContext.mockResolvedValue(ok({ revision: 1 }))
+    agentApi.getContext.mockResolvedValue(ok({ entries: [], totals: { entries: 0, suggested: 0, references: 0 } }))
+    agentApi.createContextEntry.mockImplementation(async (wid, body) => ok({ id: 'e1', ...body }))
     agentApi.createChat.mockResolvedValueOnce(
       ok({ id: NEW_CHAT_ID, title: '', title_source: 'auto', messages: [], current_leaf_id: null, active_run: null })
     )
@@ -311,11 +311,12 @@ describe('first research: onboarding to the agent chat', () => {
       keywords: [PROMPT, 'notion alternatives for startups'],
       competitors: [{ name: 'Evernote', domain: 'evernote.com' }],
     })
-    expect(agentApi.putContext).toHaveBeenCalledWith(
-      WID,
-      expect.objectContaining({ audience: 'Operations leads at growing companies', revision: 0 }),
-      { _silentError: true }
-    )
+    expect(agentApi.createContextEntry).toHaveBeenCalledWith(WID, {
+      section: 'audience',
+      title: 'Audience',
+      body: 'Operations leads at growing companies',
+      references: [],
+    })
     expect(onComplete).toHaveBeenCalled()
 
     // The chat page took the stash once and sent it as a new chat.

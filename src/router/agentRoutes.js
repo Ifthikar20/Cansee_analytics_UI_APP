@@ -12,6 +12,7 @@ const AgentAgentsPage = () => import('@/pages/agent/AgentAgentsPage.vue')
 const AgentArtifactsPage = () => import('@/pages/agent/AgentArtifactsPage.vue')
 const AgentArtifactPage = () => import('@/pages/agent/AgentArtifactPage.vue')
 const AgentFindingsPage = () => import('@/pages/agent/AgentFindingsPage.vue')
+const AgentReviewsPage = () => import('@/pages/agent/AgentReviewsPage.vue')
 
 const meta = { requiresAuth: true, workspace: true }
 // Tab titles for pages that do not set their own (AgentShell applies them);
@@ -51,6 +52,7 @@ export const agentRoutes = [
                 props: true,
                 meta: titled('Findings'),
             },
+            { path: 'reviews', name: 'agent-reviews', component: AgentReviewsPage, props: true, meta: titled('Reviews') },
             {
                 path: 'reports',
                 name: 'agent-reports',

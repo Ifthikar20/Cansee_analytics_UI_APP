@@ -1,11 +1,15 @@
 <script setup>
 // The workspace sidebar: project switcher and inbox, the Agent | Analytics
-// switch, section nav, recent chats and the footer. Docked at >= 1024px,
-// otherwise rendered inside the shell's drawer (variant="drawer").
+// switch, then the agent sections and recent chats (Agent side) or the
+// analytics tabs (Analytics side), and the footer. The side follows the
+// route; Settings show the side used last. Docked at >= 1024px, otherwise
+// rendered inside the shell's drawer (variant="drawer").
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { sidebarSide } from '@/lib/analyticsNav'
 import ActivityButton from './ActivityButton.vue'
+import AnalyticsSidebarNav from './AnalyticsSidebarNav.vue'
 import ProductSwitch from './ProductSwitch.vue'
 import SidebarFooter from './SidebarFooter.vue'
 import SidebarNav from './SidebarNav.vue'
@@ -29,6 +33,8 @@ const websiteId = computed(() => {
 const website = computed(
   () => app.websites.find((w) => String(w.id) === websiteId.value) || (websiteId.value ? app.activeWebsite : null) || null,
 )
+
+const side = computed(() => sidebarSide(route))
 </script>
 
 <template>
@@ -37,9 +43,12 @@ const website = computed(
       <WorkspaceSwitcher :website="website" />
       <ActivityButton :website-id="websiteId" />
     </div>
-    <ProductSwitch :website-id="websiteId" />
-    <SidebarNav :website-id="websiteId" />
-    <SidebarRecents :website-id="websiteId" />
+    <ProductSwitch :website-id="websiteId" :side="side" />
+    <AnalyticsSidebarNav v-if="side === 'analytics'" :website-id="websiteId" />
+    <template v-else>
+      <SidebarNav :website-id="websiteId" />
+      <SidebarRecents :website-id="websiteId" />
+    </template>
     <SidebarFooter :variant="variant" />
   </nav>
 </template>

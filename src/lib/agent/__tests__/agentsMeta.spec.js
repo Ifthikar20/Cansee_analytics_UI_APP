@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { agentList, writerUnavailable } from '../agentsMeta'
+import { FileCode, FilePenLine, MessagesSquare, Newspaper, Scale, Share2 } from '@lucide/vue'
+import { AGENTS, AGENT_ORDER, agentForKind, agentList, agentMeta, writerUnavailable } from '../agentsMeta'
+import { AGENT_KEY_LIST } from '../types'
 
 const usd = (n) =>
   n.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -53,5 +55,56 @@ describe('agentList', () => {
       ['ad_campaign', ''],
     ])
     expect(agentList(catalog).every((a) => a.unavailable === '')).toBe(true)
+  })
+})
+
+describe('the ten agents', () => {
+  const ORDER = [
+    'gap_analyst',
+    'page_optimizer',
+    'aeo_article',
+    'llms_txt',
+    'comparison_page',
+    'landing_page',
+    'ad_campaign',
+    'social_posts',
+    'pr_writer',
+    'messaging_brief',
+  ]
+
+  it('lists them in catalog order, the same keys the deep links accept', () => {
+    expect(AGENT_ORDER).toEqual(ORDER)
+    expect(AGENT_KEY_LIST).toEqual(ORDER)
+    expect(agentList().map((a) => a.key)).toEqual(ORDER)
+  })
+
+  it('names the six new agents and gives each its icon; all write documents', () => {
+    const NEW = {
+      page_optimizer: ['Page Optimizer', FilePenLine],
+      comparison_page: ['Comparison Page Agent', Scale],
+      social_posts: ['Social Posts Agent', Share2],
+      pr_writer: ['PR Agent', Newspaper],
+      llms_txt: ['llms.txt Agent', FileCode],
+      messaging_brief: ['Messaging Agent', MessagesSquare],
+    }
+    for (const [key, [name, icon]] of Object.entries(NEW)) {
+      expect(AGENTS[key].name).toBe(name)
+      expect(AGENTS[key].outputKind).toBe('document')
+      // markRaw keeps the component itself.
+      expect(AGENTS[key].icon).toBe(icon)
+    }
+  })
+
+  it('carries the catalog teams, or the contract ones before it loads', () => {
+    expect(agentMeta('comparison_page').teams.map((t) => t.key)).toEqual(['product_marketing', 'content', 'growth'])
+    const catalog = [{ key: 'pr_writer', name: 'PR Agent', teams: [{ key: 'pr', label: 'PR and comms' }] }]
+    expect(agentMeta('pr_writer', catalog).teams).toEqual([{ key: 'pr', label: 'PR and comms' }])
+  })
+
+  it('keeps the general writer of each artifact kind', () => {
+    expect(agentForKind('document').key).toBe('aeo_article')
+    expect(agentForKind('report').key).toBe('gap_analyst')
+    expect(agentForKind('page').key).toBe('landing_page')
+    expect(agentForKind('sheet').key).toBe('ad_campaign')
   })
 })

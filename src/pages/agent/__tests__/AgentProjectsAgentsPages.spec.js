@@ -17,6 +17,18 @@ const { default: AgentAgentsPage } = await import('../AgentAgentsPage.vue')
 enableAutoUnmount(afterEach)
 
 const Blank = defineComponent({ render: () => h('div') })
+// The analytics tabs the Starts from links open (route names of contract 2b).
+const ANALYTICS_STUBS = [
+  ['competitors', 'competitors'],
+  ['sentiment', 'sentiment'],
+  ['fact-check', 'fact-check'],
+  ['sources-urls', 'sources'],
+  ['fan-outs', 'fan-outs'],
+  ['prompt-research', 'prompt-research'],
+  ['site-pages', 'pages'],
+  ['crawler-access', 'crawler-access'],
+  ['products', 'products'],
+].map(([name, path]) => ({ path: `/projects/:websiteId/${path}`, name, component: Blank }))
 
 async function setup(component, path, { websites = null, props = {} } = {}) {
   const pinia = createPinia()
@@ -28,6 +40,8 @@ async function setup(component, path, { websites = null, props = {} } = {}) {
       { path: '/agent/projects', name: 'agent-projects', component: Blank },
       { path: '/projects/:websiteId/agent', name: 'agent-home', component: Blank },
       { path: '/projects/:websiteId/agent/agents', name: 'agent-agents', component: Blank },
+      { path: '/settings/project', name: 'settings-project', component: Blank },
+      ...ANALYTICS_STUBS,
     ],
   })
   await router.push(path)
@@ -39,7 +53,12 @@ async function setup(component, path, { websites = null, props = {} } = {}) {
 
 beforeEach(() => {
   listWebsites.mockReset()
-  Object.assign(fakeAgent, { websiteId: 'w1', catalog: [], loadCatalog: vi.fn(async () => fakeAgent.catalog) })
+  Object.assign(fakeAgent, {
+    websiteId: 'w1',
+    catalog: [],
+    status: null,
+    loadCatalog: vi.fn(async () => fakeAgent.catalog),
+  })
 })
 
 describe('AgentProjectsPage', () => {
@@ -102,20 +121,132 @@ describe('AgentProjectsPage', () => {
 
 describe('AgentAgentsPage', () => {
   const CATALOG = [
-    { key: 'gap_analyst', name: 'Gap Analyst', description: 'Compares Google and AI answers.', output_kind: 'report', starter: 'Research our brand' },
+    {
+      key: 'gap_analyst',
+      name: 'Gap Analyst',
+      description: 'Compares Google and AI answers.',
+      output_kind: 'report',
+      starter: 'Research our brand',
+      teams: [
+        { key: 'aeo_seo', label: 'AEO and SEO' },
+        { key: 'growth', label: 'Growth' },
+      ],
+    },
+    {
+      key: 'page_optimizer',
+      name: 'Page Optimizer',
+      description: 'Rewrites one page of your site.',
+      output_kind: 'document',
+      starter: 'Optimize our page that engines retrieve but never cite.',
+      teams: [
+        { key: 'aeo_seo', label: 'AEO and SEO' },
+        { key: 'content', label: 'Content' },
+      ],
+    },
     { key: 'landing_page', name: 'Landing Page Agent', description: 'Builds a page.', output_kind: 'page', starter: '' },
+    {
+      key: 'social_posts',
+      name: 'Social Posts Agent',
+      description: 'Turns a draft into posts.',
+      output_kind: 'document',
+      starter: '',
+      teams: [
+        { key: 'social', label: 'Social' },
+        { key: 'content', label: 'Content' },
+      ],
+    },
   ]
 
-  it('renders a card per catalog agent with Use linking to a new chat', async () => {
+  const cardNames = (wrapper) => wrapper.findAll('[role="tabpanel"] li.ag-agent').map((li) => li.find('h2').text())
+
+  it('renders a card per agent with its teams, deliverable and Use linking to a new chat', async () => {
+    fakeAgent.catalog = CATALOG
+    const { wrapper } = await setup(AgentAgentsPage, '/projects/w1/agent/agents', { props: { websiteId: 'w1' } })
+    expect(wrapper.find('.ag-page-intro').text()).toBe(
+      "Specialists the agent hands work to, by team. Each one works from your context and Cansee's measurements and saves a draft for review."
+    )
+    expect(cardNames(wrapper)).toEqual(['Gap Analyst', 'Page Optimizer', 'Landing Page Agent', 'Social Posts Agent'])
+    const cards = wrapper.findAll('li.ag-agent')
+    expect(cards[0].findAll('.ag-agent-team').map((t) => t.text())).toEqual(['AEO and SEO', 'Growth'])
+    expect(cards[0].text()).toContain('Compares Google and AI answers.')
+    expect(cards[0].text()).toContain('Writes a report you can save to Reports')
+    expect(cards[0].text()).toContain('Research our brand')
+    expect(cards[0].find('a[aria-label="Use Gap Analyst"]').attributes('href')).toBe('/projects/w1/agent?agent=gap_analyst')
+    // A catalog entry without teams falls back to the contract's.
+    expect(cards[2].findAll('.ag-agent-team').map((t) => t.text())).toEqual(['Growth', 'Product marketing'])
+    expect(cards[2].find('a[aria-label="Use Landing Page Agent"]').attributes('href')).toBe(
+      '/projects/w1/agent?agent=landing_page'
+    )
+    expect(cards[1].text()).toContain('A revised page with every change listed')
+    // The specialists ask for their inputs first: Use is a button.
+    expect(cards[1].find('a[aria-label="Use Page Optimizer"]').exists()).toBe(false)
+    expect(cards[1].find('button[aria-label="Use Page Optimizer"]').exists()).toBe(true)
+  })
+
+  it('links the analytics tabs whose drafts start each agent', async () => {
     fakeAgent.catalog = CATALOG
     const { wrapper } = await setup(AgentAgentsPage, '/projects/w1/agent/agents', { props: { websiteId: 'w1' } })
     const cards = wrapper.findAll('li.ag-agent')
-    expect(cards).toHaveLength(2)
-    expect(cards[0].find('h2').text()).toBe('Gap Analyst')
-    expect(cards[0].text()).toContain('Compares Google and AI answers.')
-    expect(cards[0].text()).toContain('Research our brand')
-    expect(cards[0].find('a').attributes('href')).toBe('/projects/w1/agent?agent=gap_analyst')
-    expect(cards[1].find('a').attributes('href')).toBe('/projects/w1/agent?agent=landing_page')
+    const links = (card) => card.findAll('.ag-agent-from a').map((a) => [a.text(), a.attributes('href')])
+    expect(cards[0].find('.ag-agent-from').text()).toContain('Starts from')
+    expect(links(cards[0])).toEqual([
+      ['Competitors', '/projects/w1/competitors'],
+      ['Sentiment', '/projects/w1/sentiment'],
+    ])
+    expect(links(cards[1])).toEqual([
+      ['Fact check', '/projects/w1/fact-check'],
+      ['Pages', '/projects/w1/pages'],
+      ['Crawler access', '/projects/w1/crawler-access'],
+      ['Products', '/projects/w1/products'],
+    ])
+    // No template names the Landing Page Agent: no line.
+    expect(cards[2].find('.ag-agent-from').exists()).toBe(false)
+  })
+
+  it('filters by team with the team in the query', async () => {
+    fakeAgent.catalog = CATALOG
+    const { wrapper, router } = await setup(AgentAgentsPage, '/projects/w1/agent/agents', { props: { websiteId: 'w1' } })
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(tabs.map((t) => t.text())).toEqual([
+      'All agents',
+      'AEO and SEO',
+      'Content',
+      'Social',
+      'Growth',
+      'PR and comms',
+      'Product marketing',
+      'Brand',
+    ])
+    await tabs[2].trigger('mousedown')
+    await tabs[2].trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.query.team).toBe('content')
+    expect(cardNames(wrapper)).toEqual(['Page Optimizer', 'Social Posts Agent'])
+
+    await router.replace({ query: { team: 'growth' } })
+    await flushPromises()
+    expect(cardNames(wrapper)).toEqual(['Gap Analyst', 'Landing Page Agent'])
+
+    await router.replace({ query: { team: 'nonsense' } })
+    await flushPromises()
+    expect(cardNames(wrapper)).toHaveLength(4)
+  })
+
+  it('opens a team tab from the address', async () => {
+    fakeAgent.catalog = CATALOG
+    const { wrapper } = await setup(AgentAgentsPage, '/projects/w1/agent/agents?team=social', { props: { websiteId: 'w1' } })
+    expect(wrapper.find('[role="tab"][data-state="active"]').text()).toBe('Social')
+    expect(cardNames(wrapper)).toEqual(['Social Posts Agent'])
+  })
+
+  it('turns every Use off with the reason when the agent is switched off', async () => {
+    fakeAgent.catalog = CATALOG
+    fakeAgent.status = { enabled: false }
+    const { wrapper } = await setup(AgentAgentsPage, '/projects/w1/agent/agents', { props: { websiteId: 'w1' } })
+    const uses = wrapper.findAll('li.ag-agent [aria-label^="Use "]')
+    expect(uses).toHaveLength(4)
+    expect(uses.every((u) => u.attributes('aria-disabled') === 'true' && u.element.tagName === 'BUTTON')).toBe(true)
+    expect(wrapper.find('li.ag-agent a[aria-label^="Use "]').exists()).toBe(false)
   })
 
   it('loads the catalog when it is empty and says when there are none', async () => {
@@ -137,6 +268,6 @@ describe('AgentAgentsPage', () => {
     await wrapper.find('.ag-empty button').trigger('click')
     await flushPromises()
     expect(fakeAgent.loadCatalog).toHaveBeenCalledWith({ force: true })
-    expect(wrapper.findAll('li.ag-agent')).toHaveLength(2)
+    expect(wrapper.findAll('li.ag-agent')).toHaveLength(4)
   })
 })

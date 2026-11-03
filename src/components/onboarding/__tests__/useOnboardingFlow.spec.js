@@ -7,7 +7,7 @@ const post = vi.fn()
 const get = vi.fn()
 vi.mock('@/api/client', () => ({ default: { post: (...args) => post(...args), get: (...args) => get(...args) } }))
 
-const agentApi = { status: vi.fn(), getContext: vi.fn(), putContext: vi.fn() }
+const agentApi = { status: vi.fn(), getContext: vi.fn(), createContextEntry: vi.fn() }
 vi.mock('@/api/agent', () => ({ default: agentApi }))
 
 const websitesApi = { list: vi.fn() }
@@ -121,12 +121,13 @@ async function atRunStep({ status = STATUS, child = null } = {}) {
   return ctx
 }
 
-function finishMocks({ revision = 0 } = {}) {
+function finishMocks({ entries = 0, suggested = 0 } = {}) {
   post.mockImplementation((url) =>
     Promise.resolve(url === '/onboarding/save/' ? { data: { website_id: 'w1', name: 'Notion' } } : { data: { created_count: 3 } }),
   )
-  agentApi.getContext.mockResolvedValue({ data: { revision, audience: '', voice: '', offerings: [], rules: [] } })
-  agentApi.putContext.mockResolvedValue({ data: { revision: 1 } })
+  agentApi.getContext.mockResolvedValue({ data: { entries: [], totals: { entries, suggested, references: 0 } } })
+  agentApi.createContextEntry.mockReset()
+  agentApi.createContextEntry.mockImplementation(async (wid, body) => ({ data: { id: `e-${body.title}`, ...body } }))
   websitesApi.list.mockResolvedValue({ data: [{ id: 'w1', name: 'Notion' }] })
 }
 
@@ -525,21 +526,14 @@ describe('onboarding: first research', () => {
     // The research tracks its prompts itself: nothing goes to the prompt library.
     expect(post).toHaveBeenCalledTimes(1)
     expect(agentApi.getContext).toHaveBeenCalledWith('w1', { _silentError: true })
-    expect(agentApi.putContext).toHaveBeenCalledWith(
-      'w1',
-      {
-        audience: 'Operations leads at 50 to 500 person companies',
-        voice: 'Plain, confident, no jargon',
-        offerings: [
-          { name: 'Docs', description: '', url: '' },
-          { name: 'Wikis', description: '', url: '' },
-          { name: 'Projects', description: '', url: '' },
-        ],
-        rules: [],
-        revision: 0,
-      },
-      { _silentError: true },
-    )
+    // The contract 11d mapping: Audience, Execution titled Voice, one Offerings entry each.
+    expect(agentApi.createContextEntry.mock.calls).toEqual([
+      ['w1', { section: 'audience', title: 'Audience', body: 'Operations leads at 50 to 500 person companies', references: [] }],
+      ['w1', { section: 'execution', title: 'Voice', body: 'Plain, confident, no jargon', references: [] }],
+      ['w1', { section: 'offerings', title: 'Docs', body: '', references: [] }],
+      ['w1', { section: 'offerings', title: 'Wikis', body: '', references: [] }],
+      ['w1', { section: 'offerings', title: 'Projects', body: '', references: [] }],
+    ])
     expect(app.setWebsites).toHaveBeenCalledWith([{ id: 'w1', name: 'Notion' }])
     expect(useFirstResearch().take('w1').text).toBe(
       [
@@ -558,13 +552,20 @@ describe('onboarding: first research', () => {
     expect(flow.finishing.value).toBe('')
   })
 
-  it('leaves a context someone already saved alone', async () => {
-    const { flow } = await atRunStep()
-    finishMocks({ revision: 2 })
-    await flow.startResearch()
+  it('leaves a context someone already started alone', async () => {
+    let ctx = await atRunStep()
+    finishMocks({ entries: 2 })
+    await ctx.flow.startResearch()
     expect(agentApi.getContext).toHaveBeenCalled()
-    expect(agentApi.putContext).not.toHaveBeenCalled()
+    expect(agentApi.createContextEntry).not.toHaveBeenCalled()
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: 'agent-home' }))
+
+    // Suggestions built from the site wait for review: still not empty.
+    while (mounted.length) mounted.pop().unmount()
+    ctx = await atRunStep()
+    finishMocks({ suggested: 3 })
+    await ctx.flow.startResearch()
+    expect(agentApi.createContextEntry).not.toHaveBeenCalled()
   })
 
   it('writes no context when there is nothing to write, or when the agent is switched off', async () => {
@@ -575,7 +576,7 @@ describe('onboarding: first research', () => {
     ctx.flow.form.value.offerings = []
     await ctx.flow.startResearch()
     expect(agentApi.getContext).not.toHaveBeenCalled()
-    expect(agentApi.putContext).not.toHaveBeenCalled()
+    expect(agentApi.createContextEntry).not.toHaveBeenCalled()
 
     while (mounted.length) mounted.pop().unmount()
     agentApi.getContext.mockReset()
@@ -589,7 +590,7 @@ describe('onboarding: first research', () => {
   it('carries on when the context cannot be written', async () => {
     const { flow } = await atRunStep()
     finishMocks()
-    agentApi.putContext.mockRejectedValue({ response: { status: 409 } })
+    agentApi.createContextEntry.mockRejectedValue({ response: { status: 403 } })
     await flow.startResearch()
     expect(toast.error).not.toHaveBeenCalled()
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: 'agent-home' }))

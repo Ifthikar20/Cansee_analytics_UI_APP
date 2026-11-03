@@ -13,6 +13,12 @@
       </button>
     </DropdownMenuTrigger>
     <AgMenuContent align="end" :width="232">
+      <template v-if="approval">
+        <AgMenuLabel>
+          <span class="ag-menu-text">{{ approval }}</span>
+        </AgMenuLabel>
+        <AgMenuSeparator />
+      </template>
       <AgMenuItem v-for="action in actions" :key="action.key" @select="run(action.key)">
         <component :is="action.icon" :size="16" aria-hidden="true" />
         <span class="ag-menu-text">{{ action.label }}</span>
@@ -27,6 +33,8 @@ import { DropdownMenuRoot, DropdownMenuTrigger } from 'reka-ui'
 import { Download } from '@lucide/vue'
 import AgMenuContent from '@/components/agent/common/AgMenuContent.vue'
 import AgMenuItem from '@/components/agent/common/AgMenuItem.vue'
+import AgMenuLabel from '@/components/agent/common/AgMenuLabel.vue'
+import AgMenuSeparator from '@/components/agent/common/AgMenuSeparator.vue'
 import AgTooltip from '@/components/agent/common/AgTooltip.vue'
 import { useToast } from '@/composables/useToast'
 import { useAgentUiStore } from '@/stores/agentUi'
@@ -38,12 +46,16 @@ const props = defineProps({
   context: { type: Function, required: true },
   disabled: { type: Boolean, default: false },
   disabledReason: { type: String, default: 'Export is available when the draft is finished.' },
+  // A document's data type ('llms_txt' adds the llms.txt download).
+  dataType: { type: String, default: '' },
+  // Read-only line above the actions: `Approved: version {v}` or `Not approved yet`.
+  approval: { type: String, default: '' },
 })
 
 const toast = useToast()
 const ui = useAgentUiStore()
 
-const actions = computed(() => exportActions(props.kind))
+const actions = computed(() => exportActions(props.kind, props.dataType))
 
 async function run(key) {
   if (props.disabled) return

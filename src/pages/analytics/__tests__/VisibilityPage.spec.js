@@ -24,6 +24,7 @@ async function mountPage(path = '/projects/w1/visibility') {
       { path: '/dashboard', name: 'dashboard', component: Blank },
       { path: '/projects/:websiteId/visibility', name: 'visibility', component: VisibilityPage, props: true },
       { path: '/projects/:websiteId/prompts/:promptId', name: 'prompt', component: Blank, props: true },
+      { path: '/projects/:websiteId/competitors', name: 'competitors', component: Blank, props: true },
     ],
   })
   await router.push(path)
@@ -213,6 +214,16 @@ describe('VisibilityPage', () => {
     await flushPromises()
     expect(router.currentRoute.value.query).toEqual({})
     expect(wrapper.findAll('.viz-stat')).toHaveLength(5)
+  })
+
+  it('links to the competitor comparison under the share of voice', async () => {
+    const { wrapper, router } = await mountPage()
+    const link = wrapper.find('a.an-compare')
+    expect(link.text()).toBe('Compare with your competitors on Google and in AI answers')
+    expect(link.attributes('href')).toBe('/projects/w1/competitors')
+    await link.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('competitors')
   })
 
   it('opens a prompt from the heatmap', async () => {

@@ -160,8 +160,10 @@ export const useAgentStore = defineStore('agent', () => {
     const catalog = ref([])
     const catalogLoaded = ref(false)
     const suggestions = ref([])
-    const context = ref(null)
     const activity = ref([])
+    // Drafts waiting for this user's review in the project (GET reviews/
+    // ?box=waiting), loaded with the activity; null until known.
+    const reviewsWaiting = ref(null)
     // The chat on screen; a run finishing anywhere else marks its chat unseen.
     const viewingChatId = ref(null)
     // Research agents loaded by API, by swarm id:
@@ -1798,47 +1800,14 @@ export const useAgentStore = defineStore('agent', () => {
         }
     }
 
-    /** The brand context. Pass the page's `websiteId`; another project in scope throws project_changed. */
-    async function loadContext({ websiteId: expected = null } = {}) {
-        const wid = ensureProject(expected)
-        const ep = epoch.value
-        try {
-            const { data } = await agentApi.getContext(wid, { _silentError: true })
-            if (ep !== epoch.value) return null
-            context.value = data && typeof data === 'object' ? data : null
-            return context.value
-        } catch (err) {
-            throw normalizeError(err)
-        }
-    }
+    // The Context page reads and writes the context itself
+    // (composables/agent/useBrandContext), always naming its own project.
 
-    /**
-     * PUT the brand context with its revision; a stale one throws code
-     * revision_conflict. Pass the page's `websiteId`: a form shown for one
-     * project is never written to another (that throws project_changed).
-     */
-    async function saveContext(payload = {}, { websiteId: expected = null } = {}) {
-        const wid = ensureProject(expected)
-        const ep = epoch.value
-        const body = {
-            audience: payload.audience ?? '',
-            voice: payload.voice ?? '',
-            offerings: Array.isArray(payload.offerings) ? payload.offerings : [],
-            rules: Array.isArray(payload.rules) ? payload.rules : [],
-            revision: payload.revision ?? context.value?.revision ?? 0,
-        }
-        try {
-            const { data } = await agentApi.putContext(wid, body, { _silentError: true })
-            if (ep === epoch.value) context.value = data && typeof data === 'object' ? data : context.value
-            return context.value
-        } catch (err) {
-            throw normalizeError(err)
-        }
-    }
-
+    /** The project's activity; the review count of the sidebar refreshes with it. */
     async function loadActivity() {
         const wid = ensureProject()
         const ep = epoch.value
+        loadReviewsWaiting().catch(() => {})
         try {
             const { data } = await agentApi.activity(wid, { _silentError: true })
             if (ep !== epoch.value) return []
@@ -1847,6 +1816,29 @@ export const useAgentStore = defineStore('agent', () => {
         } catch (err) {
             throw normalizeError(err)
         }
+    }
+
+    /** How many drafts wait for this user's review (null while unknown or after a failure). */
+    async function loadReviewsWaiting() {
+        const wid = ensureProject()
+        const ep = epoch.value
+        try {
+            const { data } = await agentApi.listReviews(wid, 'waiting')
+            if (ep !== epoch.value) return reviewsWaiting.value
+            reviewsWaiting.value = listOf(data).length
+            return reviewsWaiting.value
+        } catch (err) {
+            if (ep === epoch.value) reviewsWaiting.value = null
+            throw normalizeError(err)
+        }
+    }
+
+    /** Follow a review action: the artifact's `review` summary as the server now has it. */
+    function setArtifactReview(id, review) {
+        if (id === undefined || id === null || !review || typeof review !== 'object') return
+        const key = String(id)
+        const entry = artifacts.value[key]
+        if (entry) entry.review = { ...(entry.review || {}), ...review }
     }
 
     /* ── Actions: resets ── */
@@ -1874,8 +1866,8 @@ export const useAgentStore = defineStore('agent', () => {
         runs.value = {}
         artifacts.value = {}
         suggestions.value = []
-        context.value = null
         activity.value = []
+        reviewsWaiting.value = null
         viewingChatId.value = null
         swarms.value = {}
     }
@@ -1910,8 +1902,8 @@ export const useAgentStore = defineStore('agent', () => {
     )
     // The project follows the workspace URL, never app.activeWebsite on its
     // own: AgentShell calls init() for the project in view. The active
-    // website can change while a page that blocked the switch (unsaved
-    // context edits) still shows the old project.
+    // website can change while a page that blocked the switch (an unsaved
+    // context entry) still shows the old project.
 
     return {
         // state
@@ -1929,8 +1921,8 @@ export const useAgentStore = defineStore('agent', () => {
         catalog,
         catalogLoaded,
         suggestions,
-        context,
         activity,
+        reviewsWaiting,
         viewingChatId,
         swarms,
         // getters
@@ -1976,9 +1968,9 @@ export const useAgentStore = defineStore('agent', () => {
         // other
         loadCatalog,
         loadSuggestions,
-        loadContext,
-        saveContext,
         loadActivity,
+        loadReviewsWaiting,
+        setArtifactReview,
         // streaming (runManager calls this; exposed for tests and tools)
         applyEvents,
         // resets

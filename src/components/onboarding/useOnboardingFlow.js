@@ -516,20 +516,29 @@ export function provideOnboardingFlow({ onComplete } = {}) {
     }),
   )
 
-  /** Brand facts for the agents, written only into a project with no context yet. */
+  /**
+   * The brand context the agents use, as context entries (p2_contract.md
+   * 11d mapping): an Audience entry, an Execution entry titled Voice and one
+   * Offerings entry per offering. Written only into a project whose context
+   * has no entry and no suggestion yet.
+   */
   async function saveBrandContext(websiteId) {
     const audience = form.value.audience.trim()
     const voice = form.value.voice.trim()
-    const offerings = form.value.offerings.map((name) => ({ name, description: '', url: '' }))
+    const offerings = form.value.offerings.map((name) => String(name || '').trim()).filter(Boolean)
     if (!audience && !voice && !offerings.length) return
     try {
       const { data } = await agentApi.getContext(websiteId, { _silentError: true })
-      // A saved context (a project set up before) is never overwritten.
-      if (Number(data?.revision) !== 0) return
-      await agentApi.putContext(websiteId, { audience, voice, offerings, rules: [], revision: 0 }, { _silentError: true })
+      // A context someone already started (a project set up before) is never added to.
+      const totals = data?.totals
+      if (!totals || Number(totals.entries) !== 0 || Number(totals.suggested) !== 0) return
+      const entries = []
+      if (audience) entries.push({ section: 'audience', title: 'Audience', body: audience })
+      if (voice) entries.push({ section: 'execution', title: 'Voice', body: voice })
+      for (const name of offerings) entries.push({ section: 'offerings', title: name, body: '' })
+      for (const entry of entries) await agentApi.createContextEntry(websiteId, { ...entry, references: [] })
     } catch {
-      // 409: a teammate saved first. Anything else: the context page can
-      // still be filled in later; it never blocks setup.
+      // The Context page can still be filled in later; it never blocks setup.
     }
   }
 

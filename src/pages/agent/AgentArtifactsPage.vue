@@ -1,10 +1,11 @@
 <script setup>
 // Reports, Documents and Sheets: the project's artifacts of the given kinds,
-// searchable. A row opens the artifact; "Open in chat" returns to the chat
-// that made it with the artifact open in the browser pane.
+// searchable and filtered by review state. A row opens the artifact; "Open
+// in chat" returns to the chat that made it with the artifact open in the
+// browser pane.
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { MessageSquare } from '@lucide/vue'
+import { ChevronDown, MessageSquare } from '@lucide/vue'
 import { useAgentStore } from '@/stores/agent'
 import { kindMeta } from '@/lib/agent/agentsMeta'
 import AgPage from '@/components/agent/common/AgPage.vue'
@@ -13,6 +14,8 @@ import AgEmptyState from '@/components/agent/common/AgEmptyState.vue'
 import AgSearchField from '@/components/agent/common/AgSearchField.vue'
 import { IconDocuments, IconReports, IconSheets } from '@/components/agent/icons'
 import { errorMessage, relativeTime } from '@/components/agent/common/agentText'
+import ReviewChip from '@/components/agent/review/ReviewChip.vue'
+import { REVIEW_FILTERS, effectiveState } from '@/lib/agent/review'
 
 const ROUTE_KINDS = {
   'agent-reports': ['report'],
@@ -80,7 +83,14 @@ const loading = ref(true)
 const error = ref('')
 const query = ref('')
 const searched = ref('')
+// '' = All, else a review state (p2_contract.md 13a), on the effective state.
+const reviewFilter = ref('')
 let request = 0
+
+const shown = computed(() =>
+  reviewFilter.value ? items.value.filter((a) => effectiveState(a.review) === reviewFilter.value) : items.value,
+)
+const filterLabel = computed(() => REVIEW_FILTERS.find((f) => f.value === reviewFilter.value)?.label || '')
 
 async function load(q = searched.value) {
   if (typeof agent.loadArtifacts !== 'function' || !wid.value) return
@@ -105,6 +115,7 @@ watch(
   () => {
     query.value = ''
     searched.value = ''
+    reviewFilter.value = ''
     items.value = []
     load('')
   },
@@ -147,6 +158,15 @@ const ctaTo = computed(() =>
   <AgPage :title="section.title" :intro="section.intro" :busy="loading">
     <div class="ag-arts-search">
       <AgSearchField v-model="query" :label="`Search ${section.noun}`" @search="onSearch" />
+      <label class="ag-arts-filter">
+        <span class="ag-arts-filter-label">Review</span>
+        <span class="ag-arts-filter-box">
+          <select v-model="reviewFilter" class="ag-arts-filter-input">
+            <option v-for="f in REVIEW_FILTERS" :key="f.value" :value="f.value">{{ f.label }}</option>
+          </select>
+          <ChevronDown class="ag-arts-filter-icon" :size="14" aria-hidden="true" />
+        </span>
+      </label>
     </div>
 
     <ul v-if="loading && !items.length" class="ag-arts" role="list" aria-hidden="true">
@@ -171,18 +191,23 @@ const ctaTo = computed(() =>
 
     <p v-else-if="!items.length && searched" class="ag-arts-none">No {{ section.noun }} match "{{ searched }}".</p>
 
+    <p v-else-if="items.length && !shown.length" class="ag-arts-none">No {{ section.noun }} match "{{ filterLabel }}".</p>
+
     <AgEmptyState v-else-if="!items.length" :icon="section.icon" :title="section.empty" :body="section.emptyBody">
       <AgButton v-if="ctaTo" size="sm" :to="ctaTo">{{ section.cta }}</AgButton>
     </AgEmptyState>
 
     <ul v-else class="ag-arts" role="list">
-      <li v-for="a in items" :key="a.id" class="ag-art">
+      <li v-for="a in shown" :key="a.id" class="ag-art">
         <RouterLink :to="artifactTo(a)" class="ag-art-main">
           <span class="ag-art-icon" :style="{ color: kindMeta(a.kind).color }" aria-hidden="true">
             <component :is="kindMeta(a.kind).icon" :size="14" />
           </span>
           <span class="ag-art-text">
-            <span class="ag-art-title">{{ a.title || kindMeta(a.kind).label }}</span>
+            <span class="ag-art-head">
+              <span class="ag-art-title">{{ a.title || kindMeta(a.kind).label }}</span>
+              <ReviewChip :review="a.review || null" plain />
+            </span>
             <span v-if="metaFor(a)" class="ag-art-meta ag-tnum">{{ metaFor(a) }}</span>
           </span>
         </RouterLink>
@@ -204,7 +229,62 @@ const ctaTo = computed(() =>
 
 <style scoped>
 .ag-arts-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
   margin-bottom: 16px;
+}
+
+.ag-arts-search > :first-child {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.ag-arts-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ag-arts-filter-label {
+  color: var(--ag-fg-3);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ag-arts-filter-box {
+  position: relative;
+  display: inline-flex;
+}
+
+.ag-arts-filter-input {
+  height: 32px;
+  padding: 0 30px 0 10px;
+  border: 1px solid var(--ag-btn-border);
+  border-radius: 8px;
+  background: var(--ag-btn-bg);
+  color: var(--ag-fg-1);
+  font: inherit;
+  font-size: 13px;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.ag-arts-filter-input:focus-visible {
+  border-color: var(--ag-ring);
+  border-radius: 8px;
+  outline: none;
+}
+
+.ag-arts-filter-icon {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  color: var(--ag-fg-3);
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .ag-arts-none {
@@ -281,7 +361,15 @@ const ctaTo = computed(() =>
   min-width: 0;
 }
 
+.ag-art-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .ag-art-title {
+  min-width: 0;
   overflow: hidden;
   color: var(--ag-fg-1);
   font-size: 14px;

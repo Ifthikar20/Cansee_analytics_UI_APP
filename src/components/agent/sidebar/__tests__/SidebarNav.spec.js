@@ -4,11 +4,11 @@ import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, reactive } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-const fakeAgent = reactive({ artifacts: {}, artifact: (id) => fakeAgent.artifacts[id] || null })
+const fakeAgent = reactive({ artifacts: {}, reviewsWaiting: null, artifact: (id) => fakeAgent.artifacts[id] || null })
 vi.mock('@/stores/agent', () => ({ useAgentStore: () => fakeAgent }))
 
+// ProductSwitch has its own spec (ProductSwitch.spec.js).
 const { default: SidebarNav } = await import('../SidebarNav.vue')
-const { default: ProductSwitch } = await import('../ProductSwitch.vue')
 
 enableAutoUnmount(afterEach)
 
@@ -27,6 +27,7 @@ async function setup(component, path, props) {
       { path: '/projects/:websiteId/agent/context', name: 'agent-context', component: Blank },
       { path: '/projects/:websiteId/agent/agents', name: 'agent-agents', component: Blank },
       { path: '/projects/:websiteId/agent/findings', name: 'agent-findings', component: Blank },
+      { path: '/projects/:websiteId/agent/reviews', name: 'agent-reviews', component: Blank },
       { path: '/projects/:websiteId/agent/reports', name: 'agent-reports', component: Blank },
       { path: '/projects/:websiteId/agent/sheets', name: 'agent-sheets', component: Blank },
       { path: '/projects/:websiteId/agent/documents', name: 'agent-documents', component: Blank },
@@ -40,10 +41,11 @@ async function setup(component, path, props) {
 
 beforeEach(() => {
   fakeAgent.artifacts = {}
+  fakeAgent.reviewsWaiting = null
 })
 
 describe('SidebarNav', () => {
-  it('lists the eight sections in order with project links', async () => {
+  it('lists the nine sections in order with project links', async () => {
     const w = await setup(SidebarNav, '/projects/w1/agent', { websiteId: 'w1' })
     const links = w.findAll('a.ag-nav-row')
     expect(links.map((a) => a.text())).toEqual([
@@ -52,6 +54,7 @@ describe('SidebarNav', () => {
       'Context',
       'Agents',
       'Findings',
+      'Reviews',
       'Reports',
       'Sheets',
       'Documents',
@@ -62,11 +65,28 @@ describe('SidebarNav', () => {
       '/projects/w1/agent/context',
       '/projects/w1/agent/agents',
       '/projects/w1/agent/findings',
+      '/projects/w1/agent/reviews',
       '/projects/w1/agent/reports',
       '/projects/w1/agent/sheets',
       '/projects/w1/agent/documents',
     ])
-    expect(w.findAll('svg.ag-nav-icon')).toHaveLength(8)
+    expect(w.findAll('svg.ag-nav-icon')).toHaveLength(9)
+  })
+
+  it('counts the drafts waiting for your review, and hides a zero or unknown count', async () => {
+    fakeAgent.reviewsWaiting = 3
+    let w = await setup(SidebarNav, '/projects/w1/agent/reviews', { websiteId: 'w1' })
+    const reviews = w.find('[aria-current="page"]')
+    expect(reviews.find('.ag-nav-label').text()).toBe('Reviews')
+    expect(reviews.find('.ag-nav-count').text()).toBe('3')
+    expect(reviews.find('.ag-nav-count').attributes('aria-label')).toBe('3 waiting for your review')
+
+    fakeAgent.reviewsWaiting = 0
+    w = await setup(SidebarNav, '/projects/w1/agent', { websiteId: 'w1' })
+    expect(w.find('.ag-nav-count').exists()).toBe(false)
+    fakeAgent.reviewsWaiting = null
+    w = await setup(SidebarNav, '/projects/w1/agent', { websiteId: 'w1' })
+    expect(w.find('.ag-nav-count').exists()).toBe(false)
   })
 
   it('shows Findings with the flag glyph and marks it current on its page', async () => {
@@ -94,24 +114,6 @@ describe('SidebarNav', () => {
   it('disables project sections when there is no project', async () => {
     const w = await setup(SidebarNav, '/agent/projects', { websiteId: null })
     expect(w.findAll('a.ag-nav-row').map((a) => a.text())).toEqual(['Projects'])
-    expect(w.findAll('[aria-disabled="true"]')).toHaveLength(7)
-  })
-})
-
-describe('ProductSwitch', () => {
-  it('links Agent to the project home and Analytics to the dashboard', async () => {
-    const w = await setup(ProductSwitch, '/projects/w1/agent/context', { websiteId: 'w1' })
-    const [agentLink, analytics] = w.findAll('a')
-    expect(agentLink.text()).toBe('Agent')
-    expect(agentLink.attributes('href')).toBe('/projects/w1/agent')
-    expect(agentLink.attributes('aria-current')).toBe('true')
-    expect(analytics.text()).toBe('Analytics')
-    expect(analytics.attributes('href')).toBe('/dashboard')
-    expect(w.attributes('role')).toBe('group')
-  })
-
-  it('falls back to /agent without a project', async () => {
-    const w = await setup(ProductSwitch, '/agent/projects', { websiteId: null })
-    expect(w.find('a').attributes('href')).toBe('/agent')
+    expect(w.findAll('[aria-disabled="true"]')).toHaveLength(8)
   })
 })

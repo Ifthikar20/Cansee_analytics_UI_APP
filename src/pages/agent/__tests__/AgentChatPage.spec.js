@@ -11,7 +11,7 @@ vi.mock('@/stores/agent', () => ({ useAgentStore: () => fakeAgent }))
 const fakePane = reactive({})
 vi.mock('@/stores/agentPane', () => ({ useAgentPaneStore: () => fakePane }))
 
-const fakeUi = { announce: vi.fn() }
+const fakeUi = { announce: vi.fn(), focusComposer: vi.fn() }
 vi.mock('@/stores/agentUi', () => ({ useAgentUiStore: () => fakeUi }))
 
 const fakeAuth = reactive({ user: { id: 7 } })
@@ -119,6 +119,7 @@ beforeEach(() => {
   chatMounts.length = 0
   resetStores()
   fakeUi.announce.mockReset()
+  fakeUi.focusComposer.mockReset()
   Object.values(toast).forEach((fn) => fn.mockReset())
 })
 
@@ -274,5 +275,104 @@ describe('AgentChatPage ?tab=', () => {
     const { router } = await setup('/projects/w1/agent/c/c1?artifact=a7')
     expect(fakePane.openArtifact).toHaveBeenCalledWith('a7', { activate: true })
     expect(router.currentRoute.value.query).toEqual({})
+  })
+})
+
+describe('AgentChatPage ?from= (Ask the agent)', () => {
+  const STATUS = {
+    limits: { run_cost_usd: '3.00' },
+    allowance: { cap_usd: '5.00', spent_usd: '0.92' },
+    writers: { page_optimizer: { available: true, needs_usd: '0.45' } },
+  }
+  const notice = () => document.body.querySelector('.ag-drafted[role="status"]')
+
+  it('shows where the draft came from, focuses the composer and drops the query, sending nothing', async () => {
+    resetStores({ status: STATUS })
+    const { router } = await setup('/projects/w1/agent?agent=page_optimizer&from=pages')
+    expect(notice()).not.toBeNull()
+    expect(notice().querySelector('.ag-drafted-line').textContent).toBe('Drafted from Pages. Review it, then send.')
+    expect(notice().querySelector('.ag-drafted-limits').textContent).toBe(
+      'A reply stops once it has used $3.00 of AI allowance; the request already running finishes. $4.08 left this month.'
+    )
+    expect(fakeUi.focusComposer).toHaveBeenCalled()
+    expect(router.currentRoute.value.query).toEqual({ agent: 'page_optimizer' })
+    // The composer mounts with the draft and the agent named by ?agent=.
+    expect(chatMounts.at(-1)).toEqual({ chatId: null, initialAgent: 'page_optimizer' })
+    expect(fakeAgent.send).not.toHaveBeenCalled()
+  })
+
+  it('mounts the chat column again when a draft arrives on the new chat already open', async () => {
+    resetStores({ status: STATUS })
+    const { router, wrapper } = await setup('/projects/w1/agent')
+    expect(chatMounts).toHaveLength(1)
+    expect(notice()).toBeNull()
+
+    await router.push('/projects/w1/agent?agent=gap_analyst&from=sentiment')
+    await flushPromises()
+    expect(chatMounts).toHaveLength(2)
+    expect(wrapper.find('.chat-stub').attributes('data-agent')).toBe('gap_analyst')
+    expect(notice().querySelector('.ag-drafted-line').textContent).toBe('Drafted from Sentiment. Review it, then send.')
+    expect(router.currentRoute.value.query).toEqual({ agent: 'gap_analyst' })
+    expect(fakeAgent.send).not.toHaveBeenCalled()
+  })
+
+  it('names the Agents page and keeps only the first sentence with an unlimited allowance', async () => {
+    resetStores({ status: { ...STATUS, allowance: { cap_usd: '0.00', spent_usd: '1.20' } } })
+    await setup('/projects/w1/agent?from=agents')
+    expect(notice().querySelector('.ag-drafted-line').textContent).toBe('Drafted from Agents. Review it, then send.')
+    expect(notice().querySelector('.ag-drafted-limits').textContent).toBe(
+      'A reply stops once it has used $3.00 of AI allowance; the request already running finishes.'
+    )
+  })
+
+  it('says when the preselected writer cannot start', async () => {
+    resetStores({
+      status: { ...STATUS, writers: { page_optimizer: { available: false, needs_usd: '0.45' } } },
+    })
+    await setup('/projects/w1/agent?agent=page_optimizer&from=crawler-access')
+    expect(notice().querySelector('.ag-drafted-line').textContent).toBe('Drafted from Crawler access. Review it, then send.')
+    expect(notice().querySelector('.ag-drafted-limits').textContent).toBe(
+      'A reply stops once it has used $3.00 of AI allowance; the request already running finishes. $4.08 left this month. ' +
+        'Needs at least $0.45 of AI allowance; $4.08 left this month.'
+    )
+  })
+
+  it('shows the first line alone until the agent status has loaded', async () => {
+    resetStores({ status: null })
+    await setup('/projects/w1/agent?from=fact-check')
+    expect(notice().querySelector('.ag-drafted-line').textContent).toBe('Drafted from Fact check. Review it, then send.')
+    expect(notice().querySelector('.ag-drafted-limits')).toBeNull()
+    fakeAgent.status = STATUS
+    await flushPromises()
+    expect(notice().querySelector('.ag-drafted-limits').textContent).toContain('$3.00')
+  })
+
+  it('clears the notice once the message is sent and the chat has its id', async () => {
+    resetStores({ status: STATUS, messages: {}, visiblePath: () => [] })
+    await setup('/projects/w1/agent?from=pages')
+    expect(notice()).not.toBeNull()
+    // The first message shows in the new chat's thread.
+    fakeAgent.messages = { m1: { id: 'm1', role: 'user' } }
+    fakeAgent.visiblePath = (key) => (key === 'new' ? ['m1'] : [])
+    await flushPromises()
+    expect(notice()).toBeNull()
+
+    resetStores({ status: STATUS })
+    const next = await setup('/projects/w1/agent?from=products')
+    expect(notice()).not.toBeNull()
+    await next.router.replace({ name: 'agent-chat', params: { websiteId: 'w1', chatId: 'c9' } })
+    await flushPromises()
+    expect(notice()).toBeNull()
+  })
+
+  it('ignores ?from= on an existing chat and an unknown tab, and drops it', async () => {
+    let ctx = await setup('/projects/w1/agent/c/c1?from=pages')
+    expect(notice()).toBeNull()
+    expect(ctx.router.currentRoute.value.query).toEqual({})
+    expect(fakeUi.focusComposer).not.toHaveBeenCalled()
+
+    ctx = await setup('/projects/w1/agent?from=elsewhere')
+    expect(notice()).toBeNull()
+    expect(ctx.router.currentRoute.value.query).toEqual({})
   })
 })

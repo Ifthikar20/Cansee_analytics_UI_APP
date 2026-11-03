@@ -11,7 +11,11 @@ import api from './client'
 
 const site = (wid) => `/agent/websites/${encodeURIComponent(wid)}`
 const live = (wid) => `/agent/live/websites/${encodeURIComponent(wid)}`
+const enc = encodeURIComponent
 const runStart = (config = {}) => ({ _noRetry429: true, ...config })
+// Context, reviews, team and the usage dashboard show their failures where
+// they happen (p2_frontend.md 10), so none of them toasts.
+const quiet = (config = {}) => ({ _silentError: true, ...config })
 const clean = (params) =>
     Object.fromEntries(Object.entries(params || {}).filter(([, v]) => v !== undefined && v !== null && v !== ''))
 
@@ -48,12 +52,69 @@ export default {
     // {message_id, title?}; 409 already_saved carries details.artifact_id
     saveReport: (wid, data, config) => api.post(`${site(wid)}/reports/`, clean(data), config),
 
+    /* ── context manager (p2_contract.md 11b): viewers read, members write ── */
+
+    // ContextOverview: sections, entries, documents, facts, competitors, totals, build, can_edit
     getContext: (wid, config) => api.get(`${site(wid)}/context/`, config),
-    // {audience, voice, offerings, rules, revision}; 409 revision_conflict when stale
-    putContext: (wid, data, config) => api.put(`${site(wid)}/context/`, data, config),
+    // {section, title, body, references: [RefInput]}; 201 Entry (active, origin user)
+    createContextEntry: (wid, data, config) => api.post(`${site(wid)}/context/entries/`, data, quiet(config)),
+    // {revision, title?, body?, section?, position?}; 409 revision_conflict when stale
+    updateContextEntry: (wid, id, data, config) =>
+        api.patch(`${site(wid)}/context/entries/${enc(id)}/`, data, quiet(config)),
+    deleteContextEntry: (wid, id, revision, config) =>
+        api.delete(`${site(wid)}/context/entries/${enc(id)}/`, { ...quiet(config), params: { revision } }),
+    // suggested entries only; {accepted, dismissed}
+    reviewContextEntries: (wid, { accept = [], dismiss = [] } = {}, config) =>
+        api.post(`${site(wid)}/context/entries/review/`, { accept, dismiss }, quiet(config)),
+    // RefInput {kind, url?, fact_id?, document_id?, competitor_domain?, quote?}; 201 Reference
+    addContextReference: (wid, entryId, data, config) =>
+        api.post(`${site(wid)}/context/entries/${enc(entryId)}/references/`, data, quiet(config)),
+    deleteContextReference: (wid, id, config) =>
+        api.delete(`${site(wid)}/context/references/${enc(id)}/`, quiet(config)),
+    listContextDocuments: (wid, config) => api.get(`${site(wid)}/context/documents/`, quiet(config)),
+    // Document plus `text`
+    getContextDocument: (wid, id, config) => api.get(`${site(wid)}/context/documents/${enc(id)}/`, quiet(config)),
+    // {title, text}; 201 Document
+    createContextDocument: (wid, data, config) => api.post(`${site(wid)}/context/documents/`, data, quiet(config)),
+    // {title?, text?}
+    updateContextDocument: (wid, id, data, config) =>
+        api.patch(`${site(wid)}/context/documents/${enc(id)}/`, data, quiet(config)),
+    deleteContextDocument: (wid, id, config) =>
+        api.delete(`${site(wid)}/context/documents/${enc(id)}/`, quiet(config)),
 
     suggestions: (wid, config) => api.get(`${site(wid)}/suggestions/`, config),
     activity: (wid, config) => api.get(`${site(wid)}/activity/`, config),
+
+    /* ── approvals (p2_contract.md 13c) ── */
+
+    getReview: (wid, aid, config) => api.get(`${site(wid)}/artifacts/${enc(aid)}/review/`, quiet(config)),
+    // {action, revision, reviewer_id?, note?}; 409 revision_conflict | review_state
+    reviewAction: (wid, aid, data, config) =>
+        api.post(`${site(wid)}/artifacts/${enc(aid)}/review/`, data, quiet(config)),
+    // {body}; 201 ReviewEvent
+    addReviewComment: (wid, aid, data, config) =>
+        api.post(`${site(wid)}/artifacts/${enc(aid)}/review/comments/`, data, quiet(config)),
+    // box: 'waiting' | 'mine' | 'approved'; [ArtifactSummary], newest first
+    listReviews: (wid, box, config) => api.get(`${site(wid)}/reviews/`, { ...quiet(config), params: clean({ box }) }),
+    // [{id, name, email, role, is_you}]; viewers get 403 permission_denied
+    team: (wid, config) => api.get(`${site(wid)}/team/`, quiet(config)),
+
+    /* ── usage dashboard (p2_contract.md 14b; signed in, not project-scoped) ── */
+
+    // {scope, period, interval, website_id}
+    commandCenter: (params = {}, config) =>
+        api.get('/agent/command-center/', { ...quiet(config), params: clean(params) }),
+
+    /* ── other apps' lists the agent task dialog and the context picker read ── */
+
+    // GET search-gap overview; callers read prompts[] {prompt_id, text}
+    trackedPrompts: (wid, config) => api.get(`/search-gap/websites/${enc(wid)}/overview/`, quiet(config)),
+    // current brand facts; the envelope turns the paginated list into the data array
+    brandFacts: (wid, { status, q } = {}, config) =>
+        api.get(`/brand-vault/websites/${enc(wid)}/facts/`, {
+            ...quiet(config),
+            params: clean({ status, q, only_current: 'true' }),
+        }),
 
     /* ── research agents (swarms): private to the chat's user ── */
 

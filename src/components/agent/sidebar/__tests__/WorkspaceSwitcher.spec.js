@@ -26,6 +26,7 @@ async function setup() {
       { path: '/login', name: 'login', component: Blank },
       { path: '/settings', name: 'settings', component: Blank },
       { path: '/settings/project', name: 'settings-project', component: Blank },
+      { path: '/settings/usage-dashboard', name: 'settings-command-center', component: Blank },
       { path: '/billing', name: 'billing', component: Blank },
       { path: '/projects/:websiteId/agent', name: 'agent-home', component: Blank },
       { path: '/projects/:websiteId/agent/reports', name: 'agent-reports', component: Blank },
@@ -85,6 +86,18 @@ describe('WorkspaceSwitcher', () => {
     menu = await openMenu(wrapper)
     item(menu, 'Billing').click()
     await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/billing'))
+  })
+
+  it('opens the usage dashboard from the account menu', async () => {
+    const { wrapper, router } = await setup()
+    const menu = await openMenu(wrapper)
+    const entry = item(menu, 'Usage dashboard')
+    expect(entry).toBeTruthy()
+    expect(entry.querySelector('svg')).not.toBeNull()
+    // "Command Center" is the design's working name only.
+    expect(menu.textContent).not.toContain('Command Center')
+    entry.click()
+    await vi.waitFor(() => expect(router.currentRoute.value.path).toBe('/settings/usage-dashboard'))
   })
 
   it('sets the theme from the Appearance submenu', async () => {

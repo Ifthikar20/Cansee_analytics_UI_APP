@@ -101,6 +101,36 @@ describe('AgentArtifactsPage', () => {
     expect(rows[1].find('a.ag-art-chat').exists()).toBe(false)
   })
 
+  it("shows each draft's review state and filters by it", async () => {
+    const review = (state, effective = state, version = 2) => ({ state, effective_state: effective, version, reviewer_name: '', updated_at: null })
+    fakeAgent.loadArtifacts = vi.fn(async () => [
+      { id: 'a1', kind: 'document', title: 'Approved guide', latest_version: 2, review: review('approved') },
+      { id: 'a2', kind: 'document', title: 'Guide in review', latest_version: 1, review: review('in_review') },
+      // Approved at version 2, edited since: a draft again.
+      { id: 'a3', kind: 'document', title: 'Edited guide', latest_version: 3, review: review('approved', 'draft') },
+      { id: 'a4', kind: 'page', title: 'Never reviewed', latest_version: 1 },
+    ])
+    const { wrapper } = await setup('agent-documents', ['document', 'page'])
+    const states = () => wrapper.findAll('li.ag-art').map((li) => [li.find('.ag-art-title').text(), li.find('.ag-rchip').text()])
+    expect(states()).toEqual([
+      ['Approved guide', 'Approved v2'],
+      ['Guide in review', 'In review'],
+      ['Edited guide', 'Draft'],
+      ['Never reviewed', 'Draft'],
+    ])
+    const select = wrapper.find('.ag-arts-filter select')
+    expect(select.findAll('option').map((o) => o.text())).toEqual(['All', 'Draft', 'In review', 'Changes requested', 'Approved'])
+    await select.setValue('draft')
+    expect(states().map(([title]) => title)).toEqual(['Edited guide', 'Never reviewed'])
+    await select.setValue('approved')
+    expect(states().map(([title]) => title)).toEqual(['Approved guide'])
+    await select.setValue('changes_requested')
+    expect(wrapper.findAll('li.ag-art')).toHaveLength(0)
+    expect(wrapper.text()).toContain('No documents match "Changes requested".')
+    // Filtering is local: the list was read once.
+    expect(fakeAgent.loadArtifacts).toHaveBeenCalledTimes(1)
+  })
+
   it('searches after a pause and says when nothing matches', async () => {
     const { wrapper } = await setup('agent-reports', ['report'])
     vi.useFakeTimers()

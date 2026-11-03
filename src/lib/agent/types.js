@@ -287,7 +287,19 @@ export const TAB_STATUSES = new Set(['loading', 'ready', 'error'])
 
 export const ARTIFACT_KIND_LIST = Object.freeze(['page', 'document', 'sheet', 'report'])
 
-export const AGENT_KEY_LIST = Object.freeze(['gap_analyst', 'landing_page', 'aeo_article', 'ad_campaign'])
+// The ten agents of GET agents/, in catalog order (p2_contract.md 12b).
+export const AGENT_KEY_LIST = Object.freeze([
+    'gap_analyst',
+    'page_optimizer',
+    'aeo_article',
+    'llms_txt',
+    'comparison_page',
+    'landing_page',
+    'ad_campaign',
+    'social_posts',
+    'pr_writer',
+    'messaging_brief',
+])
 
 // The chat key for a chat that does not exist on the server yet.
 export const NEW_CHAT_KEY = 'new'

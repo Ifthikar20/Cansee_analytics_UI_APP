@@ -5,12 +5,19 @@ import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }))
+// Citation analytics reads its own endpoint, so the client mock above
+// serves the Sources table alone.
+const insights = vi.hoisted(() => ({ citations: vi.fn() }))
+const ask = vi.hoisted(() => ({ askAgent: vi.fn(async () => true) }))
 
 vi.mock('@/api/client', () => ({ default: client, authHeaders: () => ({}), refreshAccessToken: async () => '' }))
+vi.mock('@/api/insights', () => ({ default: insights }))
+vi.mock('@/lib/agent/askAgent', () => ask)
 
 import SourcesUrlsPage from '@/pages/SourcesUrlsPage.vue'
 import { VizChartStub, chartsById } from './__fixtures__/vizStub'
 import { WEBSITE_ID } from './__fixtures__/polish'
+import { apiError, citationsPayload } from '@/pages/analytics/__tests__/__fixtures__/measurementPayloads'
 
 enableAutoUnmount(afterEach)
 
@@ -48,8 +55,9 @@ async function mountPage() {
         routes: [
             { path: '/dashboard', component: Blank },
             { path: '/settings/connections', component: Blank },
-            { path: '/projects/:websiteId/sources', name: 'sources-urls', component: Blank },
+            { path: '/projects/:websiteId/sources', name: 'sources-urls', component: Blank, meta: { analytics: 'sources' } },
             { path: '/projects/:websiteId/sources/detail', name: 'sources-url-detail', component: Blank },
+            { path: '/projects/:websiteId/prompts/:promptId', name: 'prompt', component: Blank },
         ],
     })
     await router.push(`/projects/${WEBSITE_ID}/sources`)
@@ -68,6 +76,9 @@ const entities = (wrapper) =>
 
 beforeEach(() => {
     Object.values(client).forEach((fn) => fn.mockReset())
+    insights.citations.mockReset()
+    insights.citations.mockResolvedValue({ data: citationsPayload() })
+    ask.askAgent.mockClear()
 })
 
 describe('SourcesUrlsPage: charts', () => {
@@ -126,5 +137,109 @@ describe('SourcesUrlsPage: charts', () => {
         expect(types.props('spec').datasets[0].data).toEqual([67, 33])
         expect(types.props('empty')).toBeNull()
         expect(types.text()).toContain('Total retrievals: 12')
+    })
+})
+
+describe('SourcesUrlsPage: citation analytics', () => {
+    const section = (wrapper) => wrapper.find('[aria-labelledby="ca-title"]')
+
+    it('comes first, with its own filters, tiles, charts and tables', async () => {
+        client.get.mockResolvedValueOnce({ data: urlsPayload(['g2.com']) })
+        const wrapper = await mountPage()
+        expect(insights.citations).toHaveBeenCalledWith(WEBSITE_ID, { period: '30d' })
+        const ca = section(wrapper)
+        expect(ca.find('h2').text()).toBe('Citation analytics')
+        expect(ca.text()).toContain('Which sources the engines rely on, and where you and your competitors are cited.')
+        expect(ca.findAll('.viz-stat').map((t) => t.text())).toEqual([
+            'Answers with sources80 of 120',
+            'Sources listed340',
+            'Cited in the answer text210 of 340',
+            'Your pages cited31',
+        ])
+        expect(ca.text()).toContain(
+            'Here every source an answer lists counts once. The table below calls that a retrieval and counts a citation each time the answer text points to the source.',
+        )
+        const charts = chartsById(wrapper)
+        expect(charts['citations.classes'].props('spec').title).toBe('Sources by type')
+        expect(charts['citations.engines'].props('spec').title).toBe('Sources by engine')
+        expect(ca.find('#ca-yours-title').text()).toBe('Your cited pages')
+        expect(ca.find('#ca-theirs-title').text()).toBe('Competitor pages cited')
+        expect(ca.find('#ca-gaps-title').text()).toBe('Prompts where only competitors are cited')
+        expect(ca.text()).toContain(
+            'Retrieved only: the engine fetched the page while answering, but its answer text never pointed to it.',
+        )
+        // The Sources table below still loads on its own.
+        expect(client.get).toHaveBeenCalledWith(`/citations/websites/${WEBSITE_ID}/urls/`, {
+            params: { period_days: 30 },
+            _silentError: true,
+        })
+    })
+
+    it('sends its own period and engine, leaving the Sources table alone', async () => {
+        client.get.mockResolvedValue({ data: urlsPayload(['g2.com']) })
+        const wrapper = await mountPage()
+        const [period, engine] = section(wrapper).findAll('select')
+        await period.setValue('7d')
+        await flushPromises()
+        await engine.setValue('claude')
+        await flushPromises()
+        expect(insights.citations).toHaveBeenLastCalledWith(WEBSITE_ID, { period: '7d', engine: 'claude' })
+        expect(client.get).toHaveBeenCalledTimes(1)
+    })
+
+    it('asks the agent for a page where only competitors are cited', async () => {
+        client.get.mockResolvedValueOnce({ data: urlsPayload(['g2.com']) })
+        const wrapper = await mountPage()
+        await section(wrapper).find('[aria-labelledby="ca-gaps-title"] .ask-btn').trigger('click')
+        await flushPromises()
+        const [, options] = ask.askAgent.mock.calls[0]
+        expect(options).toMatchObject({ websiteId: WEBSITE_ID, agent: 'aeo_article', from: 'sources' })
+        expect(options.text).toBe(
+            'For "best note taking app for teams", AI engines cited competitor pages 6 times and ours never. Most cited domains: g2.com and reddit.com.\n' +
+                'Draft a page that answers this prompt well enough to be cited.',
+        )
+    })
+
+    it('says when the answers listed no sources', async () => {
+        insights.citations.mockResolvedValue({
+            data: citationsPayload({
+                has_data: false,
+                totals: null,
+                by_class: [],
+                by_engine: [],
+                your_pages: [],
+                competitor_pages: [],
+                gaps: [],
+            }),
+        })
+        client.get.mockResolvedValueOnce({ data: urlsPayload(['g2.com']) })
+        const wrapper = await mountPage()
+        const ca = section(wrapper)
+        expect(ca.find('.viz-state-title').text()).toBe('No cited sources were recorded for these answers.')
+        expect(ca.find('.viz-state-body').text()).toBe(
+            'Engines list sources when they search the web: Perplexity always, ChatGPT and Claude when web search is on.',
+        )
+        expect(ca.findAll('.viz-stat')).toHaveLength(0)
+    })
+
+    it('says when insights are turned off on the server', async () => {
+        insights.citations.mockRejectedValue(apiError(503, 'insights_disabled', 'Insights are turned off on this server.'))
+        client.get.mockResolvedValueOnce({ data: urlsPayload(['g2.com']) })
+        const wrapper = await mountPage()
+        expect(section(wrapper).find('.viz-state-title').text()).toBe('Insights are turned off on this server.')
+        // The rest of the page still works.
+        expect(chartsById(wrapper)['sources.retrievals']).toBeTruthy()
+    })
+
+    it('shows its own load error with Try again', async () => {
+        insights.citations.mockRejectedValue(apiError(500))
+        client.get.mockResolvedValueOnce({ data: urlsPayload(['g2.com']) })
+        const wrapper = await mountPage()
+        const ca = section(wrapper)
+        expect(ca.find('.viz-state-title').text()).toBe("We couldn't load citation analytics.")
+        insights.citations.mockResolvedValue({ data: citationsPayload() })
+        await ca.find('.viz-state button').trigger('click')
+        await flushPromises()
+        expect(section(wrapper).findAll('.viz-stat')).toHaveLength(4)
     })
 })

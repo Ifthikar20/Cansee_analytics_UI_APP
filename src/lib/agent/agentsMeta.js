@@ -1,29 +1,54 @@
-// Presentation metadata for the four agents and the artifact kinds they
+// Presentation metadata for the ten agents and the artifact kinds they
 // write. Names and descriptions shown to users come from GET agents/ when
 // it has loaded; the names here are the product's own labels, used before
 // that and for ids the catalog does not list.
 import { markRaw } from 'vue'
 import {
     FileChartColumn as FileChartColumnIcon,
+    FileCode as FileCodeIcon,
+    FilePenLine as FilePenLineIcon,
     FileText as FileTextIcon,
     Megaphone as MegaphoneIcon,
+    MessagesSquare as MessagesSquareIcon,
+    Newspaper as NewspaperIcon,
+    Scale as ScaleIcon,
     ScanSearch as ScanSearchIcon,
+    Share2 as Share2Icon,
     SquareCode as SquareCodeIcon,
     SquareTerminal as SquareTerminalIcon,
     Table as TableIcon,
 } from '@lucide/vue'
+import { agentTeams } from './teams'
 
 // Raw so a consumer keeping this metadata in reactive state does not wrap
 // the components in proxies.
 const FileChartColumn = markRaw(FileChartColumnIcon)
+const FileCode = markRaw(FileCodeIcon)
+const FilePenLine = markRaw(FilePenLineIcon)
 const FileText = markRaw(FileTextIcon)
 const Megaphone = markRaw(MegaphoneIcon)
+const MessagesSquare = markRaw(MessagesSquareIcon)
+const Newspaper = markRaw(NewspaperIcon)
+const Scale = markRaw(ScaleIcon)
 const ScanSearch = markRaw(ScanSearchIcon)
+const Share2 = markRaw(Share2Icon)
 const SquareCode = markRaw(SquareCodeIcon)
 const SquareTerminal = markRaw(SquareTerminalIcon)
 const Table = markRaw(TableIcon)
 
-export const AGENT_ORDER = Object.freeze(['gap_analyst', 'landing_page', 'aeo_article', 'ad_campaign'])
+// Catalog order of GET agents/ (p2_contract.md 12b).
+export const AGENT_ORDER = Object.freeze([
+    'gap_analyst',
+    'page_optimizer',
+    'aeo_article',
+    'llms_txt',
+    'comparison_page',
+    'landing_page',
+    'ad_campaign',
+    'social_posts',
+    'pr_writer',
+    'messaging_brief',
+])
 
 export const AGENTS = Object.freeze({
     gap_analyst: {
@@ -32,11 +57,11 @@ export const AGENTS = Object.freeze({
         outputKind: 'report',
         icon: ScanSearch,
     },
-    landing_page: {
-        key: 'landing_page',
-        name: 'Landing Page Agent',
-        outputKind: 'page',
-        icon: SquareCode,
+    page_optimizer: {
+        key: 'page_optimizer',
+        name: 'Page Optimizer',
+        outputKind: 'document',
+        icon: FilePenLine,
     },
     aeo_article: {
         key: 'aeo_article',
@@ -44,11 +69,47 @@ export const AGENTS = Object.freeze({
         outputKind: 'document',
         icon: FileText,
     },
+    llms_txt: {
+        key: 'llms_txt',
+        name: 'llms.txt Agent',
+        outputKind: 'document',
+        icon: FileCode,
+    },
+    comparison_page: {
+        key: 'comparison_page',
+        name: 'Comparison Page Agent',
+        outputKind: 'document',
+        icon: Scale,
+    },
+    landing_page: {
+        key: 'landing_page',
+        name: 'Landing Page Agent',
+        outputKind: 'page',
+        icon: SquareCode,
+    },
     ad_campaign: {
         key: 'ad_campaign',
         name: 'Ad Campaign Agent',
         outputKind: 'sheet',
         icon: Megaphone,
+    },
+    social_posts: {
+        key: 'social_posts',
+        name: 'Social Posts Agent',
+        outputKind: 'document',
+        icon: Share2,
+    },
+    pr_writer: {
+        key: 'pr_writer',
+        name: 'PR Agent',
+        outputKind: 'document',
+        icon: Newspaper,
+    },
+    messaging_brief: {
+        key: 'messaging_brief',
+        name: 'Messaging Agent',
+        outputKind: 'document',
+        icon: MessagesSquare,
     },
 })
 
@@ -99,6 +160,8 @@ function titleCase(key) {
 /**
  * Metadata for an agent key, merged with its catalog entry when given
  * (`catalog` is the GET agents/ list). Unknown keys get a neutral entry.
+ * `teams` is [{key, label}], primary first: the catalog's when it sends
+ * them, else the contract's (lib/agent/teams.js).
  */
 export function agentMeta(key, catalog = null) {
     const base = AGENTS[key] || {
@@ -108,13 +171,14 @@ export function agentMeta(key, catalog = null) {
         icon: SquareCode,
     }
     const entry = Array.isArray(catalog) ? catalog.find((a) => a && a.key === key) : null
-    if (!entry) return { ...base, description: '', starter: '' }
+    if (!entry) return { ...base, description: '', starter: '', teams: agentTeams(key) }
     return {
         ...base,
         name: entry.name || base.name,
         description: entry.description || '',
         starter: entry.starter || '',
         outputKind: entry.output_kind || base.outputKind,
+        teams: agentTeams(key, entry.teams),
     }
 }
 
@@ -168,7 +232,10 @@ export function kindMeta(kind) {
     )
 }
 
+// The general writer of each kind; the six specialists also write documents.
+const KIND_WRITERS = Object.freeze(['gap_analyst', 'landing_page', 'aeo_article', 'ad_campaign'])
+
 /** The agent that writes a given artifact kind, or null. */
 export function agentForKind(kind) {
-    return AGENT_ORDER.map((k) => AGENTS[k]).find((a) => a.outputKind === kind) || null
+    return KIND_WRITERS.map((k) => AGENTS[k]).find((a) => a.outputKind === kind) || null
 }

@@ -1,8 +1,10 @@
 <script setup>
 // Workspace sections. Project-scoped entries need a project; without one they
-// render disabled (the projects list stays reachable).
-import { computed } from 'vue'
+// render disabled (the projects list stays reachable). Reviews shows how
+// many drafts wait for this user's review, loaded with the activity.
+import { computed, markRaw } from 'vue'
 import { useRoute } from 'vue-router'
+import { ClipboardCheck } from '@lucide/vue'
 import { useAgentStore } from '@/stores/agent'
 import {
   IconAgent,
@@ -28,10 +30,17 @@ const ITEMS = [
   { key: 'context', label: 'Context', icon: IconContext, name: 'agent-context' },
   { key: 'agents', label: 'Agents', icon: IconAgents, name: 'agent-agents' },
   { key: 'findings', label: 'Findings', icon: IconFindings, name: 'agent-findings' },
+  { key: 'reviews', label: 'Reviews', icon: markRaw(ClipboardCheck), name: 'agent-reviews' },
   { key: 'reports', label: 'Reports', icon: IconReports, name: 'agent-reports' },
   { key: 'sheets', label: 'Sheets', icon: IconSheets, name: 'agent-sheets' },
   { key: 'documents', label: 'Documents', icon: IconDocuments, name: 'agent-documents' },
 ]
+
+// A count the server has not answered (null) shows nothing, like zero.
+const waiting = computed(() => {
+  const n = Number(agent.reviewsWaiting)
+  return Number.isInteger(n) && n > 0 ? n : 0
+})
 
 const KIND_SECTION = { report: 'reports', sheet: 'sheets', document: 'documents', page: 'documents' }
 
@@ -48,7 +57,7 @@ const items = computed(() =>
     const enabled = item.global || Boolean(props.websiteId)
     const to = item.global ? { name: item.name } : enabled ? { name: item.name, params: { websiteId: props.websiteId } } : null
     const active = route.name === item.name || artifactSection.value === item.key
-    return { ...item, to, enabled, active }
+    return { ...item, to, enabled, active, count: item.key === 'reviews' && enabled ? waiting.value : 0 }
   }),
 )
 </script>
@@ -65,6 +74,9 @@ const items = computed(() =>
       >
         <component :is="item.icon" class="ag-nav-icon" :size="16" />
         <span class="ag-nav-label">{{ item.label }}</span>
+        <span v-if="item.count" class="ag-nav-count ag-tnum" :aria-label="`${item.count} waiting for your review`">
+          {{ item.count }}
+        </span>
       </router-link>
       <span v-else class="ag-nav-row is-disabled" aria-disabled="true">
         <component :is="item.icon" class="ag-nav-icon" :size="16" />
@@ -134,5 +146,19 @@ a.ag-nav-row:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ag-nav-count {
+  flex-shrink: 0;
+  min-width: 18px;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ag-row-active);
+  color: var(--ag-fg-1);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
 }
 </style>

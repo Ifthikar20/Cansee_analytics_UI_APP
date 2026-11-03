@@ -6,9 +6,10 @@ import { useAgentUiStore } from '@/stores/agentUi'
 import { useAppStore } from '@/stores/app'
 import { detectMac, isModEvent } from './usePlatform'
 
-// Workspace-wide shortcuts, installed once by AgentShell. Composer keys
-// (Enter, Shift+Enter, Up in an empty composer) belong to the composer; they
-// are listed here only for the shortcuts dialog.
+// Workspace-wide shortcuts, installed once by AgentShell, so they work on
+// the Agent and Analytics sides and in Settings. Composer keys (Enter,
+// Shift+Enter, Up in an empty composer) belong to the composer; they are
+// listed here only for the shortcuts dialog.
 
 export const AGENT_SHORTCUTS = Object.freeze([
   { id: 'new-chat', keys: 'mod+shift+o', label: 'New chat', group: 'General' },
@@ -76,6 +77,20 @@ export function useAgentHotkeys({ target = typeof window !== 'undefined' ? windo
       .catch(() => {})
   }
 
+  // Chat search lives in the Agent side's Recents, so an analytics or
+  // settings page first opens the project's agent home.
+  function search() {
+    const onPage = Boolean(route.meta?.analytics || route.meta?.settings)
+    const wid = websiteId()
+    if (!onPage || !wid) {
+      ui.openSearch()
+      return
+    }
+    Promise.resolve(router.push({ name: 'agent-home', params: { websiteId: wid } }))
+      .then(() => ui.openSearch())
+      .catch(() => {})
+  }
+
   function togglePane() {
     if (!CHAT_ROUTES.has(String(route.name || ''))) return false
     const pane = useAgentPaneStore()
@@ -113,7 +128,7 @@ export function useAgentHotkeys({ target = typeof window !== 'undefined' ? windo
         newChat()
         break
       case 'search':
-        ui.openSearch()
+        search()
         break
       case 'sidebar':
         ui.toggleSidebar()

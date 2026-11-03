@@ -24,6 +24,8 @@ function makeRouter() {
       { path: '/projects/:websiteId/agent', name: 'agent-home', component: Blank },
       { path: '/projects/:websiteId/agent/c/:chatId', name: 'agent-chat', component: Blank },
       { path: '/projects/:websiteId/agent/context', name: 'agent-context', component: Blank },
+      { path: '/projects/:websiteId/pages', name: 'site-pages', component: Blank, meta: { analytics: 'pages' } },
+      { path: '/settings', name: 'settings', component: Blank, meta: { settings: true } },
     ],
   })
 }
@@ -102,6 +104,35 @@ describe('useAgentHotkeys', () => {
     press(ctrl('k', { code: 'KeyK' }))
     expect(ctx.ui.filterOpen).toBe(true)
     expect(ctx.ui.sidebarCollapsed).toBe(false)
+  })
+
+  it('opens chat search from an analytics or settings page by going to the agent home first', async () => {
+    const ctx = await setup('/projects/w1/pages')
+    wrapper = ctx.wrapper
+    expect(press(ctrl('k', { code: 'KeyK' })).defaultPrevented).toBe(true)
+    await vi.waitFor(() => expect(ctx.router.currentRoute.value.name).toBe('agent-home'))
+    expect(ctx.router.currentRoute.value.params.websiteId).toBe('w1')
+    await vi.waitFor(() => expect(ctx.ui.filterOpen).toBe(true))
+
+    // Settings have no project in the URL: the active project's agent home.
+    ctx.app.setWebsites([{ id: 'w1', name: 'One' }])
+    ctx.app.setActiveWebsite(ctx.app.websites[0])
+    ctx.ui.setFilterOpen(false)
+    await ctx.router.push('/settings')
+    press(ctrl('k', { code: 'KeyK' }))
+    await vi.waitFor(() => expect(ctx.router.currentRoute.value.name).toBe('agent-home'))
+    await vi.waitFor(() => expect(ctx.ui.filterOpen).toBe(true))
+  })
+
+  it('toggles the sidebar and opens the shortcuts on page routes too', async () => {
+    const ctx = await setup('/projects/w1/pages')
+    wrapper = ctx.wrapper
+    press(ctrl('b', { code: 'KeyB' }))
+    expect(ctx.ui.sidebarCollapsed).toBe(true)
+    press(ctrl('/', { code: 'Slash' }))
+    expect(ctx.ui.shortcutsOpen).toBe(true)
+    // The browser pane exists only beside a chat.
+    expect(press(ctrl('\\', { code: 'Backslash' })).defaultPrevented).toBe(false)
   })
 
   it('toggles the pane only on chat routes', async () => {

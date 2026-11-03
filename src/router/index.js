@@ -3,14 +3,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import websitesApi from '@/api/websites'
 import { agentRoutes } from './agentRoutes'
-
-/* ── Helper: wrap a signed-in route in the app shell ── */
-const protect = (path, name, component, props = false) => ({
-    path,
-    component: () => import('@/layouts/AppShell.vue'),
-    meta: { requiresAuth: true },
-    children: [{ path: '', name, component, props }]
-})
+import { analyticsRoutes, settingsRoutes } from './analyticsRoutes'
 
 const routes = [
     /* ── Public Landing Page ── */
@@ -168,26 +161,11 @@ const routes = [
         meta: { layout: 'auth', public: true }
     },
 
-    /* ── App (signed in; each renders inside AppShell) ──
-       Three destinations: the Overview (every prompt, Google vs each AI
-       engine), a prompt's own page, and Sources; plus Settings. */
-    protect('/dashboard', 'dashboard', () => import('@/pages/OverviewPage.vue')),
-    protect('/projects/:websiteId/prompts/:promptId', 'prompt', () => import('@/pages/PromptPage.vue'), true),
-    protect('/projects/:websiteId/sources', 'sources-urls', () => import('@/pages/SourcesUrlsPage.vue'), true),
-    protect('/projects/:websiteId/sources/detail', 'sources-url-detail', () => import('@/pages/SourcesUrlDetailPage.vue'), true),
-    // The rest of Analytics (lib/analyticsNav.js): AI visibility over time,
-    // rankings by country (?prompt=<id>&check=1 opens the run dialog),
-    // website traffic and AI traffic.
-    protect('/projects/:websiteId/visibility', 'visibility', () => import('@/pages/analytics/VisibilityPage.vue'), true),
-    protect('/projects/:websiteId/countries', 'countries', () => import('@/pages/analytics/CountriesPage.vue'), true),
-    protect('/projects/:websiteId/traffic', 'traffic', () => import('@/pages/analytics/TrafficPage.vue'), true),
-    protect('/projects/:websiteId/ai-traffic', 'ai-traffic', () => import('@/pages/analytics/AiTrafficPage.vue'), true),
-    protect('/settings', 'settings', () => import('@/pages/SettingsPage.vue')),
-    protect('/settings/project', 'settings-project', () => import('@/pages/settings/ProjectSettings.vue')),
-    protect('/settings/connections', 'settings-connections', () => import('@/pages/settings/ConnectionsPage.vue')),
-    protect('/settings/brand-facts', 'settings-brand-facts', () => import('@/pages/settings/BrandFactsSettings.vue')),
-    // Polar's checkout returns to /billing, so the path stays.
-    protect('/billing', 'billing', () => import('@/pages/BillingPage.vue')),
+    /* ── App (signed in; every page renders inside the workspace shell) ──
+       Analytics (the Overview, a prompt's page and every analytics tab of
+       lib/analyticsNav.js) and Settings, in analyticsRoutes.js. */
+    ...analyticsRoutes,
+    ...settingsRoutes,
     {
         path: '/paywall',
         name: 'paywall',
@@ -195,7 +173,7 @@ const routes = [
         meta: { requiresAuth: true, layout: 'auth' }
     },
 
-    /* ── Agent workspace (its own shell; see agentRoutes.js) ── */
+    /* ── Agent workspace (the same shell; see agentRoutes.js) ── */
     ...agentRoutes,
 
     /* ── Old addresses (bookmarks, emails, OAuth returns) ──

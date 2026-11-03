@@ -1,9 +1,19 @@
 <script setup>
 // Body of the inbox popover: the project's recent activity (runs that
-// finished, new versions of pages, reports and sheets). Empty means empty.
+// finished, new versions of pages, reports and sheets, and the reviews
+// that concern you: requests, decisions and comments). Empty means empty.
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { FileChartColumn, FileText, SquareTerminal, Table2 } from '@lucide/vue'
+import {
+  CircleCheck,
+  ClipboardCheck,
+  FileChartColumn,
+  FileText,
+  MessageSquare,
+  MessageSquareWarning,
+  SquareTerminal,
+  Table2,
+} from '@lucide/vue'
 import { IconRecentChat } from '@/components/agent/icons'
 import AgButton from '@/components/agent/common/AgButton.vue'
 import AgSpinner from '@/components/agent/common/AgSpinner.vue'
@@ -25,11 +35,47 @@ const KIND = {
   report: { label: 'Report', icon: FileChartColumn, tone: 'report' },
 }
 
+// Review items (p2_contract.md 13d): icon, tone and the meta line.
+const REVIEW = {
+  review_requested: { icon: ClipboardCheck, tone: 'accent', meta: (item, v) => `${actorOf(item)} asked you to review${v}` },
+  review_approved: { icon: CircleCheck, tone: 'good', meta: (item, v) => `${actorOf(item)} approved it${v}` },
+  review_changes_requested: {
+    icon: MessageSquareWarning,
+    tone: 'warn',
+    meta: (item, v) => `${actorOf(item)} asked for changes${v}`,
+  },
+  review_comment: { icon: MessageSquare, tone: 'recent', meta: (item) => `${actorOf(item)} commented: ${item.excerpt || ''}`.trim() },
+}
+
+const KNOWN = new Set(['run_completed', 'artifact_version', ...Object.keys(REVIEW)])
+
+function actorOf(item) {
+  return String(item?.actor_name || '').trim() || 'Someone'
+}
+
+function artifactTo(item) {
+  const wid = props.websiteId
+  return wid && item.artifact_id ? { name: 'agent-artifact', params: { websiteId: wid, artifactId: String(item.artifact_id) } } : null
+}
+
 const rows = computed(() =>
   props.items
-    .filter((item) => item && (item.type === 'run_completed' || item.type === 'artifact_version'))
+    .filter((item) => item && KNOWN.has(item.type))
     .map((item, index) => {
       const wid = props.websiteId
+      const review = REVIEW[item.type]
+      if (review) {
+        const version = item.version ? ` · v${item.version}` : ''
+        return {
+          key: `${item.type}:${item.artifact_id}:${item.at}:${index}`,
+          icon: review.icon,
+          tone: review.tone,
+          title: item.title || 'Draft',
+          meta: review.meta(item, version),
+          at: item.at,
+          to: artifactTo(item),
+        }
+      }
       if (item.type === 'artifact_version') {
         const kind = KIND[item.kind] || { label: 'Artifact', icon: FileText, tone: 'doc' }
         const version = item.version ? ` v${item.version}` : ''
@@ -40,7 +86,7 @@ const rows = computed(() =>
           title: item.title || kind.label,
           meta: `${kind.label}${version}`,
           at: item.at,
-          to: wid && item.artifact_id ? { name: 'agent-artifact', params: { websiteId: wid, artifactId: String(item.artifact_id) } } : null,
+          to: artifactTo(item),
         }
       }
       return {
@@ -74,7 +120,7 @@ const rows = computed(() =>
     <div v-else-if="!rows.length" class="ag-act-empty">
       <p class="ag-act-empty-title">Nothing new yet.</p>
       <p class="ag-act-empty-body">
-        Finished agent runs and new versions of pages, reports and sheets in this project show up here.
+        Finished agent runs, new drafts and review requests in this project show up here.
       </p>
     </div>
     <ul v-else class="ag-act-list" role="list">
@@ -219,6 +265,14 @@ const rows = computed(() =>
 
 .ag-act-icon.is-recent {
   color: var(--ag-recent-icon);
+}
+
+.ag-act-icon.is-good {
+  color: var(--ag-you);
+}
+
+.ag-act-icon.is-warn {
+  color: var(--ag-warning);
 }
 
 .ag-act-text {

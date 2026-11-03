@@ -68,6 +68,23 @@ describe('agent routes', () => {
         expect(typeof findings.component).toBe('function')
         expect(findings.component).not.toBe(child('agent-home').component)
     })
+
+    it('resolves the Reviews page under the project, lazily, with its title', async () => {
+        const router = createRouter({ history: createMemoryHistory(), routes: agentRoutes })
+        const target = router.resolve({ name: 'agent-reviews', params: { websiteId: '2' }, query: { box: 'mine' } })
+        expect(target.fullPath).toBe('/projects/2/agent/reviews?box=mine')
+        expect(target.meta).toEqual({ requiresAuth: true, workspace: true, title: 'Reviews' })
+        expect(router.resolve('/projects/2/agent/reviews').name).toBe('agent-reviews')
+
+        const reviews = child('agent-reviews')
+        expect(reviews.props).toBe(true)
+        expect(typeof reviews.component).toBe('function')
+        const page = await reviews.component()
+        expect(page.default).toBeTruthy()
+        // Findings comes first in the sidebar order, then Reviews, then the lists.
+        const names = workspace.children.map((c) => c.name)
+        expect(names.indexOf('agent-reviews')).toBe(names.indexOf('agent-findings') + 1)
+    })
 })
 
 describe('resolveAgentEntry', () => {
