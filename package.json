@@ -21,6 +21,7 @@
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "d3-geo": "3.1.1",
     "dompurify": "3.4.17",
     "highlight.js": "11.12.0",
     "inter-ui": "4.1.1",
@@ -29,9 +30,11 @@
     "reka-ui": "^2.9.8",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.2.2",
+    "topojson-client": "3.1.0",
     "vue": "^3.5.25",
     "vue-chartjs": "^5.3.3",
-    "vue-router": "^4.6.4"
+    "vue-router": "^4.6.4",
+    "world-atlas": "2.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
