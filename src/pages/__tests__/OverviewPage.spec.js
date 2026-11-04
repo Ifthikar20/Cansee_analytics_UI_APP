@@ -159,13 +159,11 @@ describe('OverviewPage: AI visibility trend', () => {
 })
 
 describe('OverviewPage: charts', () => {
-    it('draws the gap map as a chart with a table and a legend of the gap classes', async () => {
+    it('keeps the page calm: no gap map and no engines heatmap until they are added as widgets', async () => {
         const { wrapper } = await mountPage()
-        const map = chartsById(wrapper)['overview.gap_map']
-        expect(map.props('spec')).toMatchObject({ representations: ['custom', 'table'], custom_label: 'Map' })
-        expect(map.find('.gap-map-stub').exists()).toBe(true)
-        const legend = map.findAll('.viz-legend-label').map((l) => l.text())
-        expect(legend).toEqual(['AI ahead', 'Google ahead', 'Strong in both', 'Invisible in both', 'Even'])
+        const charts = chartsById(wrapper)
+        expect(charts['overview.gap_map']).toBeUndefined()
+        expect(charts['overview.engines']).toBeUndefined()
     })
 
     it('shows who AI recommends as a list, with your brand selected for the bars', async () => {
@@ -182,70 +180,5 @@ describe('OverviewPage: charts', () => {
             title: 'Brands appear here once the engines have answered your prompts.',
         })
     })
-
-    it('shows engines by prompt as a heatmap and opens the prompt picked', async () => {
-        const { wrapper, router } = await mountPage()
-        const heatmap = chartsById(wrapper)['overview.engines']
-        const spec = heatmap.props('spec')
-        expect(spec).toMatchObject({ title: 'Engines by prompt', subtitle: "Share of each engine's recent answers that name you." })
-        expect(spec.representations).toEqual(['heatmap', 'table'])
-        // Largest absolute gap first.
-        expect(spec.labels).toEqual(['p-1', 'p-2', 'p-3'])
-        expect(spec.datasets.find((d) => d.key === 'gemini').states).toEqual(['not_configured', 'not_configured', 'not_configured'])
-
-        heatmap.vm.$emit('select', { label: 'p-2', labelIndex: 1 })
-        await flushPromises()
-        expect(router.currentRoute.value).toMatchObject({ name: 'prompt', params: { websiteId: WEBSITE_ID, promptId: 'p-2' } })
-    })
 })
 
-describe('OverviewPage: prompt table filters', () => {
-    it('searches the prompt text and narrows by country', async () => {
-        const { wrapper } = await mountPage()
-        expect(rowTexts(wrapper)).toEqual(['best note taking app for teams', 'notion alternatives for startups', 'team wiki software'])
-
-        await wrapper.find('input[type="search"]').setValue('NOTION')
-        expect(rowTexts(wrapper)).toEqual(['notion alternatives for startups'])
-        await wrapper.find('input[type="search"]').setValue('')
-
-        const [country] = wrapper.findAll('select.gt-select-input')
-        expect(country.findAll('option').map((o) => o.text())).toEqual(['All countries', 'United Kingdom', 'United States', 'Global'])
-        await country.setValue('__global')
-        expect(rowTexts(wrapper)).toEqual(['team wiki software'])
-        await country.setValue('gb')
-        expect(rowTexts(wrapper)).toEqual(['notion alternatives for startups'])
-    })
-
-    it('sorts by Google position, AI score and the newest prompt', async () => {
-        const { wrapper } = await mountPage()
-        const sort = wrapper.findAll('select.gt-select-input')[1]
-        expect(sort.findAll('option').map((o) => o.text())).toEqual(['Biggest gap', 'Best Google position', 'Highest AI score', 'Newest'])
-        await sort.setValue('google')
-        expect(rowTexts(wrapper)).toEqual(['notion alternatives for startups', 'best note taking app for teams', 'team wiki software'])
-        await sort.setValue('ai')
-        expect(rowTexts(wrapper)).toEqual(['best note taking app for teams', 'notion alternatives for startups', 'team wiki software'])
-        // The dashboard lists prompts oldest first.
-        await sort.setValue('newest')
-        expect(rowTexts(wrapper)).toEqual(['notion alternatives for startups', 'best note taking app for teams', 'team wiki software'])
-    })
-
-    it('offers Newest only once the order the prompts were added in is known', async () => {
-        const { wrapper } = await mountPage({ dashboard: new Error('boom') })
-        const newest = wrapper.findAll('select.gt-select-input')[1].findAll('option')[3]
-        expect(newest.text()).toBe('Newest')
-        expect(newest.attributes('disabled')).toBeDefined()
-    })
-
-    it('says when nothing matches and clears every filter', async () => {
-        const { wrapper } = await mountPage()
-        await wrapper.findAll('.gt-chip').find((c) => c.text().startsWith('AI ahead')).trigger('click')
-        await wrapper.find('input[type="search"]').setValue('wiki')
-        expect(rowTexts(wrapper)).toEqual([])
-        expect(wrapper.find('.gt-empty').text()).toContain('No prompts match these filters.')
-
-        await wrapper.find('.gt-clear').trigger('click')
-        expect(rowTexts(wrapper)).toHaveLength(3)
-        expect(wrapper.find('input[type="search"]').element.value).toBe('')
-        expect(wrapper.find('.gt-chip.is-active').text()).toContain('All')
-    })
-})

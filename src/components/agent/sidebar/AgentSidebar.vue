@@ -9,7 +9,6 @@ import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { sidebarSide } from '@/lib/analyticsNav'
 import ActivityButton from './ActivityButton.vue'
-import AnalyticsSidebarNav from './AnalyticsSidebarNav.vue'
 import ProductSwitch from './ProductSwitch.vue'
 import SidebarFooter from './SidebarFooter.vue'
 import SidebarNav from './SidebarNav.vue'
@@ -44,11 +43,10 @@ const side = computed(() => sidebarSide(route))
       <ActivityButton :website-id="websiteId" />
     </div>
     <ProductSwitch :website-id="websiteId" :side="side" />
-    <AnalyticsSidebarNav v-if="side === 'analytics'" :website-id="websiteId" />
-    <template v-else>
-      <SidebarNav :website-id="websiteId" />
-      <SidebarRecents :website-id="websiteId" />
-    </template>
+    <!-- The same sidebar on both sides: the switch changes the main area,
+         never the navigation. Analytics has no list of tabs. -->
+    <SidebarNav :website-id="websiteId" />
+    <SidebarRecents :website-id="websiteId" />
     <SidebarFooter :variant="variant" />
   </nav>
 </template>

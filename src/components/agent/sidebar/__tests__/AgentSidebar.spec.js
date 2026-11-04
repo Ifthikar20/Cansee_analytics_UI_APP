@@ -88,12 +88,12 @@ describe('AgentSidebar', () => {
     expect(wrapper.find('.stub-activity').exists()).toBe(true)
   })
 
-  it('shows the analytics tabs in place of the agent sections and recents on the Analytics side', async () => {
+  it('keeps the same sidebar on the Analytics side, with no list of analytics tabs', async () => {
     const { wrapper } = await setup('/projects/w1/crawler-access')
     expect(currentSide(wrapper)).toBe('Analytics')
-    expect(wrapper.find('[aria-label="Analytics"][role="group"]').exists()).toBe(true)
-    expect(wrapper.find('.stub-agent-nav').exists()).toBe(false)
-    expect(wrapper.find('.stub-recents').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="Analytics"][role="group"]').exists()).toBe(false)
+    expect(wrapper.find('.stub-agent-nav').exists()).toBe(true)
+    expect(wrapper.find('.stub-recents').exists()).toBe(true)
     // The switcher, inbox and footer stay.
     expect(wrapper.find('.stub-switcher').exists()).toBe(true)
     expect(wrapper.find('.ag-sb-footer').exists()).toBe(true)
@@ -105,7 +105,7 @@ describe('AgentSidebar', () => {
     await router.push('/dashboard')
     await flushPromises()
     expect(currentSide(wrapper)).toBe('Analytics')
-    expect(wrapper.find('.stub-recents').exists()).toBe(false)
+    expect(wrapper.find('.stub-recents').exists()).toBe(true)
   })
 
   it('shows the side used last on Settings, with no tab current and the footer Settings current', async () => {

@@ -117,22 +117,13 @@
           @retry="loadTrend"
         />
 
-        <div class="ov-grid">
-          <VizChart :spec="gapSpec" :heading-level="2">
-            <template #custom>
-              <GapMap :prompts="data.prompts" @open="openPrompt" />
-              <VizLegend class="ov-gap-legend" :items="gapLegend" />
-            </template>
-          </VizChart>
-
-          <VizChart :spec="leaderboardChart" :selected="yourBrandName" :empty="leaderboardEmpty" :heading-level="2">
-            <template #custom>
-              <Leaderboard :brands="data.leaderboard" />
-            </template>
-          </VizChart>
-        </div>
-
-        <EngineHeatmapPanel :prompts="data.prompts" :engines="data.engines" @open="openPrompt" />
+        <!-- Kept calm until the modular board lands: the gap map and the
+             engines heatmap move into its widget catalog. -->
+        <VizChart :spec="leaderboardChart" :selected="yourBrandName" :empty="leaderboardEmpty" :heading-level="2">
+          <template #custom>
+            <Leaderboard :brands="data.leaderboard" />
+          </template>
+        </VizChart>
 
         <section ref="tableRef" aria-labelledby="ov-table-title">
           <header class="ov-section-head">
@@ -166,18 +157,15 @@ import searchGapApi from '@/api/searchGap'
 import visibilityApi from '@/api/visibility'
 import websitesApi from '@/api/websites'
 import { useToast } from '@/composables/useToast'
-import { gapMeta } from '@/lib/gap'
-import { GAP_MAP_CLASSES, gapMapSpec, leaderboardSpec, overviewTiles, yourBrand } from '@/lib/analytics/polishSpecs'
+
+import { leaderboardSpec, overviewTiles, yourBrand } from '@/lib/analytics/polishSpecs'
 import OnboardingFlow from '@/components/onboarding/OnboardingFlow.vue'
 import GradientCard from '@/components/GradientCard.vue'
 import VizChart from '@/components/charts/VizChart.vue'
-import VizLegend from '@/components/charts/VizLegend.vue'
 import VizStatTile from '@/components/charts/VizStatTile.vue'
-import GapMap from '@/components/gap/GapMap.vue'
 import GapTable from '@/components/gap/GapTable.vue'
 import Leaderboard from '@/components/gap/Leaderboard.vue'
 import VisibilityTrendPanel from '@/components/gap/VisibilityTrendPanel.vue'
-import EngineHeatmapPanel from '@/components/gap/EngineHeatmapPanel.vue'
 import AddPromptsDialog from '@/components/gap/AddPromptsDialog.vue'
 import AddProjectDialog from '@/components/projects/AddProjectDialog.vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -216,8 +204,6 @@ const trendFailed = ref(false)
 const tiles = computed(() =>
   overviewTiles(k.value, trend.value?.headline, data.value?.prompts).map(({ key, ...props }) => ({ key, props })),
 )
-const gapSpec = computed(() => gapMapSpec(data.value?.prompts))
-const gapLegend = GAP_MAP_CLASSES.map((cls) => ({ key: cls, label: gapMeta(cls).label, color: gapMeta(cls).color, shape: 'dot' }))
 const leaderboardChart = computed(() => leaderboardSpec(data.value?.leaderboard))
 const leaderboardEmpty = computed(() =>
   data.value?.leaderboard?.length ? null : { title: 'Brands appear here once the engines have answered your prompts.' },
