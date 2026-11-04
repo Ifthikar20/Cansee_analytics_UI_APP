@@ -6,12 +6,12 @@
     :style="{ '--viz-chart-surface': surfaceCss }"
     :aria-labelledby="title ? titleId : undefined"
   >
-    <header v-if="title || subtitle || $slots.actions || showPicker || switchOptions.length > 1" class="viz-head">
+    <header v-if="title || subtitle || $slots.actions || showPicker || showSwitcher" class="viz-head">
       <div class="viz-head-text">
         <component :is="headingTag" v-if="title" :id="titleId" class="viz-title">{{ title }}</component>
         <p v-if="subtitle" class="viz-sub">{{ subtitle }}</p>
       </div>
-      <div v-if="$slots.actions || showPicker || switchOptions.length > 1" class="viz-tools">
+      <div v-if="$slots.actions || showPicker || showSwitcher" class="viz-tools">
         <slot name="actions" />
         <label v-if="showPicker" class="viz-pick">
           <span class="viz-pick-label">Show</span>
@@ -19,12 +19,7 @@
             <option v-for="d in norm.datasets" :key="d.key" :value="d.key">{{ d.label }}</option>
           </select>
         </label>
-        <VizSwitcher
-          v-if="switchOptions.length > 1"
-          :model-value="current"
-          :options="switchOptions"
-          @update:model-value="choose"
-        />
+        <VizSwitcher v-if="showSwitcher" :model-value="current" :options="switchOptions" @update:model-value="choose" />
       </div>
     </header>
 
@@ -85,7 +80,7 @@
           :selectable="selectable"
           @select="onSelect"
         />
-        <VizTileMap
+        <VizGeoMap
           v-else-if="current === 'map' && picked"
           :spec="norm"
           :dataset="picked"
@@ -93,7 +88,7 @@
           :title="title"
           :selected="selected"
           :selectable="selectable"
-          :narrow="narrow"
+          :compact="compact"
           @select="onSelect"
         />
         <slot v-else-if="current === 'custom'" name="custom" :spec="norm" :representation="current" />
@@ -123,16 +118,18 @@
 <script setup>
 // Every chart in the app goes through here. It normalizes the ChartSpec,
 // offers the representations that suit its shape (a radio switcher, the
-// table always last), keeps the reader's choice per chart (localStorage
-// 'cs-viz-v1', keyed by persistKey or spec.id), draws one of canvas,
-// heatmap, tile map, table or the caller's custom view, and keeps a
-// screen-reader table beside every representation that is not the table.
+// table always last; `hideSwitcher` drops it for compact cards), keeps the
+// reader's choice per chart (localStorage 'cs-viz-v1', keyed by persistKey
+// or spec.id), draws one of canvas, heatmap, world map, table or the
+// caller's custom view, and keeps a screen-reader table beside every
+// representation that is not the table. The world map and its geometry
+// load lazily, on the first map.
 //
 // States: first load -> skeleton; a refetch keeps the last frame dimmed
 // (aria-busy); `error` -> error panel with Try again (emits retry);
 // `empty` (or a spec with nothing to draw) -> empty panel, whose action
 // without a destination emits retry too.
-import { computed, getCurrentInstance, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import { computed, defineAsyncComponent, getCurrentInstance, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import {
   defaultRepresentation,
   labelText,
@@ -145,7 +142,7 @@ import {
 import { datasetToken, labelToken } from '@/lib/charts/palette'
 import { binsFor } from '@/lib/charts/scales'
 import { CANVAS_REPRESENTATIONS as CANVAS } from '@/lib/charts/chartjs'
-import { TILES } from '@/lib/charts/tileGrid'
+import { MAP_CODES } from '@/lib/charts/geo/isoNumeric'
 import VizCanvas from './VizCanvas.vue'
 import VizHeatmap from './VizHeatmap.vue'
 import VizLegend from './VizLegend.vue'
@@ -153,7 +150,8 @@ import VizScaleLegend from './VizScaleLegend.vue'
 import VizState from './VizState.vue'
 import VizSwitcher from './VizSwitcher.vue'
 import VizTable from './VizTable.vue'
-import VizTileMap from './VizTileMap.vue'
+
+const VizGeoMap = defineAsyncComponent(() => import('./VizGeoMap.vue'))
 
 const props = defineProps({
   // ChartSpec (contract 8a); normalized here.
@@ -173,8 +171,11 @@ const props = defineProps({
   // CSS colour for the 2px gaps and rings (default var(--viz-surface)).
   surface: { type: String, default: '' },
   headingLevel: { type: Number, default: 3 },
-  // A label to highlight (tile, heatmap row, bar).
+  // A label to highlight (country, heatmap row, bar).
   selected: { type: String, default: '' },
+  // Hide the representation switcher (board cards); the screen-reader
+  // table stays.
+  hideSwitcher: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:representation', 'select', 'retry'])
 
@@ -268,7 +269,7 @@ const current = computed(() => {
   if (!norm.value) return 'table'
   const wanted = props.representation || internal.value
   if (wanted && offered.value.includes(wanted)) return wanted
-  return defaultRepresentation(norm.value, { narrow: narrow.value, picked: pickKey.value })
+  return defaultRepresentation(norm.value, { picked: pickKey.value })
 })
 
 const switchOptions = computed(() =>
@@ -277,6 +278,8 @@ const switchOptions = computed(() =>
     label: rep === 'custom' ? norm.value?.custom_label || 'Chart' : REP_LABELS[rep],
   })),
 )
+
+const showSwitcher = computed(() => !props.hideSwitcher && switchOptions.value.length > 1)
 
 function choose(rep) {
   if (!rep || rep === current.value) return
@@ -366,18 +369,19 @@ const statesPresent = computed(() => {
   return [...new Set(list.flatMap((d) => d.states.filter(Boolean)))]
 })
 
-// Something on screen has no value and no state: a tile of a country with
-// no label, or a null point.
+// Something on screen has no value and no state: a country the map draws
+// with no label, or a null point.
 const missingPresent = computed(() => {
   const s = norm.value
   if (!s) return false
   if (current.value === 'map') {
     const d = picked.value
     if (!d) return true
-    return TILES.some((tile) => {
-      const j = s.labels.indexOf(tile.code)
-      return j < 0 || (d.data[j] === null && !d.states[j])
-    })
+    for (const code of MAP_CODES) {
+      const j = s.labels.indexOf(code)
+      if (j < 0 || (d.data[j] === null && !d.states[j])) return true
+    }
+    return false
   }
   return s.datasets.some((d) => d.data.some((v, j) => v === null && !d.states[j]))
 })

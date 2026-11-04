@@ -11,7 +11,6 @@
           :aria-pressed="filter === chip.key ? 'true' : 'false'"
           @click="filter = chip.key"
         >
-          <span v-if="chip.color" class="gt-chip-dot" :style="{ background: chip.color }" aria-hidden="true"></span>
           {{ chip.label }}
           <span class="gt-chip-count">{{ chip.count }}</span>
         </button>
@@ -46,12 +45,7 @@
           <tr>
             <th class="gt-prompt" scope="col">Prompt</th>
             <th scope="col">Google</th>
-            <th v-for="e in engineColumns" :key="e.key" scope="col">
-              <span class="gt-engine-head">
-                <span class="gt-engine-dot" :style="{ background: e.color }" aria-hidden="true"></span>
-                {{ e.label }}
-              </span>
-            </th>
+            <th v-for="e in engineColumns" :key="e.key" scope="col">{{ e.label }}</th>
             <th scope="col">Gap</th>
             <th class="gt-fix" scope="col">Top fix</th>
           </tr>
@@ -83,7 +77,6 @@
                 :class="{ 'is-missing': !cell(row, e.key).mentioned }"
                 :title="cellTitle(row, e)"
               >
-                <span class="gt-rank-dot" :style="{ background: gapMeta(cell(row, e.key).class).color }" aria-hidden="true"></span>
                 {{ rankText(cell(row, e.key)) }}
               </span>
               <span v-else class="gt-muted" :title="cell(row, e.key).configured ? 'No answers yet' : 'Not available yet'">—</span>
@@ -203,7 +196,6 @@ const chips = computed(() => {
     ...GAP_ORDER.filter((cls) => counts[cls]).map((cls) => ({
       key: cls,
       label: gapMeta(cls).label,
-      color: gapMeta(cls).color,
       count: counts[cls],
     })),
   ]
@@ -370,12 +362,6 @@ function cellTitle(row, engine) {
   background: var(--accent);
 }
 
-.gt-chip-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
 .gt-chip-count {
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
@@ -449,18 +435,6 @@ function cellTitle(row, engine) {
   letter-spacing: 0.04em;
 }
 
-.gt-engine-head {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.gt-engine-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
 .gt-google strong,
 .gt-rank {
   font-variant-numeric: tabular-nums;
@@ -477,21 +451,12 @@ function cellTitle(row, engine) {
 }
 
 .gt-rank {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   font-weight: 600;
 }
 
 .gt-rank.is-missing {
   color: var(--muted-foreground);
   font-weight: 400;
-}
-
-.gt-rank-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
 }
 
 .gt-muted {

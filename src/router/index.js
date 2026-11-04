@@ -162,8 +162,8 @@ const routes = [
     },
 
     /* ── App (signed in; every page renders inside the workspace shell) ──
-       Analytics (the Overview, a prompt's page and every analytics tab of
-       lib/analyticsNav.js) and Settings, in analyticsRoutes.js. */
+       Analytics (the board, its /dashboard entry and the redirects of the
+       old analytics tabs) and Settings, in analyticsRoutes.js. */
     ...analyticsRoutes,
     ...settingsRoutes,
     {
@@ -188,7 +188,7 @@ const routes = [
                 ? { name: 'settings-connections', query: { ...to.query, website: to.params.id } }
                 : { name: 'settings-project' },
     },
-    { path: '/analytics/:websiteId', redirect: { name: 'dashboard' } },
+    { path: '/analytics/:websiteId', redirect: (to) => ({ name: 'analytics', params: { websiteId: to.params.websiteId } }) },
     // The old Ask Cansee chat is now the agent workspace.
     { path: '/ask/:conversationId?', redirect: { name: 'agent', params: {} } },
     { path: '/app-onboarding', redirect: { name: 'dashboard' } },
@@ -209,8 +209,13 @@ const routes = [
     { path: '/llm-ranking/:websiteId/brand-input', redirect: { name: 'settings-brand-facts' } },
     { path: '/llm-ranking/:websiteId/benchmarks', redirect: { name: 'settings-brand-facts' } },
     // Prompt library, brand research, brand security and the rest of the
-    // old AI Visibility section all fold into the overview.
-    { path: '/llm-ranking/:websiteId/:rest(.*)*', redirect: { name: 'dashboard' } },
+    // old AI Visibility section all fold into the project's board. Only
+    // websiteId is passed on: to.params also holds `rest`, which the board
+    // route has no place for (vue-router would drop it with a warning).
+    {
+        path: '/llm-ranking/:websiteId/:rest(.*)*',
+        redirect: (to) => ({ name: 'analytics', params: { websiteId: to.params.websiteId } }),
+    },
 
     /* ── 404 ── */
     {

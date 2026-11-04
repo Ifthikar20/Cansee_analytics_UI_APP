@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import VizChart from '@/components/charts/VizChart.vue'
@@ -235,7 +235,7 @@ describe('VizChart', () => {
     expect(visibleTable(wrapper).text()).toContain('40%')
   })
 
-  it('shows the map with a scale legend and a picker for several datasets', () => {
+  it('shows the world map with a scale legend and a picker for several datasets', async () => {
     const wrapper = render({
       spec: {
         title: 'Rankings by country',
@@ -250,13 +250,50 @@ describe('VizChart', () => {
         state_labels: { not_found: 'Not in top 10' },
       },
     })
-    expect(wrapper.findAll('.viz-tile')).toHaveLength(114)
+    // The map and its geometry load lazily.
+    await vi.waitFor(() => expect(wrapper.find('svg.viz-geo-svg').exists()).toBe(true))
+    expect(wrapper.findAll('path.viz-geo-country')).toHaveLength(176)
     expect(wrapper.find('[data-code="GB"]').attributes('aria-label')).toBe('United Kingdom: 40%')
+    expect(wrapper.find('svg').attributes('aria-label')).toBe('Rankings by country')
     const scale = wrapper.find('.viz-scale').text()
     expect(scale).toContain('0-19%')
     expect(scale).toContain('Not checked')
     expect(scale).toContain('No data')
     expect(wrapper.find('select').exists()).toBe(true)
+    expect(wrapper.find('.viz-sr-only table').exists()).toBe(true)
+    expect(switchLabels(wrapper)).toEqual(['Map', 'Bars', 'Table'])
+  })
+
+  it('keeps a narrow map a map', async () => {
+    const original = globalThis.ResizeObserver
+    let report = null
+    globalThis.ResizeObserver = class {
+      constructor(callback) {
+        report = callback
+      }
+      observe() {}
+      disconnect() {}
+    }
+    try {
+      const wrapper = render({
+        spec: { title: 'Visitors by country', x: 'country', value: 'count', labels: ['us'], datasets: [{ key: 'v', data: [30] }] },
+      })
+      report([{ borderBoxSize: [{ inlineSize: 340 }] }])
+      await nextTick()
+      expect(wrapper.find('figure').classes()).toContain('is-narrow')
+      expect(wrapper.find('[role="radio"][aria-checked="true"]').text()).toBe('Map')
+    } finally {
+      globalThis.ResizeObserver = original
+    }
+  })
+
+  it('hides the representation switcher on request and keeps the screen-reader table', () => {
+    const wrapper = render({ hideSwitcher: true })
+    expect(wrapper.find('[role="radiogroup"]').exists()).toBe(false)
+    expect(wrapper.find('h3').text()).toBe('Visibility over time')
+    expect(wrapper.find('.viz-sr-only table').exists()).toBe(true)
+    const bare = render({ hideSwitcher: true, spec: { ...engines(), title: '', subtitle: '' } })
+    expect(bare.find('.viz-head').exists()).toBe(false)
   })
 
   it('emits select from a heatmap row when someone listens', async () => {

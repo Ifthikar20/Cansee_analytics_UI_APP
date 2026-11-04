@@ -14,7 +14,7 @@ const { default: AiTrafficPage } = await import('../AiTrafficPage.vue')
 const Blank = defineComponent({ render: () => h('div') })
 const mounted = []
 
-async function mountPage(path = '/projects/w1/ai-traffic') {
+async function mountPage(path = '/projects/w1/ai-traffic', focus = '') {
   const pinia = createPinia()
   setActivePinia(pinia)
   useAppStore().setWebsites([{ id: 'w1', name: 'Notion' }])
@@ -22,7 +22,12 @@ async function mountPage(path = '/projects/w1/ai-traffic') {
     history: createMemoryHistory(),
     routes: [
       { path: '/settings/connections', name: 'settings-connections', component: Blank },
-      { path: '/projects/:websiteId/ai-traffic', name: 'ai-traffic', component: AiTrafficPage, props: true },
+      {
+        path: '/projects/:websiteId/ai-traffic',
+        name: 'ai-traffic',
+        component: AiTrafficPage,
+        props: (route) => ({ websiteId: route.params.websiteId, focus }),
+      },
     ],
   })
   await router.push(path)
@@ -87,6 +92,23 @@ describe('AiTrafficPage', () => {
       'crawlers.bots',
       'crawlers.series',
       'crawlers.purposes',
+    ])
+  })
+
+  it('puts the focused section first, in the DOM as on screen', async () => {
+    const titles = (wrapper) => wrapper.findAll('.an-section h2').map((h) => h.text())
+    const visits = await mountPage('/projects/w1/ai-traffic', 'visits')
+    expect(titles(visits.wrapper)).toEqual(['Visits from AI assistants', 'AI crawlers'])
+    const crawlers = await mountPage('/projects/w1/ai-traffic', 'crawlers')
+    expect(titles(crawlers.wrapper)).toEqual(['AI crawlers', 'Visits from AI assistants'])
+    expect(ids(crawlers.wrapper)).toEqual([
+      'crawlers.bots',
+      'crawlers.series',
+      'crawlers.purposes',
+      'ai.series',
+      'ai.assistants',
+      'ai.countries',
+      'ai.landing',
     ])
   })
 

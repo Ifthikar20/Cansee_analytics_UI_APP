@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { defineComponent, h } from 'vue'
+import { computed, defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() }))
@@ -28,6 +28,8 @@ vi.mock('@/api/insights', () => ({ default: insights }))
 vi.mock('@/lib/agent/askAgent', () => ask)
 
 import PromptPage from '@/pages/PromptPage.vue'
+import promptLibrary from '@/api/promptLibrary'
+import { BOARD_CONTEXT } from '@/lib/board/context'
 import { VizChartStub, chartsById } from './__fixtures__/vizStub'
 import { PROMPT_ID, WEBSITE_ID, countryMatrix, dashboardPayload, promptDetail } from './__fixtures__/polish'
 import { fanOutsPayload } from '@/pages/analytics/__tests__/__fixtures__/measurementPayloads'
@@ -35,6 +37,13 @@ import { fanOutsPayload } from '@/pages/analytics/__tests__/__fixtures__/measure
 enableAutoUnmount(afterEach)
 
 const Blank = defineComponent({ render: () => h('div') })
+const board = {
+    websiteId: computed(() => WEBSITE_ID),
+    open: vi.fn(),
+    close: vi.fn(),
+    invalidate: vi.fn(),
+    revalidate: vi.fn(),
+}
 
 const HISTORY = [
     { checked_at: '2026-10-08T09:00:00Z', position: 7, depth: 100, page: 1, location: 'gb', error: '' },
@@ -64,11 +73,10 @@ async function mountPage({
     insights.runOptions.mockResolvedValue({
         data: { kind: 'fanout_google', enabled: true, configured: { google: true }, limits: { max_units: 10 }, choices: {} },
     })
-    client.get.mockImplementation((url) =>
-        url === `/search-gap/websites/${WEBSITE_ID}/prompts/${PROMPT_ID}/`
-            ? Promise.resolve({ data: detail })
-            : Promise.reject(new Error(`unexpected GET ${url}`))
-    )
+    client.get.mockImplementation((url) => {
+        if (url !== `/search-gap/websites/${WEBSITE_ID}/prompts/${PROMPT_ID}/`) return Promise.reject(new Error(`unexpected GET ${url}`))
+        return detail instanceof Error ? Promise.reject(detail) : Promise.resolve({ data: detail })
+    })
     if (history instanceof Error) visibility.dashboard.mockRejectedValue(history)
     else visibility.dashboard.mockResolvedValue({ data: history })
     if (matrix instanceof Error) countries.matrix.mockRejectedValue(matrix)
@@ -77,17 +85,17 @@ async function mountPage({
         history: createMemoryHistory(),
         routes: [
             { path: '/dashboard', name: 'dashboard', component: Blank },
-            { path: '/projects/:websiteId/prompts/:promptId', name: 'prompt', component: Blank },
-            { path: '/projects/:websiteId/countries', name: 'countries', component: Blank },
+            { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank },
             { path: '/settings/connections', name: 'settings-connections', component: Blank },
         ],
     })
-    await router.push(`/projects/${WEBSITE_ID}/prompts/${PROMPT_ID}`)
+    await router.push(`/projects/${WEBSITE_ID}/analytics?widget=prompts&prompt=${PROMPT_ID}`)
     await router.isReady()
     const wrapper = mount(PromptPage, {
         props: { websiteId: WEBSITE_ID, promptId: PROMPT_ID },
         global: {
             plugins: [router],
+            provide: { [BOARD_CONTEXT]: board },
             stubs: {
                 VizChart: VizChartStub,
                 PromptSecurityFindings: true,
@@ -101,7 +109,8 @@ async function mountPage({
     return { wrapper, router }
 }
 
-const CHECK_LINK = `/projects/${WEBSITE_ID}/countries?prompt=${PROMPT_ID}&check=1`
+const CHECK_LINK = `/projects/${WEBSITE_ID}/analytics?prompt=${PROMPT_ID}&check=1&widget=countries`
+const ALL_PROMPTS = `/projects/${WEBSITE_ID}/analytics?widget=prompts`
 
 beforeEach(() => {
     Object.values(client).forEach((fn) => fn.mockReset())
@@ -109,6 +118,44 @@ beforeEach(() => {
     countries.matrix.mockReset()
     Object.values(insights).forEach((fn) => fn.mockReset())
     ask.askAgent.mockClear()
+    board.invalidate.mockClear()
+    promptLibrary.setArchived.mockReset()
+})
+
+describe('PromptPage: in the Prompts panel', () => {
+    it('goes back to All prompts and names the prompt in a plain block', async () => {
+        const { wrapper } = await mountPage()
+        const back = wrapper.find('.pp-back')
+        expect(back.text()).toBe('All prompts')
+        expect(back.attributes('href')).toBe(ALL_PROMPTS)
+        // The panel's own title is the h2 above; the prompt is a section heading.
+        expect(wrapper.find('h1').exists()).toBe(false)
+        expect(wrapper.find('h2.pp-title').text()).toBe('best note taking app for teams')
+        expect(wrapper.find('.pp-eyebrow').exists()).toBe(false)
+        expect(wrapper.find('.gcard').exists()).toBe(false)
+        expect(wrapper.find('.pp-verdict').text()).toContain('ChatGPT lists you #2. Google has you at #4 (page 1).')
+        expect(wrapper.find('.pp-verdict .gap-badge').text()).toBe('Even -10')
+    })
+
+    it('links a prompt that is gone back to All prompts', async () => {
+        const gone = new Error('gone')
+        gone.response = { status: 404 }
+        const { wrapper } = await mountPage({ detail: gone })
+        const missing = wrapper.find('.pp-missing')
+        expect(missing.text()).toContain("This prompt isn't tracked in this project any more.")
+        expect(missing.find('a').text()).toBe('All prompts')
+        expect(missing.find('a').attributes('href')).toBe(ALL_PROMPTS)
+    })
+
+    it('returns to the list after archiving and refetches the overview', async () => {
+        const { wrapper, router } = await mountPage()
+        promptLibrary.setArchived.mockResolvedValue({})
+        await wrapper.findAll('button').find((b) => b.text() === 'Archive').trigger('click')
+        await flushPromises()
+        expect(promptLibrary.setArchived).toHaveBeenCalledWith('bp-1', true)
+        expect(board.invalidate).toHaveBeenCalledWith('overview')
+        expect(router.currentRoute.value.fullPath).toBe(ALL_PROMPTS)
+    })
 })
 
 describe('PromptPage: how Google searches this prompt', () => {

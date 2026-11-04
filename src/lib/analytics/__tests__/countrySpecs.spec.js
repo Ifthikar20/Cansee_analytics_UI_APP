@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeVizSpec, representationsFor } from '@/lib/charts/spec'
+import { defaultRepresentation, normalizeVizSpec, representationsFor } from '@/lib/charts/spec'
 import {
     aiOverviewText,
     cellText,
@@ -116,6 +116,8 @@ describe('promptsByCountry', () => {
         expect(spec.datasets[0]).toMatchObject({ data: [null], states: ['not_checked'] })
         expect(spec.datasets[1]).toMatchObject({ data: [85], states: [null] })
         expect(offered(spec)).toEqual(['heatmap', 'table'])
+        // Calm by default: the table first, the heatmap one click away.
+        expect(defaultRepresentation(spec)).toBe('table')
     })
 
     it('shows positions for Google and ranks for an engine', () => {

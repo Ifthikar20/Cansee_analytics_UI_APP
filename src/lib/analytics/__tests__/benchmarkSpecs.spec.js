@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeVizSpec, representationsFor, tableModel } from '@/lib/charts/spec'
+import { defaultRepresentation, normalizeVizSpec, representationsFor, tableModel } from '@/lib/charts/spec'
 import {
     aiByPrompt,
     biggestGaps,
@@ -110,10 +110,12 @@ describe('compareBrands', () => {
     })
 })
 
-describe('by prompt heatmaps', () => {
+describe('by prompt views', () => {
     it('shows AI visibility per prompt; prompts without answers are Not checked', () => {
         const spec = aiByPrompt(competitorsPayload())
-        expect(spec).toMatchObject({ id: 'competitors.ai_by_prompt', title: 'AI visibility by prompt', type: 'heatmap' })
+        // Calm default: the table first, the heatmap still offered.
+        expect(spec).toMatchObject({ id: 'competitors.ai_by_prompt', title: 'AI visibility by prompt', type: 'table' })
+        expect(defaultRepresentation(normalizeVizSpec(spec))).toBe('table')
         expect(spec.label_names.p3).toBe('note app with offline mode')
         expect(dataset(spec, 'you').data).toEqual([25, null, 16.7])
         expect(dataset(spec, 'you').states).toEqual([null, 'not_checked', null])
@@ -128,9 +130,11 @@ describe('by prompt heatmaps', () => {
             id: 'competitors.google_by_prompt',
             title: 'Google position by prompt',
             value: 'rank',
+            type: 'table',
             state_labels: { not_found: 'Not on page one' },
             footnote: "From each prompt's latest Google check. Competitors are seen only on page one.",
         })
+        expect(defaultRepresentation(normalizeVizSpec(spec))).toBe('table')
         expect(dataset(spec, 'you').data).toEqual([14, null, null])
         expect(dataset(spec, 'you').states).toEqual([null, 'not_checked', 'failed'])
         expect(dataset(spec, 'b1').states).toEqual(['not_found', 'not_checked', 'failed'])

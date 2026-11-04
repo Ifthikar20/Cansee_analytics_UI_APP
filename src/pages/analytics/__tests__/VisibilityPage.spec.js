@@ -14,7 +14,7 @@ const { default: VisibilityPage } = await import('../VisibilityPage.vue')
 const Blank = defineComponent({ render: () => h('div') })
 const mounted = []
 
-async function mountPage(path = '/projects/w1/visibility') {
+async function mountPage(path = '/projects/w1/visibility', { focus = '' } = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
   useAppStore().setWebsites([{ id: 'w1', name: 'Notion' }])
@@ -22,7 +22,13 @@ async function mountPage(path = '/projects/w1/visibility') {
     history: createMemoryHistory(),
     routes: [
       { path: '/dashboard', name: 'dashboard', component: Blank },
-      { path: '/projects/:websiteId/visibility', name: 'visibility', component: VisibilityPage, props: true },
+      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank, props: true },
+      {
+        path: '/projects/:websiteId/visibility',
+        name: 'visibility',
+        component: VisibilityPage,
+        props: (to) => ({ websiteId: to.params.websiteId, focus }),
+      },
       { path: '/projects/:websiteId/prompts/:promptId', name: 'prompt', component: Blank, props: true },
       { path: '/projects/:websiteId/competitors', name: 'competitors', component: Blank, props: true },
     ],
@@ -130,29 +136,35 @@ describe('VisibilityPage', () => {
     [
       'no_prompts',
       'No prompts tracked yet.',
-      'Add the questions your buyers ask on the Overview. Cansee asks each AI engine and tracks the answers here.',
-      'Go to Overview',
+      'Add the questions your buyers ask in Prompts. Cansee asks each AI engine and tracks the answers here.',
+      'Add prompts',
+      '/projects/w1/analytics?add=1&widget=prompts',
     ],
     [
       'no_engines',
       'No AI engine is connected yet.',
       'Visibility needs at least one AI engine. An administrator adds the engine keys on the server.',
       null,
+      null,
     ],
     [
       'no_answers',
       'No AI answers in the last 30 days.',
       'Answers appear after the engines are asked your prompts. Use Check now on a prompt, or start research in the Agent.',
-      'Go to Overview',
+      'Open prompts',
+      '/projects/w1/analytics?widget=prompts',
     ],
-  ])('shows the %s empty state instead of the charts', async (reason, title, body, action) => {
+  ])('shows the %s empty state instead of the charts', async (reason, title, body, action, href) => {
     visibilityApi.dashboard.mockResolvedValue(ok(visibilityPayload({ has_data: false, empty_reason: reason })))
     const { wrapper } = await mountPage()
     const state = wrapper.find('.viz-state')
     expect(state.find('.viz-state-title').text()).toBe(title)
     expect(state.find('.viz-state-body').text()).toBe(body)
-    if (action) expect(state.find('a').text()).toBe(action)
-    else expect(state.find('a').exists()).toBe(false)
+    if (action) {
+      // The Overview's prompts live in the board's Prompts widget now.
+      expect(state.find('a').text()).toBe(action)
+      expect(state.find('a').attributes('href')).toBe(href)
+    } else expect(state.find('a').exists()).toBe(false)
     expect(charts(wrapper)).toHaveLength(0)
     expect(wrapper.findAll('.viz-stat')).toHaveLength(0)
     // The filters stay, so another period can be tried.
@@ -224,6 +236,33 @@ describe('VisibilityPage', () => {
     await link.trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.name).toBe('competitors')
+  })
+
+  it.each([
+    ['', ['visibility.engines', 'visibility.sov', 'visibility.sov_total', 'visibility.sentiment', 'visibility.citations',
+      'visibility.domains', 'visibility.by_engine_bar', 'visibility.by_prompt']],
+    ['over-time', ['visibility.engines', 'visibility.sov', 'visibility.sov_total', 'visibility.sentiment',
+      'visibility.citations', 'visibility.domains', 'visibility.by_engine_bar', 'visibility.by_prompt']],
+    ['by-engine', ['visibility.by_engine_bar', 'visibility.engines', 'visibility.sov', 'visibility.sov_total',
+      'visibility.sentiment', 'visibility.citations', 'visibility.domains', 'visibility.by_prompt']],
+    ['share-of-voice', ['visibility.sov', 'visibility.sov_total', 'visibility.engines', 'visibility.sentiment',
+      'visibility.citations', 'visibility.domains', 'visibility.by_engine_bar', 'visibility.by_prompt']],
+    ['by-prompt', ['visibility.by_prompt', 'visibility.engines', 'visibility.sov', 'visibility.sov_total',
+      'visibility.sentiment', 'visibility.citations', 'visibility.domains', 'visibility.by_engine_bar']],
+    ['unknown', ['visibility.engines', 'visibility.sov', 'visibility.sov_total', 'visibility.sentiment',
+      'visibility.citations', 'visibility.domains', 'visibility.by_engine_bar', 'visibility.by_prompt']],
+  ])('puts the focused section first (focus %s), in the DOM as on screen', async (focus, order) => {
+    const { wrapper } = await mountPage('/projects/w1/visibility', { focus })
+    expect(charts(wrapper).map((c) => c.props('spec').id)).toEqual(order)
+    // The tiles stay on top of every section.
+    expect(wrapper.find('.an-kpis').exists()).toBe(true)
+  })
+
+  it('keeps the competitors link right under the share of voice when it is first', async () => {
+    const { wrapper } = await mountPage('/projects/w1/visibility', { focus: 'share-of-voice' })
+    const sections = wrapper.findAll('.an-page > *').map((el) => el.classes().join(' ') || el.element.tagName.toLowerCase())
+    const sov = sections.indexOf('an-two')
+    expect(sections[sov + 1]).toBe('an-compare')
   })
 
   it('opens a prompt from the heatmap', async () => {

@@ -200,7 +200,7 @@ function rankPoint(cell) {
 /**
  * Prompts (rows) by checked country (columns). All engines: the AI score
  * (0-100) of each prompt and country; Google: your position; one engine:
- * where it names you.
+ * where it names you. It opens as the table; the heatmap is the other view.
  */
 export function promptsByCountry(matrix, { engine = '' } = {}) {
     const cells = matrix?.cells || []
@@ -240,7 +240,7 @@ export function promptsByCountry(matrix, { engine = '' } = {}) {
                 states: points.map((p) => p.state),
             }
         }),
-        type: 'heatmap',
+        type: 'table',
         representations: ['heatmap'],
         state_labels: stateLabels,
         ...(engine ? {} : { max: 100 }),

@@ -221,7 +221,7 @@ const rows = computed(() =>
   text-align: right !important;
 }
 
-@media (max-width: 640px) {
+@container bd-panel (max-width: 480px) {
   .tt {
     padding: 16px;
   }

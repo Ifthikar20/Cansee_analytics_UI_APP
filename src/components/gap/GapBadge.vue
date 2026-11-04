@@ -1,12 +1,13 @@
 <template>
-  <span class="gap-badge" :style="{ '--tone': meta.color }" :title="meta.blurb">
-    <span class="gap-badge-dot" aria-hidden="true"></span>
+  <span class="gap-badge" :title="meta.blurb">
     {{ meta.label }}
     <span v-if="showValue && valueText" class="gap-badge-value">{{ valueText }}</span>
   </span>
 </template>
 
 <script setup>
+// A gap class in words, with its value when asked: "AI ahead +40",
+// "Not definite". Plain text, no colour: the words carry the class.
 import { computed } from 'vue'
 import { gapDisplay, gapMeta, gapValue, gapValueText } from '@/lib/gap'
 
@@ -25,28 +26,15 @@ const valueText = computed(() => (props.gap ? gapValueText(props.gap) : gapValue
 
 <style scoped>
 .gap-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--tone) 13%, transparent);
-  color: var(--tone);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.4;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 500;
   white-space: nowrap;
 }
 
-.gap-badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--tone);
-}
-
 .gap-badge-value {
+  color: var(--muted-foreground);
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
-  opacity: 0.85;
 }
 </style>

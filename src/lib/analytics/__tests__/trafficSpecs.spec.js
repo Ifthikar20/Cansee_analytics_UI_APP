@@ -37,10 +37,14 @@ describe('website traffic', () => {
     it('maps visitors by country, with the unknown count as a footnote', () => {
         const spec = countriesMap(trafficCountries())
         expect(spec).toMatchObject({ id: 'traffic.countries', x: 'country', value: 'count', type: 'map' })
+        expect(spec.title).toBe('Visitors by country')
         expect(spec.labels).toEqual(['US', 'GB', 'DE'])
         expect(spec.datasets[0]).toMatchObject({ label: 'Unique visitors', data: [30, 8, 3] })
         expect(spec.footnote).toBe('3 without a known country.')
         expect(offered(spec)).toEqual(['map', 'hbar', 'table'])
+        // One country dominates: decade bins, and no visit is "None recorded".
+        expect(spec).toMatchObject({ scale: 'log', missing_label: 'None recorded' })
+        expect(normalizeVizSpec(spec).scale).toBe('log')
 
         const own = countriesMap(trafficCountries({ countries_unknown: null }), {
             id: 'countries.visitors',
@@ -49,6 +53,14 @@ describe('website traffic', () => {
         })
         expect(own).toMatchObject({ id: 'countries.visitors', subtitle: 'Cansee pixel · last 30 days', footnote: 'A note.' })
         expect(countriesMap(trafficCountries({ countries_unknown: 0 })).footnote).toBeUndefined()
+    })
+
+    it('calls Cloudflare requests requests, never visitors', () => {
+        const spec = countriesMap(cloudflareTraffic())
+        expect(spec.title).toBe('Requests by country')
+        expect(spec.datasets[0].label).toBe('Requests')
+        expect(countriesMap(cloudflareTraffic({ metric_label: null })).datasets[0].label).toBe('Requests')
+        expect(countriesMap(cloudflareTraffic(), { title: 'Own title' }).title).toBe('Own title')
     })
 
     it('draws one measure at a time, with days before the pixel started as not measured', () => {
@@ -163,6 +175,7 @@ describe('AI visits', () => {
         const { referrals } = aiTrafficPayload()
         expect(offered(byAssistant(referrals))).toEqual(['hbar', 'doughnut', 'table'])
         expect(offered(aiCountries(referrals))).toEqual(['map', 'hbar', 'table'])
+        expect(aiCountries(referrals)).toMatchObject({ scale: 'log', missing_label: 'None recorded' })
     })
 
     it('lists landing pages per assistant, drawing one at a time', () => {

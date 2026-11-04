@@ -1,6 +1,6 @@
 // Chart specs (contract 8a) and stat tiles for the visibility dashboard
-// payload (contract 5). Pure functions: the page and the Overview's trend
-// panel render what these return through VizChart and VizStatTile.
+// payload (contract 5). Pure functions: the page and the board's cards
+// render what these return through VizChart and VizStatTile.
 //
 // A null in the payload is a gap or a state word, never a zero: buckets
 // without answers have null rates, and the charts keep them as gaps.
@@ -37,8 +37,8 @@ function engineLabel(payload, key) {
 }
 
 /**
- * Visibility over time, one line per engine. Also used by the Overview's
- * trend panel and the Prompt page's history (with their own id and title).
+ * Visibility over time, one line per engine. Also used by the Prompt
+ * page's history (with its own id and title).
  */
 export function visibilityOverTime(
     payload,
@@ -84,7 +84,11 @@ function shownEngines(payload, hasAnswers) {
         .map((e) => ({ key: e.key, label: e.label || engineMeta(e.key).label, configured: Boolean(e.configured) }))
 }
 
-/** Prompts (rows) by engine (columns): the share of answers that name you. */
+/**
+ * Prompts (rows) by engine (columns): the share of answers that name you.
+ * It starts as the table (calm, board_contract.md 10); the heatmap stays
+ * one switch away.
+ */
 export function byPromptHeatmap(payload) {
     const prompts = payload?.by_prompt || []
     const engines = shownEngines(payload, (key) => prompts.some((p) => (p.engines?.[key]?.answers || 0) > 0))
@@ -111,7 +115,7 @@ export function byPromptHeatmap(payload) {
                 }),
             }
         }),
-        type: 'heatmap',
+        type: 'table',
         representations: ['heatmap'],
     }
 }

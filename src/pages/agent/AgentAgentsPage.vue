@@ -11,7 +11,8 @@ import { useAppStore } from '@/stores/app'
 import { agentList } from '@/lib/agent/agentsMeta'
 import { TEAMS, TEAM_KEYS } from '@/lib/agent/teams'
 import { ASK_TEMPLATES } from '@/lib/analytics/askTemplates'
-import { ANALYTICS_SECTIONS, sectionRoute } from '@/lib/analyticsNav'
+import { boardLocation } from '@/lib/board/links'
+import { WIDGETS } from '@/lib/board/widgets'
 import AgPage from '@/components/agent/common/AgPage.vue'
 import AgButton from '@/components/agent/common/AgButton.vue'
 import AgEmptyState from '@/components/agent/common/AgEmptyState.vue'
@@ -67,7 +68,7 @@ function agentsOf(key) {
   return agents.value.filter((a) => (a.teams || []).some((t) => t.key === key))
 }
 
-/* ── Starts from: the tabs whose Ask the agent drafts name the agent ── */
+/* ── Starts from: the widgets whose Ask the agent drafts name the agent ── */
 
 const startsFromByAgent = computed(() => {
   const fromKeys = {}
@@ -80,11 +81,11 @@ const startsFromByAgent = computed(() => {
   }
   const out = {}
   for (const [name, keys] of Object.entries(fromKeys)) {
-    // Sidebar order, labels and routes from the analytics navigation.
-    out[name] = ANALYTICS_SECTIONS.filter((s) => keys.has(s.key)).map((s) => ({
-      key: s.key,
-      label: s.label,
-      to: sectionRoute(s.key, wid.value),
+    // Catalog order and titles; each link opens that widget's panel.
+    out[name] = WIDGETS.filter((w) => keys.has(w.key)).map((w) => ({
+      key: w.key,
+      label: w.title,
+      to: boardLocation(wid.value, w.key),
     }))
   }
   return out

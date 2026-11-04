@@ -24,7 +24,7 @@ describe('ASK_TEMPLATES', () => {
       expect(t.agents).toContain(t.agent)
     }
     expect(ASK_TEMPLATES.fact_publishers).toMatchObject({ from: 'fact-check', agents: ['pr_writer'] })
-    expect(ASK_TEMPLATES.citation_gap.from).toBe('sources')
+    expect(ASK_TEMPLATES.citation_gap.from).toBe('citations')
   })
 })
 

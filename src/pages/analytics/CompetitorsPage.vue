@@ -168,6 +168,7 @@ import { CircleX } from '@lucide/vue'
 import insightsApi from '@/api/insights'
 import { useAnalyticsQuery } from '@/composables/analytics/useAnalyticsQuery'
 import { useQueryState } from '@/composables/analytics/useQueryState'
+import { boardLocation } from '@/lib/board/links'
 import { ENGINES } from '@/lib/engines'
 import {
   aiByPrompt, biggestGaps, brandTiles, compareBrands, googleByPrompt, googleState, hasAnswers, headToHeadRows,
@@ -220,6 +221,9 @@ const engineOptions = computed(
 const days = computed(() => periodDays(data.value?.window?.period || period.value))
 const integer = new Intl.NumberFormat('en-US')
 
+// Prompts (and their Google checks) live in the board's Prompts widget.
+const promptsLink = computed(() => boardLocation(props.websiteId, 'prompts'))
+
 function count(value) {
   return typeof value === 'number' ? integer.format(value) : 'Not measured'
 }
@@ -243,7 +247,7 @@ const aiEmpty = computed(() =>
     : {
         title: `No AI answers in the last ${days.value} days.`,
         body: 'Answers appear after the engines are asked your prompts.',
-        action: { label: 'Go to Overview', to: { name: 'dashboard' } },
+        action: { label: 'Open prompts', to: promptsLink.value },
       },
 )
 
@@ -259,8 +263,8 @@ const googleEmpty = computed(() => {
   if (state === 'not_checked') {
     return {
       title: 'No Google checks yet.',
-      body: 'Check a prompt on the Overview to compare positions.',
-      action: { label: 'Go to Overview', to: { name: 'dashboard' } },
+      body: 'Check Google for a prompt in Prompts to compare positions.',
+      action: { label: 'Open prompts', to: promptsLink.value },
     }
   }
   return null
@@ -445,7 +449,7 @@ function openPrompt(event) {
   color: var(--muted-foreground);
 }
 
-@media (max-width: 767px) {
+@container bd-panel (max-width: 560px) {
   .an-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

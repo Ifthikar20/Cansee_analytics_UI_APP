@@ -17,18 +17,11 @@ const { default: AgentAgentsPage } = await import('../AgentAgentsPage.vue')
 enableAutoUnmount(afterEach)
 
 const Blank = defineComponent({ render: () => h('div') })
-// The analytics tabs the Starts from links open (route names of contract 2b).
+// The Starts from links open a widget's panel on the Analytics board.
 const ANALYTICS_STUBS = [
-  ['competitors', 'competitors'],
-  ['sentiment', 'sentiment'],
-  ['fact-check', 'fact-check'],
-  ['sources-urls', 'sources'],
-  ['fan-outs', 'fan-outs'],
-  ['prompt-research', 'prompt-research'],
-  ['site-pages', 'pages'],
-  ['crawler-access', 'crawler-access'],
-  ['products', 'products'],
-].map(([name, path]) => ({ path: `/projects/:websiteId/${path}`, name, component: Blank }))
+  { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank },
+  { path: '/dashboard', name: 'dashboard', component: Blank },
+]
 
 async function setup(component, path, { websites = null, props = {} } = {}) {
   const pinia = createPinia()
@@ -183,21 +176,21 @@ describe('AgentAgentsPage', () => {
     expect(cards[1].find('button[aria-label="Use Page Optimizer"]').exists()).toBe(true)
   })
 
-  it('links the analytics tabs whose drafts start each agent', async () => {
+  it('links the board widgets whose drafts start each agent, in catalog order', async () => {
     fakeAgent.catalog = CATALOG
     const { wrapper } = await setup(AgentAgentsPage, '/projects/w1/agent/agents', { props: { websiteId: 'w1' } })
     const cards = wrapper.findAll('li.ag-agent')
     const links = (card) => card.findAll('.ag-agent-from a').map((a) => [a.text(), a.attributes('href')])
     expect(cards[0].find('.ag-agent-from').text()).toContain('Starts from')
     expect(links(cards[0])).toEqual([
-      ['Competitors', '/projects/w1/competitors'],
-      ['Sentiment', '/projects/w1/sentiment'],
+      ['Sentiment', '/projects/w1/analytics?widget=sentiment'],
+      ['Competitors', '/projects/w1/analytics?widget=competitors'],
     ])
     expect(links(cards[1])).toEqual([
-      ['Fact check', '/projects/w1/fact-check'],
-      ['Pages', '/projects/w1/pages'],
-      ['Crawler access', '/projects/w1/crawler-access'],
-      ['Products', '/projects/w1/products'],
+      ['Fact check', '/projects/w1/analytics?widget=fact-check'],
+      ['Crawler access', '/projects/w1/analytics?widget=crawler-access'],
+      ['Pages', '/projects/w1/analytics?widget=pages'],
+      ['Products', '/projects/w1/analytics?widget=products'],
     ])
     // No template names the Landing Page Agent: no line.
     expect(cards[2].find('.ag-agent-from').exists()).toBe(false)

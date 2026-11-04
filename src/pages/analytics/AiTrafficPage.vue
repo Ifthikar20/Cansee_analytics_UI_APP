@@ -41,113 +41,116 @@
         </AlertDescription>
       </Alert>
 
-      <!-- Visits from AI assistants (pixel or GA4) -->
-      <section class="an-section" aria-labelledby="ai-visits-title">
-        <header class="an-section-head">
-          <h2 id="ai-visits-title" class="an-section-title">Visits from AI assistants</h2>
-          <p v-if="referralsLine" class="an-section-sub">{{ referralsLine }}</p>
-        </header>
+      <!-- The focused section first, in DOM order as on screen. -->
+      <template v-for="key in sectionOrder" :key="key">
+        <!-- Visits from AI assistants (pixel or GA4) -->
+        <section v-if="key === 'visits'" class="an-section" aria-labelledby="ai-visits-title">
+          <header class="an-section-head">
+            <h2 id="ai-visits-title" class="an-section-title">Visits from AI assistants</h2>
+            <p v-if="referralsLine" class="an-section-sub">{{ referralsLine }}</p>
+          </header>
 
-        <VizState v-if="referralsUnavailable" v-bind="referralsUnavailable" @action="reload" />
-
-        <template v-else>
-          <div class="an-kpis">
-            <VizStatTile
-              v-for="tile in referralTileList"
-              :key="tile.key"
-              :label="tile.label"
-              :value="tile.value"
-              :kind="tile.kind"
-              :state-text="tile.stateText"
-              :hint="tile.hint"
-            />
-          </div>
-
-          <VizState v-if="referralsZero" v-bind="referralsZero" />
+          <VizState v-if="referralsUnavailable" v-bind="referralsUnavailable" @action="reload" />
 
           <template v-else>
-            <VizChart :spec="visitsSpec" :loading="loading" :height="260" :heading-level="3" />
-            <div class="an-two">
-              <VizChart :spec="assistantsSpec" :loading="loading" :heading-level="3" />
-              <VizChart
-                :spec="countriesSpec"
-                :loading="loading"
-                :empty="(referrals.countries || []).length ? null : { title: 'No countries recorded for these visits.' }"
-                :heading-level="3"
+            <div class="an-kpis">
+              <VizStatTile
+                v-for="tile in referralTileList"
+                :key="tile.key"
+                :label="tile.label"
+                :value="tile.value"
+                :kind="tile.kind"
+                :state-text="tile.stateText"
+                :hint="tile.hint"
               />
             </div>
-            <VizChart
-              :spec="landingSpec"
-              :loading="loading"
-              :empty="(referrals.landing_pages || []).length ? null : { title: 'No landing pages recorded for these visits.' }"
-              :heading-level="3"
-            />
+
+            <VizState v-if="referralsZero" v-bind="referralsZero" />
+
+            <template v-else>
+              <VizChart :spec="visitsSpec" :loading="loading" :height="260" :heading-level="3" />
+              <div class="an-two">
+                <VizChart :spec="assistantsSpec" :loading="loading" :heading-level="3" />
+                <VizChart
+                  :spec="countriesSpec"
+                  :loading="loading"
+                  :empty="(referrals.countries || []).length ? null : { title: 'No countries recorded for these visits.' }"
+                  :heading-level="3"
+                />
+              </div>
+              <VizChart
+                :spec="landingSpec"
+                :loading="loading"
+                :empty="(referrals.landing_pages || []).length ? null : { title: 'No landing pages recorded for these visits.' }"
+                :heading-level="3"
+              />
+            </template>
           </template>
-        </template>
-      </section>
+        </section>
 
-      <!-- AI crawlers (Cloudflare only) -->
-      <section class="an-section" aria-labelledby="ai-crawlers-title">
-        <header class="an-section-head">
-          <h2 id="ai-crawlers-title" class="an-section-title">AI crawlers</h2>
-          <p class="an-section-sub">{{ crawlerLine }}</p>
-        </header>
+        <!-- AI crawlers (Cloudflare only) -->
+        <section v-else-if="key === 'crawlers'" class="an-section" aria-labelledby="ai-crawlers-title">
+          <header class="an-section-head">
+            <h2 id="ai-crawlers-title" class="an-section-title">AI crawlers</h2>
+            <p class="an-section-sub">{{ crawlerLine }}</p>
+          </header>
 
-        <VizState v-if="crawlersUnavailable" v-bind="crawlersUnavailable" @action="reload" />
-
-        <template v-else>
-          <div class="an-kpis">
-            <VizStatTile
-              v-for="tile in crawlerTileList"
-              :key="tile.key"
-              :label="tile.label"
-              :value="tile.value"
-              :kind="tile.kind"
-              :state-text="tile.stateText"
-              :hint="tile.hint"
-            />
-          </div>
-
-          <VizState v-if="crawlersZero" v-bind="crawlersZero" />
+          <VizState v-if="crawlersUnavailable" v-bind="crawlersUnavailable" @action="reload" />
 
           <template v-else>
-            <VizChart :spec="botsSpec" :loading="loading" :heading-level="3">
-              <template #custom>
-                <div class="an-scroll">
-                  <table class="an-table">
-                    <caption class="sr-only">Requests by crawler, with operator and purpose</caption>
-                    <thead>
-                      <tr>
-                        <th scope="col">Crawler</th>
-                        <th scope="col">Operator</th>
-                        <th scope="col">Purpose</th>
-                        <th scope="col" class="is-num">Requests</th>
-                        <th scope="col" class="is-num">Share</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="row in botRows" :key="row.key">
-                        <th scope="row">{{ row.name }}</th>
-                        <td>{{ row.operator || 'Unknown' }}</td>
-                        <td>{{ row.purpose }}</td>
-                        <td class="is-num">{{ countText(row.requests) }}</td>
-                        <td class="is-num">{{ shareText(row.share) }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </template>
-            </VizChart>
-            <VizChart :spec="crawlerDaysSpec" :loading="loading" :heading-level="3" />
-            <VizChart :spec="purposesChart" :loading="loading" :heading-level="3" />
-            <CrawlerPathsTable :paths="topPaths" :bots="crawlers.bots || []" />
-          </template>
+            <div class="an-kpis">
+              <VizStatTile
+                v-for="tile in crawlerTileList"
+                :key="tile.key"
+                :label="tile.label"
+                :value="tile.value"
+                :kind="tile.kind"
+                :state-text="tile.stateText"
+                :hint="tile.hint"
+              />
+            </div>
 
-          <footer class="an-foot">
-            <p v-for="line in crawlerNotes" :key="line">{{ line }}</p>
-          </footer>
-        </template>
-      </section>
+            <VizState v-if="crawlersZero" v-bind="crawlersZero" />
+
+            <template v-else>
+              <VizChart :spec="botsSpec" :loading="loading" :heading-level="3">
+                <template #custom>
+                  <div class="an-scroll">
+                    <table class="an-table">
+                      <caption class="sr-only">Requests by crawler, with operator and purpose</caption>
+                      <thead>
+                        <tr>
+                          <th scope="col">Crawler</th>
+                          <th scope="col">Operator</th>
+                          <th scope="col">Purpose</th>
+                          <th scope="col" class="is-num">Requests</th>
+                          <th scope="col" class="is-num">Share</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="row in botRows" :key="row.key">
+                          <th scope="row">{{ row.name }}</th>
+                          <td>{{ row.operator || 'Unknown' }}</td>
+                          <td>{{ row.purpose }}</td>
+                          <td class="is-num">{{ countText(row.requests) }}</td>
+                          <td class="is-num">{{ shareText(row.share) }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
+              </VizChart>
+              <VizChart :spec="crawlerDaysSpec" :loading="loading" :heading-level="3" />
+              <VizChart :spec="purposesChart" :loading="loading" :heading-level="3" />
+              <CrawlerPathsTable :paths="topPaths" :bots="crawlers.bots || []" />
+            </template>
+
+            <footer class="an-foot">
+              <p v-for="line in crawlerNotes" :key="line">{{ line }}</p>
+            </footer>
+          </template>
+        </section>
+      </template>
     </template>
   </div>
 </template>
@@ -155,7 +158,8 @@
 <script setup>
 // AI traffic (contract 4e): visits referred by AI assistants (pixel or
 // GA4) and AI crawler requests (Cloudflare only, when its plan allows the
-// query). Each half says in words when its source cannot show it.
+// query). Each half says in words when its source cannot show it. The
+// board opens it for two widgets: `focus` puts that half first.
 import { computed } from 'vue'
 import { CircleX } from '@lucide/vue'
 import trafficApi from '@/api/traffic'
@@ -178,7 +182,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 const props = defineProps({
   websiteId: { type: String, required: true },
+  // 'visits' | 'crawlers': the section shown first (the AI traffic and AI
+  // crawlers widgets).
+  focus: { type: String, default: '' },
 })
+
+const SECTIONS = ['visits', 'crawlers']
+const sectionOrder = computed(() =>
+  SECTIONS.includes(props.focus) ? [props.focus, ...SECTIONS.filter((key) => key !== props.focus)] : SECTIONS,
+)
 
 const PERIOD_LABELS = { '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days' }
 
@@ -367,13 +379,14 @@ function shareText(value) {
   white-space: nowrap;
 }
 
-@media (max-width: 1100px) {
+/* The page renders in the board's side panel: its width decides. */
+@container bd-panel (max-width: 760px) {
   .an-two {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-@media (max-width: 640px) {
+@container bd-panel (max-width: 480px) {
   .an-kpis {
     grid-template-columns: minmax(0, 1fr);
   }

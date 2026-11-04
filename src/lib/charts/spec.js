@@ -7,7 +7,11 @@
 //     value?: number|percent|count|rank|usd, unit?, labels[], label_names?,
 //     datasets: [{key, label, data[], states?[], entity?, value?}], type?,
 //     representations?[], stacked?, pick_one?, custom_label?, palette?,
-//     emphasis?, state_labels?, missing_label?, footnote?, max? }
+//     emphasis?, state_labels?, missing_label?, footnote?, max?,
+//     scale?: linear|log }
+//
+// `scale: 'log'` bins a count, number or usd map or heatmap by decades
+// (lib/charts/scales), for measures where one country dominates.
 //
 // Optional extras beyond the contract: `label_header` (the table's first
 // column heading; default Date / Week / Month, Country or Name),
@@ -60,6 +64,7 @@ export const STATE_LABELS = Object.freeze({
 const X_KINDS = ['category', 'time', 'country']
 const TIME_UNITS = ['day', 'week', 'month']
 const PALETTES = ['categorical', 'sequential', 'ordinal', 'diverging', 'emphasis']
+const SCALES = ['linear', 'log']
 const MAX = { title: 120, subtitle: 200, unit: 8, footnote: 300, name: 200, short: 40 }
 // Category labels longer than this turn bars horizontal (8b).
 const LONG_LABEL = 14
@@ -187,6 +192,7 @@ export function normalizeVizSpec(spec, { limits = PAGE_LIMITS } = {}) {
     missing_label: clip(spec.missing_label, MAX.short) || 'No data',
     footnote: clip(spec.footnote, MAX.footnote),
     max,
+    scale: oneOf(spec.scale, SCALES, 'linear'),
     truncated: datasets.length > kept.length,
     total_datasets: datasets.length,
   }
@@ -308,16 +314,16 @@ export function representationsFor(spec, { picked = null } = {}) {
 const PLOTS = ['line', 'area', 'bar', 'hbar', 'stacked_bar', 'doughnut']
 
 /**
- * `spec.type` when offered, else the first offered; a narrow map starts as
- * bars. A plot with no value to draw (every point a state word, such as
- * Google checks that all missed) starts as the table, which says them.
+ * `spec.type` when offered, else the first offered; a map stays a map at
+ * any width, since it scales. A plot with no value to draw (every point a
+ * state word, such as Google checks that all missed) starts as the table,
+ * which says them.
  */
-export function defaultRepresentation(spec, { narrow = false, picked = null } = {}) {
+export function defaultRepresentation(spec, { picked = null } = {}) {
   const s = ensure(spec)
   if (!s) return 'table'
   const offered = representationsFor(s, { picked })
   let rep = s.type && offered.includes(s.type) ? s.type : offered[0]
-  if (narrow && rep === 'map' && offered.includes('hbar')) rep = 'hbar'
   const drawn = s.pick_one ? [pickedDataset(s, picked)] : s.datasets
   if (PLOTS.includes(rep) && !drawn.some((d) => d.data.some((v) => v !== null))) rep = 'table'
   return rep

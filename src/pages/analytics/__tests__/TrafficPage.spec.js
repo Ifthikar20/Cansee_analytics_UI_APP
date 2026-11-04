@@ -128,6 +128,22 @@ describe('TrafficPage', () => {
       body: 'Cloudflare does not report referrers on this plan.',
     })
     expect(chart(wrapper, 'traffic.countries').props('spec').footnote).toBeUndefined()
+    // Requests, never visitors.
+    expect(chart(wrapper, 'traffic.countries').props('spec').title).toBe('Requests by country')
+  })
+
+  it("says when Cloudflare's breakdown could not be loaded, and retries", async () => {
+    trafficApi.traffic.mockResolvedValue(ok(cloudflareTraffic({ pages: null, devices: null })))
+    const { wrapper } = await mountPage('/projects/w1/traffic?source=cloudflare')
+    const failed = { kind: 'error', title: "Cloudflare's breakdown couldn't be loaded just now.", action: { label: 'Try again' } }
+    expect(chart(wrapper, 'traffic.pages').props('empty')).toEqual(failed)
+    expect(chart(wrapper, 'traffic.devices').props('empty')).toEqual(failed)
+    trafficApi.traffic.mockResolvedValue(ok(cloudflareTraffic()))
+    chart(wrapper, 'traffic.pages').vm.$emit('retry')
+    await flushPromises()
+    expect(trafficApi.traffic).toHaveBeenCalledTimes(2)
+    expect(chart(wrapper, 'traffic.pages').props('empty')).toBeNull()
+    expect(chart(wrapper, 'traffic.devices').props('empty')).toBeNull()
   })
 
   it('says when the source could not be reached and a saved copy is shown', async () => {

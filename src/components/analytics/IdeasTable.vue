@@ -429,7 +429,7 @@ function toggle(id) {
   line-height: 1.5;
 }
 
-@media (max-width: 640px) {
+@container bd-panel (max-width: 480px) {
   .it {
     padding: 16px;
   }

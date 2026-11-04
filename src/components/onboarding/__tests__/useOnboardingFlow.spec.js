@@ -667,7 +667,7 @@ describe('onboarding: first research', () => {
     )
     await flow.skipResearch()
     expect(toast.warning).toHaveBeenCalledWith(
-      "Your project is saved, but we couldn't add its starter prompts. Add them from the Overview.",
+      "Your project is saved, but we couldn't add its starter prompts. Add them from Prompts on Analytics.",
     )
     expect(auth.fetchSession).toHaveBeenCalled()
   })

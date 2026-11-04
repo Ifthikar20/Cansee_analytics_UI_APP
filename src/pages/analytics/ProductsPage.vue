@@ -560,13 +560,13 @@ async function archive() {
   gap: 8px;
 }
 
-@media (max-width: 1100px) {
+@container bd-panel (max-width: 760px) {
   .an-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 767px) {
+@container bd-panel (max-width: 560px) {
   .an-card {
     padding: 16px;
   }

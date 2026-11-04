@@ -39,6 +39,53 @@ describe('binsFor', () => {
     ])
   })
 
+  describe('with a log scale', () => {
+    const log = (data, extra = {}) => binsFor(spec('count', data, { scale: 'log', ...extra }))
+    const read = (bins) => bins.map((b) => [b.label, b.level])
+
+    it('keeps one bin up to a single-digit max', () => {
+      expect(read(log([7, 2, 1]))).toEqual([['1-7', 5]])
+    })
+
+    it('uses one bin per decade up to the max, the last ending on it', () => {
+      expect(read(log([480, 12, 3]))).toEqual([
+        ['1-9', 1],
+        ['10-99', 3],
+        ['100-480', 5],
+      ])
+      const big = log([480213, 1204, 15])
+      expect(read(big)).toEqual([
+        ['1-99', 1],
+        ['100-999', 2],
+        ['1,000-9,999', 3],
+        ['10,000-99,999', 4],
+        ['100,000-480,213', 5],
+      ])
+      expect(big.every((b) => b.integer)).toBe(true)
+      expect(binOf(99, big)).toBe(1)
+      expect(binOf(100, big)).toBe(2)
+      expect(binOf(480213, big)).toBe(5)
+    })
+
+    it('starts the first bin at 0 when a measured zero is drawn', () => {
+      const bins = log([0, 480])
+      expect(bins[0]).toMatchObject({ min: 0, max: 9, label: '0-9', level: 1 })
+      expect(binOf(0, bins)).toBe(1)
+    })
+
+    it('falls back to the linear bins when the largest value is below 1', () => {
+      const bins = binsFor(spec('usd', [0.12, 0.4], { scale: 'log' }))
+      expect(bins).toHaveLength(5)
+      expect(bins[0].min).toBe(0)
+      expect(read(log([0, 0]))).toEqual(read(binsFor(spec('count', [0, 0]))))
+    })
+
+    it('leaves percents and ranks on their fixed bins', () => {
+      expect(binsFor(spec('percent', [3, 50], { scale: 'log' }))[0].label).toBe('0-19%')
+      expect(binsFor(spec('rank', [1, 40], { scale: 'log' }))[0].label).toBe('#1-3')
+    })
+  })
+
   it('bins one dataset of several by its own kind', () => {
     const s = normalizeVizSpec({
       title: 'T',

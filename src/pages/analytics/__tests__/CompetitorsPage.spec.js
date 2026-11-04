@@ -26,6 +26,7 @@ async function mountPage(path = '/projects/w1/competitors') {
     history: createMemoryHistory(),
     routes: [
       { path: '/dashboard', name: 'dashboard', component: Blank },
+      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank },
       {
         path: '/projects/:websiteId/competitors',
         name: 'competitors',
@@ -154,7 +155,7 @@ describe('CompetitorsPage', () => {
     const ai = {
       title: 'No AI answers in the last 30 days.',
       body: 'Answers appear after the engines are asked your prompts.',
-      action: { label: 'Go to Overview', to: { name: 'dashboard' } },
+      action: { label: 'Open prompts', to: { name: 'analytics', params: { websiteId: 'w1' }, query: { widget: 'prompts' } } },
     }
     expect(charts['competitors.visibility'].props('empty')).toEqual(ai)
     expect(charts['competitors.ai_by_prompt'].props('empty')).toEqual(ai)
@@ -173,8 +174,8 @@ describe('CompetitorsPage', () => {
     const { wrapper } = await mountPage()
     expect(chartsById(wrapper)['competitors.google_by_prompt'].props('empty')).toEqual({
       title: 'No Google checks yet.',
-      body: 'Check a prompt on the Overview to compare positions.',
-      action: { label: 'Go to Overview', to: { name: 'dashboard' } },
+      body: 'Check Google for a prompt in Prompts to compare positions.',
+      action: { label: 'Open prompts', to: { name: 'analytics', params: { websiteId: 'w1' }, query: { widget: 'prompts' } } },
     })
   })
 

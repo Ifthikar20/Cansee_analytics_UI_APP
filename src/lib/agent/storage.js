@@ -25,6 +25,8 @@ const TABS_PREFIX = 'cs-agent-tabs-v1:'
 const DRAFT_PREFIX = 'cs-agent-draft-v1:'
 const ACTIVITY_SEEN_PREFIX = 'cs-agent-activity-seen-v1:'
 const FINDINGS_PREFIX = 'cs-agent-findings-v1:'
+// The analytics board's cached layouts (stores/board.js), keyed by user and project.
+const BOARD_PREFIX = 'cs-board-v1:'
 
 export const USER_KEY_PREFIXES = Object.freeze([
     LAST_PROJECT_PREFIX,
@@ -33,6 +35,7 @@ export const USER_KEY_PREFIXES = Object.freeze([
     DRAFT_PREFIX,
     ACTIVITY_SEEN_PREFIX,
     FINDINGS_PREFIX,
+    BOARD_PREFIX,
 ])
 
 const FINDINGS_PREF_KEYS = Object.freeze(['status', 'category', 'severity'])

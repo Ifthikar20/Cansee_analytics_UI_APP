@@ -14,11 +14,11 @@ const { default: SourceStates } = await import('../SourceStates.vue')
 const Blank = defineComponent({ render: () => h('div') })
 const mounted = []
 
-async function withRouter(path = '/projects/w1/sentiment') {
+async function withRouter(path = '/projects/w1/analytics?widget=sentiment') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/projects/:websiteId/sentiment', name: 'sentiment', component: Blank, meta: { analytics: 'sentiment' } },
+      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank, meta: { board: true } },
       { path: '/elsewhere', name: 'elsewhere', component: Blank },
     ],
   })
@@ -33,7 +33,7 @@ afterEach(() => {
 })
 
 describe('AskAgentButton', () => {
-  it('drafts the template for the current tab and its agent', async () => {
+  it('drafts the template for the open panel and its agent', async () => {
     const router = await withRouter()
     const wrapper = mount(AskAgentButton, {
       props: {
@@ -58,7 +58,19 @@ describe('AskAgentButton', () => {
     })
   })
 
-  it("takes a label, and the template's tab off an analytics route", async () => {
+  it('names the widget whose panel is open, over the template', async () => {
+    const router = await withRouter('/projects/w1/analytics?widget=citations')
+    const wrapper = mount(AskAgentButton, {
+      props: { websiteId: 'w1', template: 'page_optimize', values: { url: 'https://a.test/x', facts: ['- Google: #4 for "crm"'] } },
+      global: { plugins: [router] },
+    })
+    mounted.push(wrapper)
+    await wrapper.find('button').trigger('click')
+    await flushPromises()
+    expect(askAgent.mock.calls[0][1]).toMatchObject({ agent: 'page_optimizer', from: 'citations' })
+  })
+
+  it("takes a label, and the template's own key without a panel", async () => {
     const router = await withRouter('/elsewhere')
     const wrapper = mount(AskAgentButton, {
       props: { websiteId: 'w1', template: 'fact_publishers', values: { claim: 'x', key: 'k' }, label: 'Ask publishers to correct it' },

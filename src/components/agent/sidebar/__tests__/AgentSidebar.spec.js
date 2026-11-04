@@ -3,8 +3,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { ANALYTICS_SECTIONS, rememberAnalyticsSection, rememberSidebarSide, sectionLabel } from '@/lib/analyticsNav'
+import { setLastChat } from '@/lib/agent/storage'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 
 // The switcher, inbox, agent sections and recents belong to other files;
 // these stand-ins say where each one renders.
@@ -22,29 +23,20 @@ vi.mock('../SidebarRecents.vue', stub('stub-recents'))
 const { default: AgentSidebar } = await import('../AgentSidebar.vue')
 
 const Blank = defineComponent({ render: () => h('div') })
-const at = (key) => ({ analytics: key, title: sectionLabel(key) })
-const pathOf = (name) => (name === 'site-pages' ? 'pages' : name === 'sources-urls' ? 'sources' : name)
 
 function makeRouter() {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/docs', name: 'docs', component: Blank },
-      { path: '/support', name: 'support', component: Blank },
       { path: '/agent', name: 'agent', component: Blank },
-      { path: '/dashboard', name: 'dashboard', component: Blank, meta: at('overview') },
+      { path: '/dashboard', name: 'dashboard', component: Blank, meta: { page: true, title: 'Analytics' } },
       { path: '/settings', name: 'settings', component: Blank, meta: { settings: true, title: 'Settings' } },
       { path: '/billing', name: 'billing', component: Blank, meta: { settings: true, title: 'Billing' } },
       { path: '/projects/:websiteId/agent', name: 'agent-home', component: Blank },
+      { path: '/projects/:websiteId/agent/c/:chatId', name: 'agent-chat', component: Blank },
       { path: '/projects/:websiteId/agent/context', name: 'agent-context', component: Blank },
-      { path: '/projects/:websiteId/prompts/:promptId', name: 'prompt', component: Blank, meta: at('overview') },
-      { path: '/projects/:websiteId/sources/detail', name: 'sources-url-detail', component: Blank, meta: at('sources') },
-      ...ANALYTICS_SECTIONS.filter((s) => s.key !== 'overview').map((s) => ({
-        path: `/projects/:websiteId/${pathOf(s.route)}`,
-        name: s.route,
-        component: Blank,
-        meta: at(s.key),
-      })),
+      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank, meta: { board: true } },
     ],
   })
 }
@@ -55,6 +47,7 @@ async function setup(path) {
   const pinia = createPinia()
   setActivePinia(pinia)
   useAppStore().setWebsites([{ id: 'w1', name: 'Wrenfield' }])
+  useAuthStore().user = { id: 7 }
   const router = makeRouter()
   await router.push(path)
   await router.isReady()
@@ -65,7 +58,7 @@ async function setup(path) {
 }
 
 const switchItems = (wrapper) => wrapper.findAll('.ag-ps-item')
-const currentSide = (wrapper) => wrapper.find('.ag-ps-item.is-active').text()
+const current = (wrapper) => wrapper.findAll('.ag-ps-item.is-active').map((a) => a.text())
 
 beforeEach(() => {
   sessionStorage.clear()
@@ -78,64 +71,44 @@ afterEach(() => {
 })
 
 describe('AgentSidebar', () => {
-  it('shows the agent sections and recents on the Agent side', async () => {
-    const { wrapper } = await setup('/projects/w1/agent/context')
-    expect(currentSide(wrapper)).toBe('Agent')
-    expect(wrapper.find('.stub-agent-nav').exists()).toBe(true)
-    expect(wrapper.find('.stub-recents').exists()).toBe(true)
-    expect(wrapper.find('[aria-label="Analytics"][role="group"]').exists()).toBe(false)
-    expect(wrapper.find('.stub-switcher').exists()).toBe(true)
-    expect(wrapper.find('.stub-activity').exists()).toBe(true)
-  })
+  it('shows the same sidebar on the Agent and Analytics tabs', async () => {
+    const { wrapper, router } = await setup('/projects/w1/agent/context')
+    expect(current(wrapper)).toEqual(['Agent'])
+    const parts = () => ['.stub-switcher', '.stub-activity', '.stub-agent-nav', '.stub-recents', '.ag-sb-footer'].map((s) => wrapper.find(s).exists())
+    expect(parts()).toEqual([true, true, true, true, true])
 
-  it('keeps the same sidebar on the Analytics side, with no list of analytics tabs', async () => {
-    const { wrapper } = await setup('/projects/w1/crawler-access')
-    expect(currentSide(wrapper)).toBe('Analytics')
-    expect(wrapper.find('[aria-label="Analytics"][role="group"]').exists()).toBe(false)
-    expect(wrapper.find('.stub-agent-nav').exists()).toBe(true)
-    expect(wrapper.find('.stub-recents').exists()).toBe(true)
-    // The switcher, inbox and footer stay.
-    expect(wrapper.find('.stub-switcher').exists()).toBe(true)
-    expect(wrapper.find('.ag-sb-footer').exists()).toBe(true)
-  })
-
-  it('follows the route between the sides', async () => {
-    const { wrapper, router } = await setup('/projects/w1/agent')
-    expect(currentSide(wrapper)).toBe('Agent')
-    await router.push('/dashboard')
+    await router.push('/projects/w1/analytics?widget=countries')
     await flushPromises()
-    expect(currentSide(wrapper)).toBe('Analytics')
-    expect(wrapper.find('.stub-recents').exists()).toBe(true)
+    expect(current(wrapper)).toEqual(['Analytics'])
+    expect(parts()).toEqual([true, true, true, true, true])
+    // No list of analytics tabs on either side.
+    expect(wrapper.find('[aria-label="Analytics"][role="group"]').exists()).toBe(false)
   })
 
-  it('shows the side used last on Settings, with no tab current and the footer Settings current', async () => {
-    rememberSidebarSide('analytics')
+  it('marks neither tab on Settings and Billing, and the footer Settings as current', async () => {
     const { wrapper, router } = await setup('/settings')
-    expect(currentSide(wrapper)).toBe('Analytics')
-    expect(wrapper.findAll('.ag-an [aria-current="page"]')).toHaveLength(0)
+    expect(current(wrapper)).toEqual([])
     const settings = wrapper.find('.ag-sb-footer a[aria-label="Settings"]')
     expect(settings.attributes('href')).toBe('/settings')
     expect(settings.attributes('aria-current')).toBe('page')
 
-    rememberSidebarSide('agent')
     await router.push('/billing')
     await flushPromises()
-    expect(currentSide(wrapper)).toBe('Agent')
-    expect(wrapper.find('.ag-sb-footer a[aria-label="Settings"]').attributes('aria-current')).toBe('page')
+    expect(current(wrapper)).toEqual([])
 
-    await router.push('/projects/w1/agent')
+    await router.push('/dashboard')
     await flushPromises()
-    expect(wrapper.find('.ag-sb-footer a[aria-label="Settings"]').attributes('aria-current')).toBeUndefined()
+    expect(current(wrapper)).toEqual(['Analytics'])
   })
 
-  it('points the Analytics switch at the tab last used for the project', async () => {
-    const { wrapper, router } = await setup('/projects/w1/agent')
-    const analytics = () => switchItems(wrapper)[1]
-    expect(analytics().attributes('href')).toBe('/dashboard')
-    rememberAnalyticsSection('w1', 'products')
-    await router.push('/projects/w1/agent/context')
+  it("links Agent to the project's last chat and Analytics to its board", async () => {
+    const { wrapper, router } = await setup('/projects/w1/analytics?widget=traffic')
+    const [agent, analytics] = switchItems(wrapper)
+    expect(agent.attributes('href')).toBe('/projects/w1/agent')
+    expect(analytics.attributes('href')).toBe('/projects/w1/analytics')
+    setLastChat(7, 'w1', 'c42')
+    await router.push('/projects/w1/analytics')
     await flushPromises()
-    expect(analytics().attributes('href')).toBe('/projects/w1/products')
-    expect(switchItems(wrapper)[0].attributes('href')).toBe('/projects/w1/agent')
+    expect(switchItems(wrapper)[0].attributes('href')).toBe('/projects/w1/agent/c/c42')
   })
 })

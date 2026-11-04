@@ -1,14 +1,13 @@
 import { isNavigationFailure, useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { ANALYTICS_SECTIONS } from '@/lib/analyticsNav'
 
 // Switching project from the workspace sidebar. Project-scoped list pages
 // keep their section; a chat, an artifact or the projects list land on the
 // new project's agent home, because chats and artifacts belong to one
-// project. An analytics tab stays the same tab for the new project; a
-// prompt's page and a source's detail belong to the old project's records,
-// so they fall back to their tab, and the query keys that name records of
-// one project are dropped. The Overview and Settings stay where they are.
+// project. The Analytics board stays the board of the new project, with
+// the same panel (`widget`) and filters; the query keys that name records
+// of one project (a prompt, a cited URL...) are dropped. The Analytics
+// entry and Settings stay where they are.
 //
 // Navigation comes first: the router makes the project active once the
 // navigation is confirmed, and the shell's agent.init(newId) resets the old
@@ -17,12 +16,6 @@ import { ANALYTICS_SECTIONS } from '@/lib/analyticsNav'
 // project fully in place.
 
 const KEEP_SECTION = new Set(['agent-context', 'agent-agents', 'agent-reports', 'agent-documents', 'agent-sheets'])
-
-// Analytics tabs addressed by a project (the Overview follows the active project).
-const ANALYTICS_PROJECT_ROUTES = new Set(
-  ANALYTICS_SECTIONS.flatMap((s) => s.match).filter((name) => name !== 'dashboard'),
-)
-const ANALYTICS_FALLBACK = Object.freeze({ prompt: { name: 'dashboard' }, 'sources-url-detail': { name: 'sources-urls' } })
 
 // Routes without a project in the URL that stay as they are.
 const STAY = new Set([
@@ -35,8 +28,8 @@ const STAY = new Set([
   'billing',
 ])
 
-// Filters that name records of one project; they do not carry over.
-export const PROJECT_QUERY_KEYS = Object.freeze(['prompt', 'check', 'product', 'verdict', 'topic', 'filter'])
+// Panel keys that name records of one project; they do not carry over.
+export const PROJECT_QUERY_KEYS = Object.freeze(['prompt', 'check', 'product', 'verdict', 'topic', 'filter', 'url'])
 
 function carriedQuery(query) {
   const out = { ...(query || {}) }
@@ -46,16 +39,14 @@ function carriedQuery(query) {
 
 /**
  * Where switching to `websiteId` goes from route `routeName`, or null when
- * the page stays as it is (the Overview, Settings, Billing).
+ * the page stays as it is (the Analytics entry, Settings, Billing).
  */
 export function projectTarget(routeName, websiteId, query = {}) {
   const name = String(routeName || '')
   const params = { websiteId: String(websiteId) }
   if (STAY.has(name)) return null
   if (KEEP_SECTION.has(name)) return { name, params }
-  const fallback = ANALYTICS_FALLBACK[name]
-  if (fallback) return fallback.name === 'dashboard' ? { name: 'dashboard' } : { name: fallback.name, params }
-  if (ANALYTICS_PROJECT_ROUTES.has(name)) return { name, params, query: carriedQuery(query) }
+  if (name === 'analytics') return { name, params, query: carriedQuery(query) }
   return { name: 'agent-home', params }
 }
 

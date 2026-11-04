@@ -92,19 +92,31 @@ describe('askAgent', () => {
     expect(localStorage.getItem(draftKey)).toBeNull()
   })
 
-  it('labels every tab of the contract and the Agents page', () => {
+  it("labels every board widget by its title, the Agents page and the old Citations tab's key", () => {
     expect(ASK_FROM_LABELS).toMatchObject({
-      overview: 'Overview',
+      summary: 'Summary',
+      prompts: 'Prompts',
+      visibility: 'AI visibility over time',
       competitors: 'Competitors',
       'fact-check': 'Fact check',
-      sources: 'Citations',
+      citations: 'Citations',
       'fan-outs': 'Query fan-outs',
       'prompt-research': 'Prompt research',
       pages: 'Pages',
       'crawler-access': 'Crawler access',
+      'ai-crawlers': 'AI crawlers',
       products: 'Products',
       agents: 'Agents',
+      sources: 'Citations',
     })
-    expect(Object.keys(ASK_FROM_LABELS)).toHaveLength(15)
+    // 19 widgets, the Agents page and the legacy key; the Overview is gone.
+    expect(Object.keys(ASK_FROM_LABELS)).toHaveLength(21)
+    expect(ASK_FROM_LABELS.overview).toBeUndefined()
+  })
+
+  it('carries the widget a draft came from', async () => {
+    const router = await makeRouter()
+    await askAgent(router, { websiteId: 'w1', agent: 'aeo_article', from: 'citations', text: 'Hi' })
+    expect(router.currentRoute.value.query).toEqual({ agent: 'aeo_article', from: 'citations' })
   })
 })

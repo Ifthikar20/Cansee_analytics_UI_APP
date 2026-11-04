@@ -44,6 +44,7 @@ async function mountPage(path = '/projects/w1/fan-outs') {
     history: createMemoryHistory(),
     routes: [
       { path: '/dashboard', name: 'dashboard', component: Blank },
+      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank },
       {
         path: '/projects/:websiteId/fan-outs',
         name: 'fan-outs',
@@ -195,16 +196,19 @@ describe('FanoutsPage', () => {
       'none_recorded',
       'No searches recorded yet.',
       'Searches are recorded from answers collected after web search was turned on. Check a prompt now to record some.',
-      'Go to Overview',
+      'Open prompts',
     ],
-    ['no_answers', 'No AI answers in the last 30 days.', '', 'Go to Overview'],
+    ['no_answers', 'No AI answers in the last 30 days.', '', 'Open prompts'],
   ])('shows the %s state', async (reason, title, body, action) => {
     insights.fanOuts.mockResolvedValue(ok(fanOutsPayload({ empty_reason: reason })))
     const { wrapper } = await mountPage()
     expect(stateTitles(wrapper)).toEqual([title])
     if (body) expect(wrapper.find('.viz-state-body').text()).toBe(body)
-    if (action) expect(wrapper.find('.viz-state a').text()).toBe(action)
-    else expect(wrapper.find('.viz-state a').exists()).toBe(false)
+    if (action) {
+      // Prompts are the board's Prompts widget now, for this project.
+      expect(wrapper.find('.viz-state a').text()).toBe(action)
+      expect(wrapper.find('.viz-state a').attributes('href')).toBe('/projects/w1/analytics?widget=prompts')
+    } else expect(wrapper.find('.viz-state a').exists()).toBe(false)
     expect(wrapper.findAll('.fpc')).toHaveLength(0)
   })
 

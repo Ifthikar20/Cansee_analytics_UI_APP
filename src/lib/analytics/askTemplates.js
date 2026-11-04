@@ -61,7 +61,7 @@ export const ASK_TEMPLATES = Object.freeze({
     ),
     citation_gap: T(
         'citation_gap',
-        'sources',
+        'citations',
         ['aeo_article'],
         'For "{prompt}", AI engines cited competitor pages {competitor_citations} times and ours never. Most cited domains: {domains}.\n' +
             'Draft a page that answers this prompt well enough to be cited.'

@@ -1,8 +1,8 @@
 <template>
   <div class="pp">
-    <router-link :to="{ name: 'dashboard' }" class="pp-back">
+    <router-link :to="allPrompts" replace class="pp-back">
       <ArrowLeft class="size-4" aria-hidden="true" />
-      Overview
+      All prompts
     </router-link>
 
     <div v-if="loading && !detail" class="pp-skeleton">
@@ -13,7 +13,7 @@
 
     <p v-else-if="notFound" class="pp-missing">
       This prompt isn't tracked in this project any more.
-      <router-link :to="{ name: 'dashboard' }">Back to the overview</router-link>
+      <router-link :to="allPrompts" replace>All prompts</router-link>
     </p>
 
     <section v-else-if="loadFailed && !detail" class="pp-state">
@@ -29,8 +29,7 @@
 
       <header class="pp-head">
         <div class="pp-head-text">
-          <p class="pp-eyebrow">Prompt</p>
-          <h1 class="pp-title">{{ detail.prompt.text }}</h1>
+          <h2 class="pp-title">{{ detail.prompt.text }}</h2>
           <p class="pp-meta">
             <MethodChip v-if="googleMethod" :method="googleMethod.method" :label="googleMethod.label" />
             <span v-else-if="detail.prompt.location">Searched from {{ detail.prompt.location.toUpperCase() }}</span>
@@ -54,16 +53,14 @@
         </div>
       </header>
 
-      <GradientCard class="pp-verdict">
-        <div class="pp-verdict-inner">
-          <div class="pp-verdict-badge"><GapBadge :cls="detail.gap.class" :value="detail.gap.value" show-value /></div>
-          <p class="pp-verdict-text">{{ detail.verdict }}</p>
-          <p v-if="detail.gap.ai_score !== null && detail.gap.search_score !== null" class="pp-verdict-scores">
-            AI score {{ detail.gap.ai_score }} against a Google score of {{ detail.gap.search_score }}.
-            {{ gapMeta(detail.gap.class).blurb }}
-          </p>
-        </div>
-      </GradientCard>
+      <section class="pp-verdict" aria-label="The gap">
+        <p class="pp-verdict-badge"><GapBadge :cls="detail.gap.class" :value="detail.gap.value" show-value /></p>
+        <p class="pp-verdict-text">{{ detail.verdict }}</p>
+        <p v-if="detail.gap.ai_score !== null && detail.gap.search_score !== null" class="pp-verdict-scores">
+          AI score {{ detail.gap.ai_score }} against a Google score of {{ detail.gap.search_score }}.
+          {{ gapMeta(detail.gap.class).blurb }}
+        </p>
+      </section>
 
       <section class="pp-section" aria-labelledby="pp-actions-title">
         <header class="pp-section-head">
@@ -238,6 +235,10 @@
 </template>
 
 <script setup>
+// One tracked prompt (the Prompts panel's detail): the gap, where to
+// change, Google next to every engine, history, the engines' searches,
+// countries and what AI gets wrong. "All prompts" goes back to the list;
+// archiving returns there too and refetches the board's overview.
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft, Archive, CalendarClock, RefreshCw } from '@lucide/vue'
@@ -249,13 +250,14 @@ import promptLibrary from '@/api/promptLibrary'
 import visibilityApi from '@/api/visibility'
 import { useToast } from '@/composables/useToast'
 import { isActiveInsightRun, useInsightRun } from '@/composables/analytics/useInsightRun'
+import { useBoard } from '@/lib/board/context'
+import { boardLocation } from '@/lib/board/links'
 import { gapMeta } from '@/lib/gap'
 import { cellText, matrixEngines, promptCountryRows } from '@/lib/analytics/countrySpecs'
 import { googleHistorySpec } from '@/lib/analytics/polishSpecs'
 import { visibilityOverTime } from '@/lib/analytics/visibilitySpecs'
 import { fanoutsEmpty, unreportedSearches } from '@/lib/analytics/researchSpecs'
 import { timeAgo } from '@/utils/timeAgo'
-import GradientCard from '@/components/GradientCard.vue'
 import GapBadge from '@/components/gap/GapBadge.vue'
 import ActionList from '@/components/gap/ActionList.vue'
 import GoogleCard from '@/components/gap/GoogleCard.vue'
@@ -280,6 +282,9 @@ const props = defineProps({
 
 const router = useRouter()
 const toast = useToast()
+const board = useBoard()
+
+const allPrompts = computed(() => boardLocation(props.websiteId, 'prompts'))
 
 const detail = ref(null)
 const loading = ref(false)
@@ -397,11 +402,7 @@ const countriesFailed = ref(false)
 
 const countryRows = computed(() => (matrix.value ? promptCountryRows(matrix.value, props.promptId) : []))
 const countryEngines = computed(() => (matrix.value ? matrixEngines(matrix.value) : []))
-const checkCountries = computed(() => ({
-  name: 'countries',
-  params: { websiteId: props.websiteId },
-  query: { prompt: props.promptId, check: '1' },
-}))
+const checkCountries = computed(() => boardLocation(props.websiteId, 'countries', { prompt: props.promptId, check: '1' }))
 
 function googleText(row) {
   if (!row.google && matrix.value?.google?.configured === false) return 'Not configured'
@@ -521,8 +522,9 @@ async function archive() {
   archiving.value = true
   try {
     await promptLibrary.setArchived(detail.value.prompt.brand_prompt_id, true)
-    toast.success('Prompt archived. It no longer runs or counts in the overview.')
-    router.push({ name: 'dashboard' })
+    toast.success('Prompt archived. It no longer runs or counts on the board.')
+    board.invalidate('overview')
+    router.replace(boardLocation(props.websiteId, 'prompts'))
   } catch {
     archiving.value = false
   }
@@ -642,21 +644,12 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
   max-width: 820px;
 }
 
-.pp-eyebrow {
-  color: var(--gap-ai);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 .pp-title {
-  margin-top: 4px;
   color: var(--foreground);
-  font-size: clamp(1.5rem, 2.6vw, 2.2rem);
+  font-size: 20px;
   font-weight: 600;
-  letter-spacing: -0.035em;
-  line-height: 1.12;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
   text-wrap: balance;
 }
 
@@ -676,28 +669,34 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
   gap: 8px;
 }
 
-.pp-verdict-inner {
+/* The gap in a plain bordered block: the words carry the class. */
+.pp-verdict {
   display: grid;
-  gap: 8px;
-  padding: 26px 30px;
+  gap: 6px;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
 }
 
-.pp-verdict-badge :deep(.gap-badge) {
-  background: rgba(255, 255, 255, 0.92);
+.pp-verdict-badge {
+  color: var(--muted-foreground);
+  font-size: 13px;
 }
 
 .pp-verdict-text {
-  color: #ffffff;
-  font-size: clamp(1.25rem, 2.1vw, 1.75rem);
+  color: var(--foreground);
+  font-size: 17px;
   font-weight: 600;
-  letter-spacing: -0.025em;
-  line-height: 1.25;
-  text-wrap: balance;
+  letter-spacing: -0.015em;
+  line-height: 1.35;
+  text-wrap: pretty;
 }
 
 .pp-verdict-scores {
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 14px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .pp-section-head {
@@ -809,16 +808,17 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
   gap: 12px;
 }
 
-@media (max-width: 960px) {
+/* The page renders in the board's side panel: its width decides. */
+@container bd-panel (max-width: 760px) {
   .pp-compare,
   .pp-history {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-@media (max-width: 640px) {
-  .pp-verdict-inner {
-    padding: 22px 20px;
+@container bd-panel (max-width: 480px) {
+  .pp-verdict {
+    padding: 16px;
   }
 }
 </style>

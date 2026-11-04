@@ -180,7 +180,10 @@ export function sentimentByEngine(payload) {
     }
 }
 
-/** Tone per prompt (rows) as a heatmap; a row opens the prompt page. */
+/**
+ * Tone per prompt (rows); a row opens the prompt. It starts as the table
+ * (calm, board_contract.md 10), with the heatmap still offered.
+ */
 export function sentimentByPrompt(payload) {
     const rows = Array.isArray(payload?.by_prompt) ? payload.by_prompt : []
     return {
@@ -199,7 +202,7 @@ export function sentimentByPrompt(payload) {
             data: rows.map((r) => num(r[t.key])),
         })),
         stacked: true,
-        type: 'heatmap',
+        type: 'table',
     }
 }
 

@@ -1,8 +1,8 @@
-// Chart specs (contract 8a) and stat tiles for the pages that existed
-// before the chart system: the Overview (KPI tiles, gap map, leaderboard,
-// engines by prompt), the Prompt page's Google history, Sources and its URL
-// detail, and Settings > AI usage. Pure functions: the pages render what
-// these return through VizChart and VizStatTile.
+// Chart specs (contract 8a) and stat tiles for the views that existed
+// before the chart system: the board's Summary (KPI tiles, gap map) and
+// Who AI recommends (leaderboard), the Prompt page's Google history,
+// Sources and its URL detail, and Settings > AI usage. Pure functions: the
+// views render what these return through VizChart and VizStatTile.
 //
 // A value that was not measured is null with a state word, never 0. Counts
 // of things that were measured (prompts in a gap class, retrievals) may be 0.
@@ -20,7 +20,7 @@ function round1(value) {
     return Math.round(value * 10) / 10
 }
 
-/* ── Overview ── */
+/* ── Summary (the search-gap overview payload) ── */
 
 // "4 not in the top 30": how many prompts Google did not rank, within the
 // smallest depth any of those searches covered (true for each of them).
@@ -33,10 +33,12 @@ function notRankedHint(count, prompts) {
 }
 
 /**
- * The Overview's five KPI tiles (VizStatTile props plus a key). AI
- * visibility gains a change against the previous 30 days from the
- * visibility dashboard's `headline`, only when both windows have a value.
- * `prompts` (the overview rows) give the depth Google was searched to.
+ * The five KPI tiles (VizStatTile props plus a key), without colour: the
+ * words carry the classes. AI visibility gains a change against the
+ * previous 30 days from the visibility dashboard's `headline`, only when
+ * both windows have a value. `prompts` (the overview rows) give the depth
+ * Google was searched to. A gap class needs a Google check, so until one
+ * ran the class counts read "Not checked", never 0.
  */
 export function overviewTiles(kpis, headline = null, prompts = []) {
     const k = kpis || {}
@@ -47,6 +49,8 @@ export function overviewTiles(kpis, headline = null, prompts = []) {
             ? { value: round1(now - before), unit: 'pts', label: 'vs previous 30 days', goodWhen: 'up' }
             : null
     const count = (value) => num(value) ?? 0
+    const googleChecked = count(k.google_checked) > 0
+    const gapCount = (value) => (googleChecked ? num(value) : null)
     return [
         {
             key: 'ai_visibility',
@@ -71,25 +75,25 @@ export function overviewTiles(kpis, headline = null, prompts = []) {
         {
             key: 'ai_ahead',
             label: 'AI ahead',
-            value: num(k.ai_ahead),
+            value: gapCount(k.ai_ahead),
             kind: 'count',
-            tone: GAP.ai_ahead.color,
+            stateText: 'Not checked',
             hint: 'AI ranks you higher than Google',
         },
         {
             key: 'google_ahead',
             label: 'Google ahead',
-            value: num(k.google_ahead),
+            value: gapCount(k.google_ahead),
             kind: 'count',
-            tone: GAP.google_ahead.color,
+            stateText: 'Not checked',
             hint: 'Google ranks you higher than AI',
         },
         {
             key: 'invisible_both',
             label: 'Invisible in both',
-            value: num(k.invisible_both),
+            value: gapCount(k.invisible_both),
             kind: 'count',
-            tone: GAP.invisible_both.color,
+            stateText: 'Not checked',
             hint: 'Neither surfaces you',
         },
     ]
@@ -192,50 +196,6 @@ export function leaderboardSpec(brands) {
 export function yourBrand(brands) {
     const you = (Array.isArray(brands) ? brands : []).find((b) => b.is_you)
     return you ? String(you.name ?? '') : ''
-}
-
-/**
- * Engines by prompt: the `limit` prompts with the largest absolute gap
- * (rows) by engine (columns), the share of recent answers that name you.
- */
-export function engineHeatmapSpec(prompts, engines, { limit = 15 } = {}) {
-    const rows = (Array.isArray(prompts) ? prompts : [])
-        .map((p, i) => ({ p, i, size: Math.abs(num(p.gap?.value) ?? 0) }))
-        .sort((a, b) => b.size - a.size || a.i - b.i)
-        .slice(0, limit)
-        .map((r) => r.p)
-    const columns = (Array.isArray(engines) ? engines : []).map((e) => ({
-        key: e.key,
-        label: e.label || engineMeta(e.key).label,
-        configured: e.configured !== false,
-    }))
-    return {
-        id: 'overview.engines',
-        title: 'Engines by prompt',
-        subtitle: "Share of each engine's recent answers that name you.",
-        x: 'category',
-        value: 'percent',
-        labels: rows.map((p) => String(p.prompt_id)),
-        label_names: promptNames(rows),
-        label_header: 'Prompt',
-        datasets: columns.map((e) => {
-            const cells = rows.map((p) => p.engines?.[e.key] || null)
-            const configured = (c) => e.configured && c?.configured !== false
-            const answered = (c) => configured(c) && (c?.answers || 0) > 0
-            return {
-                key: e.key,
-                label: e.label,
-                entity: `engine:${e.key}`,
-                data: cells.map((c) => (answered(c) ? num(c.visibility_pct) : null)),
-                states: cells.map((c) => {
-                    if (!configured(c)) return 'not_configured'
-                    return answered(c) ? null : 'not_checked'
-                }),
-            }
-        }),
-        type: 'heatmap',
-        representations: ['heatmap', 'table'],
-    }
 }
 
 /* ── Prompt page ── */

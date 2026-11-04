@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { defineComponent, h } from 'vue'
+import { computed, defineComponent, h } from 'vue'
 import { RouterView, createMemoryHistory, createRouter } from 'vue-router'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { BOARD_CONTEXT } from '@/lib/board/context'
 import { useAppStore } from '@/stores/app'
 import {
   apiError,
@@ -39,6 +40,13 @@ const { default: CountriesPage } = await import('../CountriesPage.vue')
 const Blank = defineComponent({ render: () => h('div') })
 const Shell = defineComponent({ render: () => h(TooltipProvider, null, () => h(RouterView)) })
 const mounted = []
+const board = {
+  websiteId: computed(() => 'w1'),
+  open: vi.fn(),
+  close: vi.fn(),
+  invalidate: vi.fn(),
+  revalidate: vi.fn(),
+}
 
 async function mountPage(path = '/projects/w1/countries') {
   const pinia = createPinia()
@@ -50,13 +58,13 @@ async function mountPage(path = '/projects/w1/countries') {
       { path: '/dashboard', name: 'dashboard', component: Blank },
       { path: '/settings/connections', name: 'settings-connections', component: Blank },
       { path: '/projects/:websiteId/countries', name: 'countries', component: CountriesPage, props: true },
-      { path: '/projects/:websiteId/prompts/:promptId', name: 'prompt', component: Blank, props: true },
+      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank },
     ],
   })
   await router.push(path)
   await router.isReady()
   const wrapper = mount(Shell, {
-    global: { plugins: [pinia, router], stubs: { VizChart: true } },
+    global: { plugins: [pinia, router], provide: { [BOARD_CONTEXT]: board }, stubs: { VizChart: true } },
     attachTo: document.body,
   })
   mounted.push(wrapper)
@@ -71,6 +79,7 @@ const stateTitle = (wrapper) => wrapper.find('.viz-state-title').text()
 
 beforeEach(() => {
   localStorage.clear()
+  board.open.mockClear()
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
   for (const fn of Object.values(countriesApi)) fn.mockReset()
   trafficApi.countries.mockReset()
@@ -99,7 +108,10 @@ describe('CountriesPage', () => {
       'countries.visitors',
     ])
     expect(chart(wrapper, 'countries.visitors').props('spec').subtitle).toBe('Cansee pixel · last 30 days')
+    expect(chart(wrapper, 'countries.visitors').props('spec').title).toBe('Visitors by country')
     expect(chart(wrapper, 'countries.visitors').props('empty')).toBeNull()
+    // Prompts by country opens as the table; the heatmap is one click away.
+    expect(chart(wrapper, 'countries.prompts').props('spec')).toMatchObject({ type: 'table', representations: ['heatmap'] })
 
     const rows = wrapper.findAll('.ct-row')
     expect(rows.map((r) => r.find('.ct-country-name').text())).toEqual(['Germany', 'United Kingdom'])
@@ -146,6 +158,24 @@ describe('CountriesPage', () => {
     expect(dialog.text()).toContain('Notion is a good pick.')
   })
 
+  it('opens a prompt picked by country in the Prompts panel', async () => {
+    const { wrapper } = await mountPage()
+    chart(wrapper, 'countries.prompts').vm.$emit('select', { label: 'p1' })
+    await flushPromises()
+    expect(board.open).toHaveBeenCalledWith('prompts', { prompt: 'p1' })
+  })
+
+  it('names Cloudflare requests as requests', async () => {
+    trafficApi.countries.mockResolvedValue(
+      ok(trafficCountries({ source: 'cloudflare', source_label: 'Cloudflare', metric: 'requests', metric_label: 'Requests' })),
+    )
+    const { wrapper } = await mountPage()
+    const spec = chart(wrapper, 'countries.visitors').props('spec')
+    expect(spec.title).toBe('Requests by country')
+    expect(spec.datasets[0].label).toBe('Requests')
+    expect(spec).toMatchObject({ scale: 'log', missing_label: 'None recorded' })
+  })
+
   it('brings the row of a picked tile into view', async () => {
     const { wrapper } = await mountPage()
     chart(wrapper, 'countries.map').vm.$emit('select', { label: 'GB' })
@@ -174,6 +204,16 @@ describe('CountriesPage', () => {
     // The header button stays focusable but blocked, with the reason.
     const button = wrapper.find('header button')
     expect(button.attributes('aria-disabled')).toBe('true')
+  })
+
+  it('sends a project without prompts to Add prompts', async () => {
+    countriesApi.options.mockResolvedValue(ok(countryOptions({ prompts: [] })))
+    countriesApi.matrix.mockResolvedValue(ok(emptyMatrix()))
+    const { wrapper } = await mountPage()
+    expect(wrapper.find('.viz-state-body').text()).toBe('Country checks run your tracked prompts. Add prompts in Prompts.')
+    const link = wrapper.find('.viz-state a')
+    expect(link.text()).toBe('Add prompts')
+    expect(link.attributes('href')).toBe('/projects/w1/analytics?add=1&widget=prompts')
   })
 
   it('invites the first check when nothing was checked yet', async () => {

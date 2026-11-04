@@ -179,7 +179,7 @@ const promptOptions = computed(() => {
 
 // ── What is on screen ──
 const days = computed(() => periodDays(data.value?.window?.period || period.value))
-const pageEmpty = computed(() => fanoutsEmpty(data.value, { days: days.value }))
+const pageEmpty = computed(() => fanoutsEmpty(data.value, { days: days.value, websiteId: props.websiteId }))
 
 const tiles = computed(() => fanoutTiles(data.value))
 const enginesSpec = computed(() => fanoutEngines(data.value))
@@ -244,7 +244,7 @@ function openCheck(queries) {
   font-size: 13px;
 }
 
-@media (max-width: 1100px) {
+@container bd-panel (max-width: 760px) {
   .an-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

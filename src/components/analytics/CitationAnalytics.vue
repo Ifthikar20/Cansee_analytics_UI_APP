@@ -453,7 +453,7 @@ const gaps = computed(() =>
   text-align: right !important;
 }
 
-@media (max-width: 1100px) {
+@container bd-panel (max-width: 760px) {
   .ca-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -462,7 +462,7 @@ const gaps = computed(() =>
   }
 }
 
-@media (max-width: 640px) {
+@container bd-panel (max-width: 480px) {
   .ca-card {
     padding: 16px;
   }

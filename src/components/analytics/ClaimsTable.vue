@@ -399,7 +399,7 @@ function rowId(index) {
   color: var(--foreground);
 }
 
-@media (max-width: 640px) {
+@container bd-panel (max-width: 480px) {
   .cl {
     padding: 16px;
   }

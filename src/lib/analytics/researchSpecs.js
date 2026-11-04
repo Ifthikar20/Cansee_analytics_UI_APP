@@ -5,6 +5,7 @@
 // score: Cansee has no data on how often people ask. A source Cansee never
 // read (no Google check recorded its questions, web search off, AI
 // suggestions not run) reads its state word, never 0.
+import { boardLocation } from '@/lib/board/links'
 import { engineMeta } from '@/lib/engines'
 import { IDEA_SOURCES, SOURCE_STATE_WORDS, sourceStateWord } from './insightWords'
 
@@ -148,10 +149,12 @@ export function evidenceText(item) {
 
 /**
  * The VizState props for a fan-outs payload's `empty_reason` (contract 8),
- * or null when there is something to show. `days` is the window's length.
+ * or null when there is something to show. `days` is the window's length;
+ * `websiteId` sends "Open prompts" to that project's board (without one,
+ * /dashboard picks the project).
  */
-export function fanoutsEmpty(payload, { days = 30 } = {}) {
-    const overview = { label: 'Go to Overview', to: { name: 'dashboard' } }
+export function fanoutsEmpty(payload, { days = 30, websiteId = '' } = {}) {
+    const openPrompts = { label: 'Open prompts', to: boardLocation(websiteId, 'prompts') }
     switch (payload?.empty_reason) {
         case 'web_search_off':
             return {
@@ -164,10 +167,10 @@ export function fanoutsEmpty(payload, { days = 30 } = {}) {
                 kind: 'empty',
                 title: 'No searches recorded yet.',
                 body: 'Searches are recorded from answers collected after web search was turned on. Check a prompt now to record some.',
-                action: overview,
+                action: openPrompts,
             }
         case 'no_answers':
-            return { kind: 'empty', title: `No AI answers in the last ${days} days.`, action: overview }
+            return { kind: 'empty', title: `No AI answers in the last ${days} days.`, action: openPrompts }
         default:
             return null
     }

@@ -6,6 +6,7 @@ import {
     fanoutGoogleText,
     fanoutGoogleWord,
     fanoutTiles,
+    fanoutsEmpty,
     ideaSourceLabel,
     ideaTiles,
     ideasBySource,
@@ -134,5 +135,27 @@ describe('fan-outs', () => {
         expect(unreportedSearches({ searches: 61, queries: 58 })).toBe(3)
         expect(unreportedSearches({ searches: 4, queries: 6 })).toBe(0)
         expect(unreportedSearches(null)).toBe(0)
+    })
+
+    it('sends the empty states to Prompts on the board, by project when one is given', () => {
+        const toBoard = { name: 'analytics', params: { websiteId: 'w1' }, query: { widget: 'prompts' } }
+        expect(fanoutsEmpty(fanOutsPayload({ empty_reason: 'none_recorded' }), { websiteId: 'w1' })).toEqual({
+            kind: 'empty',
+            title: 'No searches recorded yet.',
+            body: 'Searches are recorded from answers collected after web search was turned on. Check a prompt now to record some.',
+            action: { label: 'Open prompts', to: toBoard },
+        })
+        expect(fanoutsEmpty(fanOutsPayload({ empty_reason: 'no_answers' }), { days: 7, websiteId: 'w1' })).toEqual({
+            kind: 'empty',
+            title: 'No AI answers in the last 7 days.',
+            action: { label: 'Open prompts', to: toBoard },
+        })
+        // Without a project, /dashboard picks one and keeps the widget.
+        expect(fanoutsEmpty(fanOutsPayload({ empty_reason: 'no_answers' })).action.to).toEqual({
+            name: 'dashboard',
+            query: { widget: 'prompts' },
+        })
+        expect(fanoutsEmpty(fanOutsPayload({ empty_reason: 'web_search_off' })).action).toBeUndefined()
+        expect(fanoutsEmpty(fanOutsPayload())).toBeNull()
     })
 })

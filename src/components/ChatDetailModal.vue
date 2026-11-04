@@ -161,6 +161,9 @@ useBodyScrollLock(computed(() => props.open))
 </script>
 
 <template>
+  <!-- Teleported: the board's side panel is a size container, which would
+       clip and place a fixed overlay inside it. -->
+  <Teleport to="body">
   <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="emit('close')">
     <div class="flex h-[85vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
       <!-- Conversation -->
@@ -326,6 +329,7 @@ useBodyScrollLock(computed(() => props.open))
       </aside>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <!-- Unscoped on purpose: the marks are injected via v-html, which scoped

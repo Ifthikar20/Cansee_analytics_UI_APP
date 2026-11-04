@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeVizSpec, representationsFor, tableModel } from '@/lib/charts/spec'
+import { defaultRepresentation, normalizeVizSpec, representationsFor, tableModel } from '@/lib/charts/spec'
 import {
     engineStateWord,
     onSite,
@@ -47,13 +47,15 @@ describe('productTiles', () => {
 describe('productEngines', () => {
     it('shows the share of answers naming each product per engine; unchecked cells are Not checked', () => {
         const spec = productEngines(productsPayload())
-        expect(spec).toMatchObject({ id: 'products.engines', title: 'Named by engine', value: 'percent', type: 'heatmap' })
+        // Calm default: bars first, the heatmap still offered.
+        expect(spec).toMatchObject({ id: 'products.engines', title: 'Named by engine', value: 'percent', type: 'bar' })
         expect(spec.label_names).toEqual({ pr1: 'Acme X200 running shoe', pr2: 'Acme trail sock' })
         expect(spec.datasets.map((d) => [d.key, d.entity, d.data, d.states])).toEqual([
             ['chatgpt', 'engine:chatgpt', [100, null], [null, 'not_checked']],
             ['claude', 'engine:claude', [0, null], [null, 'not_checked']],
         ])
         expect(offered(spec)).toEqual(['bar', 'heatmap', 'table'])
+        expect(defaultRepresentation(normalizeVizSpec(spec))).toBe('bar')
         expect(tableModel(spec).rows[1].cells.map((c) => c.text)).toEqual(['Not checked', 'Not checked'])
     })
 })

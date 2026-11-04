@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { projectTarget, useProjectSwitch } from '../useProjectSwitch'
+import { PROJECT_QUERY_KEYS, projectTarget, useProjectSwitch } from '../useProjectSwitch'
 
 const Blank = defineComponent({ render: () => h('div') })
 
@@ -18,21 +18,11 @@ function makeRouter() {
       { path: '/projects/:websiteId/agent/context', name: 'agent-context', component: Blank },
       { path: '/projects/:websiteId/agent/reports', name: 'agent-reports', component: Blank },
       { path: '/projects/:websiteId/agent/artifacts/:artifactId', name: 'agent-artifact', component: Blank },
-      { path: '/dashboard', name: 'dashboard', component: Blank, meta: { analytics: 'overview' } },
+      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank, meta: { board: true } },
+      { path: '/dashboard', name: 'dashboard', component: Blank, meta: { page: true } },
       { path: '/settings', name: 'settings', component: Blank, meta: { settings: true } },
       { path: '/settings/project', name: 'settings-project', component: Blank, meta: { settings: true } },
       { path: '/billing', name: 'billing', component: Blank, meta: { settings: true } },
-      { path: '/projects/:websiteId/prompts/:promptId', name: 'prompt', component: Blank, meta: { analytics: 'overview' } },
-      { path: '/projects/:websiteId/sources', name: 'sources-urls', component: Blank, meta: { analytics: 'sources' } },
-      {
-        path: '/projects/:websiteId/sources/detail',
-        name: 'sources-url-detail',
-        component: Blank,
-        meta: { analytics: 'sources' },
-      },
-      { path: '/projects/:websiteId/fact-check', name: 'fact-check', component: Blank, meta: { analytics: 'fact-check' } },
-      { path: '/projects/:websiteId/pages', name: 'site-pages', component: Blank, meta: { analytics: 'pages' } },
-      { path: '/projects/:websiteId/countries', name: 'countries', component: Blank, meta: { analytics: 'countries' } },
     ],
   })
 }
@@ -70,30 +60,36 @@ describe('projectTarget', () => {
     expect(projectTarget('agent-projects', 'w2')).toEqual({ name: 'agent-home', params: { websiteId: 'w2' } })
   })
 
-  it('keeps an analytics tab on the new project, without the queries that name its records', () => {
+  it('keeps the board, its panel and filters, and drops the keys that name records', () => {
     const params = { websiteId: 'w2' }
-    expect(projectTarget('site-pages', 'w2', { filter: 'cited', period: '90d' })).toEqual({
-      name: 'site-pages',
+    expect(PROJECT_QUERY_KEYS).toEqual(['prompt', 'check', 'product', 'verdict', 'topic', 'filter', 'url'])
+    expect(projectTarget('analytics', 'w2', { widget: 'pages', filter: 'cited', period: '90d' })).toEqual({
+      name: 'analytics',
       params,
-      query: { period: '90d' },
+      query: { widget: 'pages', period: '90d' },
     })
     expect(
-      projectTarget('fact-check', 'w2', { verdict: 'contradicted', topic: 'pricing', engine: 'claude', prompt: 'p1' }),
-    ).toEqual({ name: 'fact-check', params, query: { engine: 'claude' } })
-    expect(projectTarget('countries', 'w2', { prompt: 'p1', check: '1' })).toEqual({ name: 'countries', params, query: {} })
-    expect(projectTarget('products', 'w2', { product: 'p1' })).toEqual({ name: 'products', params, query: {} })
-    expect(projectTarget('crawler-access', 'w2')).toEqual({ name: 'crawler-access', params, query: {} })
-  })
-
-  it("sends a prompt's page to the Overview and a source's detail to Citations", () => {
-    expect(projectTarget('prompt', 'w2', { x: '1' })).toEqual({ name: 'dashboard' })
-    expect(projectTarget('sources-url-detail', 'w2', { url: 'https://a.test/' })).toEqual({
-      name: 'sources-urls',
-      params: { websiteId: 'w2' },
+      projectTarget('analytics', 'w2', { widget: 'fact-check', verdict: 'contradicted', topic: 'pricing', engine: 'claude', prompt: 'p1' }),
+    ).toEqual({ name: 'analytics', params, query: { widget: 'fact-check', engine: 'claude' } })
+    expect(projectTarget('analytics', 'w2', { widget: 'countries', prompt: 'p1', check: '1' })).toEqual({
+      name: 'analytics',
+      params,
+      query: { widget: 'countries' },
     })
+    expect(projectTarget('analytics', 'w2', { widget: 'citations', url: 'https://a.test/', provider: 'gpt4' })).toEqual({
+      name: 'analytics',
+      params,
+      query: { widget: 'citations', provider: 'gpt4' },
+    })
+    expect(projectTarget('analytics', 'w2', { widget: 'products', product: 'p1' })).toEqual({
+      name: 'analytics',
+      params,
+      query: { widget: 'products' },
+    })
+    expect(projectTarget('analytics', 'w2')).toEqual({ name: 'analytics', params, query: {} })
   })
 
-  it('leaves the Overview, Settings and Billing where they are', () => {
+  it('leaves the Analytics entry, Settings and Billing where they are', () => {
     const names = [
       'dashboard',
       'settings',
@@ -108,21 +104,15 @@ describe('projectTarget', () => {
 })
 
 describe('useProjectSwitch', () => {
-  let ctx
-
-  beforeEach(async () => {
-    ctx = null
-  })
-
   it('moves a list page to the same section of the other project', async () => {
-    ctx = await setup('/projects/w1/agent/reports')
+    const ctx = await setup('/projects/w1/agent/reports')
     await expect(ctx.api.switchProject('w2')).resolves.toBe(true)
     expect(ctx.router.currentRoute.value.fullPath).toBe('/projects/w2/agent/reports')
     expect(ctx.app.activeWebsite.id).toBe('w2')
   })
 
   it('opens the project home from a chat or the projects list', async () => {
-    ctx = await setup('/projects/w1/agent/c/c1')
+    let ctx = await setup('/projects/w1/agent/c/c1')
     await ctx.api.switchProject('w2')
     expect(ctx.router.currentRoute.value.fullPath).toBe('/projects/w2/agent')
 
@@ -132,31 +122,26 @@ describe('useProjectSwitch', () => {
   })
 
   it('ignores unknown ids and the project already open', async () => {
-    ctx = await setup('/projects/w1/agent/context')
+    const ctx = await setup('/projects/w1/agent/context')
     await expect(ctx.api.switchProject('nope')).resolves.toBe(false)
     await expect(ctx.api.switchProject('w1')).resolves.toBe(false)
     expect(ctx.router.currentRoute.value.fullPath).toBe('/projects/w1/agent/context')
   })
 
-  it('keeps the analytics tab and drops record queries when switching there', async () => {
-    ctx = await setup('/projects/w1/pages?filter=cited&period=7d')
+  it("keeps the board's panel and filters when switching there", async () => {
+    let ctx = await setup('/projects/w1/analytics?widget=pages&filter=cited&period=7d')
     await expect(ctx.api.switchProject('w2')).resolves.toBe(true)
-    expect(ctx.router.currentRoute.value.fullPath).toBe('/projects/w2/pages?period=7d')
+    expect(ctx.router.currentRoute.value.fullPath).toBe('/projects/w2/analytics?widget=pages&period=7d')
     expect(ctx.app.activeWebsite.id).toBe('w2')
 
-    ctx = await setup('/projects/w1/prompts/p1')
+    ctx = await setup('/projects/w1/analytics?widget=prompts&prompt=p1')
     await ctx.api.switchProject('w2')
-    expect(ctx.router.currentRoute.value.fullPath).toBe('/dashboard')
-    expect(ctx.app.activeWebsite.id).toBe('w2')
-
-    ctx = await setup('/projects/w1/sources/detail?url=https%3A%2F%2Fa.test%2F')
-    await ctx.api.switchProject('w2')
-    expect(ctx.router.currentRoute.value.fullPath).toBe('/projects/w2/sources')
+    expect(ctx.router.currentRoute.value.fullPath).toBe('/projects/w2/analytics?widget=prompts')
   })
 
-  it('changes the project in place on the Overview and Settings', async () => {
+  it('changes the project in place on the Analytics entry and Settings', async () => {
     for (const path of ['/dashboard', '/settings', '/settings/project', '/billing']) {
-      ctx = await setup(path)
+      const ctx = await setup(path)
       ctx.app.setActiveWebsite(ctx.app.websites[0])
       await expect(ctx.api.switchProject('w2')).resolves.toBe(true)
       expect(ctx.router.currentRoute.value.fullPath).toBe(path)
@@ -167,11 +152,15 @@ describe('useProjectSwitch', () => {
   })
 
   it('leaves everything in place when a guard cancels the navigation', async () => {
-    ctx = await setup('/projects/w1/agent/context')
+    const ctx = await setup('/projects/w1/agent/context')
     ctx.app.setActiveWebsite(ctx.app.websites[0])
     ctx.router.beforeEach(() => false)
     await expect(ctx.api.switchProject('w2')).resolves.toBe(false)
     expect(ctx.app.activeWebsite.id).toBe('w1')
     expect(ctx.router.currentRoute.value.params.websiteId).toBe('w1')
   })
+})
+
+beforeEach(() => {
+  localStorage.clear()
 })

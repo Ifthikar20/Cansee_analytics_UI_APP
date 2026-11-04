@@ -1,0 +1,73 @@
+<script setup>
+// What a group B card shows instead of numbers (board_contract.md 4): a
+// sentence, an optional line, and the action that would fill it. It never
+// shows sample figures. An action opens a widget's panel (`open: [key,
+// query]`), the card's own panel (`panel`, with `widget`), follows a route
+// (`to`) or asks the card to reload its source (`retry`, emits retry).
+import { useBoard } from '@/lib/board/context'
+import AgButton from '@/components/agent/common/AgButton.vue'
+
+const props = defineProps({
+  title: { type: String, required: true },
+  body: { type: String, default: '' },
+  // 'empty' | 'not_connected' | 'error' | 'disabled'
+  kind: { type: String, default: 'empty' },
+  // {label, open?: [key, query], panel?: true, to?, retry?: true}
+  action: { type: Object, default: null },
+  // The card's widget key, for `panel` actions.
+  widget: { type: String, default: '' },
+  // Inside a card's body, under its numbers: no minimum height.
+  inline: { type: Boolean, default: false },
+})
+const emit = defineEmits(['retry'])
+
+const board = useBoard()
+
+function run() {
+  const action = props.action
+  if (!action || action.to) return
+  if (action.retry) emit('retry')
+  else if (Array.isArray(action.open)) board.open(action.open[0], { ...(action.open[1] || {}) })
+  else if (action.panel && props.widget) board.open(props.widget)
+}
+</script>
+
+<template>
+  <div class="wb-state" :class="[`is-${kind}`, { 'is-inline': inline }]" :role="kind === 'error' ? 'alert' : undefined">
+    <p class="wb-state-title">{{ title }}</p>
+    <p v-if="body" class="wb-state-body">{{ body }}</p>
+    <AgButton v-if="action && action.label && action.to" size="sm" :to="action.to">{{ action.label }}</AgButton>
+    <AgButton v-else-if="action && action.label" size="sm" @click="run">{{ action.label }}</AgButton>
+  </div>
+</template>
+
+<style scoped>
+.wb-state {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  min-height: 96px;
+}
+
+.wb-state.is-inline {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.wb-state-title {
+  margin: 0;
+  color: var(--ag-fg-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+
+.wb-state-body {
+  margin: 0 0 2px;
+  color: var(--ag-fg-3);
+  font-size: 12px;
+  line-height: 16px;
+}
+</style>

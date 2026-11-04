@@ -107,10 +107,19 @@ describe('normalizeVizSpec', () => {
     expect(s.label_names).toEqual({ GB: 'United Kingdom' })
   })
 
+  it('keeps a log scale and reads anything else as linear', () => {
+    const spec = (scale) => normalizeVizSpec({ title: 'T', x: 'country', labels: ['us'], datasets: [series('a', [1])], scale })
+    expect(spec('log').scale).toBe('log')
+    expect(spec('linear').scale).toBe('linear')
+    expect(spec('sqrt').scale).toBe('linear')
+    expect(spec(undefined).scale).toBe('linear')
+  })
+
   it('fills defaults and makes dataset keys unique', () => {
     const s = normalizeVizSpec({ title: 'T', labels: ['a'], datasets: [{ data: [1] }, { key: 'x', data: [2] }, { key: 'x', data: [3] }] })
     expect(s.x).toBe('category')
     expect(s.value).toBe('number')
+    expect(s.scale).toBe('linear')
     expect(s.missing_label).toBe('No data')
     expect(s.datasets.map((d) => d.key)).toEqual(['s1', 'x', 'x-3'])
     expect(s.datasets[0].label).toBe('Series 1')
@@ -255,11 +264,12 @@ describe('defaultRepresentation', () => {
     expect(defaultRepresentation({ title: 'T', labels: ['a', 'b'], datasets: two })).toBe('bar')
   })
 
-  it('starts a narrow map as bars, unless bars are not offered', () => {
+  it('keeps a map a map at any width: it scales', () => {
     const map = { title: 'T', x: 'country', labels: ['gb'], datasets: [series('a', [40])] }
     expect(defaultRepresentation(map)).toBe('map')
-    expect(defaultRepresentation(map, { narrow: true })).toBe('hbar')
-    expect(defaultRepresentation({ ...map, value: 'rank' }, { narrow: true })).toBe('map')
+    // The old option is ignored.
+    expect(defaultRepresentation(map, { narrow: true })).toBe('map')
+    expect(defaultRepresentation({ ...map, value: 'rank' })).toBe('map')
   })
 
   it('falls back to the table for nothing to draw', () => {
@@ -291,7 +301,6 @@ describe('defaultRepresentation', () => {
     expect(defaultRepresentation(picked, { picked: 'n' })).toBe('bar')
     const map = { title: 'T', x: 'country', labels: ['gb'], datasets: [series('a', [null], { states: ['not_checked'] })] }
     expect(defaultRepresentation(map)).toBe('map')
-    expect(defaultRepresentation(map, { narrow: true })).toBe('table')
   })
 })
 

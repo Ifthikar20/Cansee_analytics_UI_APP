@@ -281,7 +281,7 @@ function check() {
   font-size: 13px;
 }
 
-@media (max-width: 640px) {
+@container bd-panel (max-width: 480px) {
   .fpc {
     padding: 16px;
   }

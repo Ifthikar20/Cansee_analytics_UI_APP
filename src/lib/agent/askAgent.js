@@ -2,20 +2,23 @@
 // the agent by opening a new chat with a drafted message. Nothing is ever
 // sent by itself, and no free text goes in the URL: the text travels as the
 // new chat's composer draft (lib/agent/storage), and the URL carries only
-// the agent key and the tab it came from (?agent=&from=), which the chat
-// page reads to show "Drafted from {tab}. Review it, then send."
-import { ANALYTICS_SECTIONS } from '@/lib/analyticsNav'
+// the agent key and the widget it came from (?agent=&from=), which the chat
+// page reads to show "Drafted from {widget}. Review it, then send."
 import { loadDraft, saveDraft } from '@/lib/agent/storage'
 import { AGENT_KEY_LIST, NEW_CHAT_KEY } from '@/lib/agent/types'
+import { WIDGETS } from '@/lib/board/widgets'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 
 export const ASK_TEXT_MAX = 2000
 
-// The tabs a draft can come from, by key (contract 2b), plus the Agents page.
+// Where a draft can come from, by key: the board's widgets
+// (board_contract.md 9), the Agents page, and `sources`, the key the
+// Citations tab used before the board (drafts opened from older links).
 export const ASK_FROM_LABELS = Object.freeze({
-    ...Object.fromEntries(ANALYTICS_SECTIONS.map((s) => [s.key, s.label])),
+    ...Object.fromEntries(WIDGETS.map((w) => [w.key, w.title])),
     agents: 'Agents',
+    sources: 'Citations',
 })
 
 const BLOCKED_STORAGE =
@@ -25,7 +28,7 @@ const BLOCKED_STORAGE =
  * Save `text` (clipped to 2,000 characters) as the new-chat draft of the
  * project, then open the new chat with `agent` preselected. The draft
  * replaces any unsent new-chat draft. An agent outside the ten keys is
- * dropped; `from` is a tab key of ASK_FROM_LABELS.
+ * dropped; `from` is a key of ASK_FROM_LABELS.
  *
  * Resolves true once the navigation went through, false when nothing could
  * be handed over (no user or project, storage blocked: the user stays where

@@ -125,13 +125,20 @@ export function trafficSeries(payload) {
     }
 }
 
+/** "Requests by country" for Cloudflare, which counts requests, never visitors. */
+export function countriesTitle(payload) {
+    return payload?.source === 'cloudflare' ? 'Requests by country' : 'Visitors by country'
+}
+
 /**
- * Visitors (users, requests) by country. Also the Countries page's
- * "Visitors by country" (its own id, subtitle and footnote).
+ * Visitors (users, requests) by country. Also the Countries page's own
+ * section (its id, subtitle and footnote) and the board's Countries card.
+ * One country usually dominates, so the map bins by decades; a country
+ * with no visit reads "None recorded".
  */
 export function countriesMap(
     payload,
-    { id = 'traffic.countries', title = 'Visitors by country', subtitle = '', footnote = null } = {},
+    { id = 'traffic.countries', title = countriesTitle(payload), subtitle = '', footnote = null } = {},
 ) {
     const rows = payload?.countries || []
     const unknown = payload?.countries_unknown
@@ -147,12 +154,14 @@ export function countriesMap(
         datasets: [
             {
                 key: 'value',
-                label: payload?.metric_label || 'Visitors',
+                label: payload?.metric_label || (payload?.source === 'cloudflare' ? 'Requests' : 'Visitors'),
                 value: 'count',
                 data: rows.map((r) => (typeof r.value === 'number' ? r.value : null)),
             },
         ],
         type: 'map',
+        scale: 'log',
+        missing_label: 'None recorded',
         ...(foot ? { footnote: foot } : {}),
     }
 }
@@ -398,6 +407,8 @@ export function aiCountries(referrals) {
             { key: 'sessions', label: 'AI-referred sessions', value: 'count', data: rows.map((r) => r.sessions ?? null) },
         ],
         type: 'map',
+        scale: 'log',
+        missing_label: 'None recorded',
     }
 }
 

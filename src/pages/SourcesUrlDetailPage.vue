@@ -1,12 +1,19 @@
 <script setup>
+// One AI answer source: how often answers retrieved and cited it, its
+// Google performance when it is your page, the prompts and brands around
+// it and the answers that used it. It is the board's Citations panel when
+// the panel's query names a `url`; there the breadcrumb becomes a link back
+// to the list, keeping the list's topic and engine.
 import { engineMeta } from '@/lib/engines'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  ChevronRight, Search, Loader2, ExternalLink, CircleX,
+  ArrowLeft, ChevronRight, Search, Loader2, ExternalLink, CircleX,
 } from '@lucide/vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import api from '@/api/client'
+import { useBoard, useInPanel } from '@/lib/board/context'
+import { boardLocation } from '@/lib/board/links'
 import ChatDetailModal from '@/components/ChatDetailModal.vue'
 import VizChart from '@/components/charts/VizChart.vue'
 import MetricInfo from '@/components/sources/MetricInfo.vue'
@@ -19,6 +26,27 @@ const route = useRoute()
 const router = useRouter()
 const websiteId = computed(() => route.params.websiteId)
 const targetUrl = computed(() => route.query.url || '')
+
+const inPanel = useInPanel()
+const board = inPanel ? useBoard() : null
+
+// The list's own filters, which the way back keeps.
+const listQuery = computed(() => {
+  const query = {}
+  for (const key of ['topic', 'provider']) {
+    const value = route.query[key]
+    if (typeof value === 'string' && value) query[key] = value
+  }
+  return query
+})
+const allCitationsTo = computed(() => boardLocation(websiteId.value, 'citations', listQuery.value))
+
+// A plain click stays in the panel; a modified click (new tab) keeps the link.
+function openList(event) {
+  if (!board || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  event.preventDefault()
+  board.open('citations', listQuery.value)
+}
 
 const loading = ref(true)
 const error = ref('')
@@ -165,8 +193,20 @@ function fmtTime(iso) {
 
 <template>
   <div class="flex flex-col gap-6">
+    <!-- In the board's panel: back to the list (the panel's title names it) -->
+    <RouterLink v-if="inPanel" v-slot="{ href }" :to="allCitationsTo" custom>
+      <a
+        :href="href"
+        class="inline-flex items-center gap-1.5 self-start text-sm font-medium text-muted-foreground hover:text-foreground"
+        @click="openList"
+      >
+        <ArrowLeft class="size-4" aria-hidden="true" />
+        All citations
+      </a>
+    </RouterLink>
+
     <!-- breadcrumb -->
-    <div class="flex items-center gap-2 text-sm text-muted-foreground">
+    <div v-else class="flex items-center gap-2 text-sm text-muted-foreground">
       <span class="font-medium text-foreground">Sources</span>
       <ChevronRight class="size-3.5" />
       <button class="hover:text-foreground" @click="backToList">URLs</button>
@@ -199,7 +239,7 @@ function fmtTime(iso) {
       </a>
 
       <!-- metrics bar -->
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+      <div class="grid grid-cols-2 gap-3 @md:grid-cols-3 @3xl:grid-cols-7">
         <Card><CardContent class="pt-5">
           <div class="flex items-center gap-1 text-xs text-muted-foreground">URL type <MetricInfo :text="HELP.urlType" /></div>
           <div class="mt-1 text-sm font-semibold text-foreground">{{ metrics.url_type }}</div>
@@ -246,7 +286,7 @@ function fmtTime(iso) {
         <p class="mb-3 text-sm text-muted-foreground">
           What this page earns on Google, over the same period.
         </p>
-        <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <div class="grid grid-cols-2 gap-3 @3xl:grid-cols-3">
           <template v-if="realTraffic.gsc">
             <Card><CardContent class="pt-5">
               <div class="flex items-center gap-1 text-xs text-muted-foreground">Google clicks <MetricInfo :text="HELP.googleClicks" /></div>
@@ -267,18 +307,18 @@ function fmtTime(iso) {
               </div>
             </CardContent></Card>
           </template>
-          <Card v-else-if="!realTraffic.gsc_connected" class="col-span-2 lg:col-span-3"><CardContent class="pt-5 text-sm text-muted-foreground">
+          <Card v-else-if="!realTraffic.gsc_connected" class="col-span-2 @3xl:col-span-3"><CardContent class="pt-5 text-sm text-muted-foreground">
             Connect Search Console to see this page's Google clicks, impressions and position.
             <router-link to="/settings/connections" class="font-medium text-foreground hover:underline">Open Connections</router-link>
           </CardContent></Card>
-          <Card v-else class="col-span-2 lg:col-span-3"><CardContent class="pt-5 text-sm text-muted-foreground">
+          <Card v-else class="col-span-2 @3xl:col-span-3"><CardContent class="pt-5 text-sm text-muted-foreground">
             No Google Search data recorded for this page in this period.
           </CardContent></Card>
         </div>
       </div>
 
       <!-- charts -->
-      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div class="grid grid-cols-1 gap-4 @3xl:grid-cols-2">
         <VizChart
           :spec="overTimeChart"
           :empty="hasOverTime ? null : NO_RETRIEVALS"

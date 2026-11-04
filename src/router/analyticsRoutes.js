@@ -1,31 +1,22 @@
 // Analytics and Settings routes, rendered inside the workspace shell
 // (AgentShell) like the agent pages. The shell import resolves to the same
 // component as agentRoutes.js, so moving between the Agent and Analytics
-// sides keeps one shell instance (sidebar, drawer, toasts).
+// tabs keeps one shell instance (sidebar, drawer, toasts).
 //
-// meta.analytics names the section (lib/analyticsNav.js) and meta.settings
-// marks a settings page; both make the shell render the page area (main-app
-// look, page bar on narrow screens). meta.title is the tab title.
-import { sectionLabel } from '@/lib/analyticsNav'
+// Analytics is one page, the board (board_contract.md 2). Its route has
+// meta.board and renders unwrapped on the agent surface, like the chat; it
+// titles itself. Every older analytics address redirects to the board and
+// opens a widget's side panel with ?widget=, keeping its query and hash.
+// The redirect records keep their names, so router.push({name: 'prompt'})
+// and every RouterLink still work: they now open a panel. meta.page (the
+// /dashboard entry) and meta.settings make the shell render the page area;
+// meta.title is the tab title there.
+import { resolveAnalyticsEntry } from './analyticsEntry'
 
 const AgentShell = () => import('@/layouts/AgentShell.vue')
 
-const OverviewPage = () => import('@/pages/OverviewPage.vue')
-const PromptPage = () => import('@/pages/PromptPage.vue')
-const CompetitorsPage = () => import('@/pages/analytics/CompetitorsPage.vue')
-const CountriesPage = () => import('@/pages/analytics/CountriesPage.vue')
-const VisibilityPage = () => import('@/pages/analytics/VisibilityPage.vue')
-const SentimentPage = () => import('@/pages/analytics/SentimentPage.vue')
-const FactCheckPage = () => import('@/pages/analytics/FactCheckPage.vue')
-const SourcesUrlsPage = () => import('@/pages/SourcesUrlsPage.vue')
-const SourcesUrlDetailPage = () => import('@/pages/SourcesUrlDetailPage.vue')
-const FanoutsPage = () => import('@/pages/analytics/FanoutsPage.vue')
-const PromptResearchPage = () => import('@/pages/analytics/PromptResearchPage.vue')
-const SitePagesPage = () => import('@/pages/analytics/SitePagesPage.vue')
-const CrawlerAccessPage = () => import('@/pages/analytics/CrawlerAccessPage.vue')
-const AiTrafficPage = () => import('@/pages/analytics/AiTrafficPage.vue')
-const TrafficPage = () => import('@/pages/analytics/TrafficPage.vue')
-const ProductsPage = () => import('@/pages/analytics/ProductsPage.vue')
+const AnalyticsBoardPage = () => import('@/pages/board/AnalyticsBoardPage.vue')
+const AnalyticsEntryPage = () => import('@/pages/board/AnalyticsEntryPage.vue')
 
 const SettingsPage = () => import('@/pages/SettingsPage.vue')
 const ProjectSettings = () => import('@/pages/settings/ProjectSettings.vue')
@@ -35,42 +26,74 @@ const CommandCenterPage = () => import('@/pages/settings/CommandCenterPage.vue')
 const BillingPage = () => import('@/pages/BillingPage.vue')
 
 const meta = { requiresAuth: true, workspace: true }
-const at = (section, extra = {}) => ({ analytics: section, title: sectionLabel(section), ...extra })
 const settings = (title) => ({ settings: true, title })
 
-// One child per section addressed by a project; the page gets websiteId as a prop.
-const projectPage = (path, name, component, section) => ({ path, name, component, props: true, meta: at(section) })
+// The board of the address's project with `widget`'s panel open. The
+// incoming query and hash stay; `extra` adds keys taken from the path
+// (a prompt's id); `widget` is set last, so it always wins.
+const board =
+    (widget, extra = () => ({})) =>
+    (to) => ({
+        name: 'analytics',
+        params: { websiteId: to.params.websiteId },
+        query: { ...to.query, ...extra(to), widget },
+        hash: to.hash,
+    })
+
+const toBoard = (path, name, widget) => ({ path, name, redirect: board(widget) })
 
 export const analyticsRoutes = [
     {
         path: '/dashboard',
         component: AgentShell,
         meta,
-        children: [{ path: '', name: 'dashboard', component: OverviewPage, meta: at('overview') }],
+        children: [
+            {
+                path: '',
+                name: 'dashboard',
+                component: AnalyticsEntryPage,
+                beforeEnter: resolveAnalyticsEntry,
+                meta: { page: true, title: 'Analytics' },
+            },
+        ],
     },
     {
         path: '/projects/:websiteId',
         component: AgentShell,
         meta,
         children: [
-            // The bare project address has no page of its own.
-            { path: '', redirect: { name: 'dashboard' } },
-            projectPage('prompts/:promptId', 'prompt', PromptPage, 'overview'),
-            projectPage('competitors', 'competitors', CompetitorsPage, 'competitors'),
-            // ?prompt=<id>&check=1 opens the run dialog.
-            projectPage('countries', 'countries', CountriesPage, 'countries'),
-            projectPage('visibility', 'visibility', VisibilityPage, 'visibility'),
-            projectPage('sentiment', 'sentiment', SentimentPage, 'sentiment'),
-            projectPage('fact-check', 'fact-check', FactCheckPage, 'fact-check'),
-            projectPage('sources', 'sources-urls', SourcesUrlsPage, 'sources'),
-            projectPage('sources/detail', 'sources-url-detail', SourcesUrlDetailPage, 'sources'),
-            projectPage('fan-outs', 'fan-outs', FanoutsPage, 'fan-outs'),
-            projectPage('prompt-research', 'prompt-research', PromptResearchPage, 'prompt-research'),
-            projectPage('pages', 'site-pages', SitePagesPage, 'pages'),
-            projectPage('crawler-access', 'crawler-access', CrawlerAccessPage, 'crawler-access'),
-            projectPage('ai-traffic', 'ai-traffic', AiTrafficPage, 'ai-traffic'),
-            projectPage('traffic', 'traffic', TrafficPage, 'traffic'),
-            projectPage('products', 'products', ProductsPage, 'products'),
+            // The bare project address opens its board.
+            {
+                path: '',
+                redirect: (to) => ({
+                    name: 'analytics',
+                    params: { websiteId: to.params.websiteId },
+                    query: to.query,
+                    hash: to.hash,
+                }),
+            },
+            { path: 'analytics', name: 'analytics', component: AnalyticsBoardPage, props: true, meta: { board: true } },
+            {
+                path: 'prompts/:promptId',
+                name: 'prompt',
+                redirect: board('prompts', (to) => ({ prompt: to.params.promptId })),
+            },
+            toBoard('competitors', 'competitors', 'competitors'),
+            // ?prompt=<id>&check=1 opens the countries run dialog in the panel.
+            toBoard('countries', 'countries', 'countries'),
+            toBoard('visibility', 'visibility', 'visibility'),
+            toBoard('sentiment', 'sentiment', 'sentiment'),
+            toBoard('fact-check', 'fact-check', 'fact-check'),
+            toBoard('sources', 'sources-urls', 'citations'),
+            // Keeps url, topic and provider: the citations panel shows that URL.
+            toBoard('sources/detail', 'sources-url-detail', 'citations'),
+            toBoard('fan-outs', 'fan-outs', 'fan-outs'),
+            toBoard('prompt-research', 'prompt-research', 'prompt-research'),
+            toBoard('pages', 'site-pages', 'pages'),
+            toBoard('crawler-access', 'crawler-access', 'crawler-access'),
+            toBoard('ai-traffic', 'ai-traffic', 'ai-traffic'),
+            toBoard('traffic', 'traffic', 'traffic'),
+            toBoard('products', 'products', 'products'),
         ],
     },
 ]

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeVizSpec, representationsFor } from '@/lib/charts/spec'
+import { defaultRepresentation, normalizeVizSpec, representationsFor } from '@/lib/charts/spec'
 import {
     byEngine,
     byPromptHeatmap,
@@ -71,8 +71,10 @@ describe('byPromptHeatmap', () => {
         expect(spec.datasets[0].states).toEqual([null, null])
         expect(spec.datasets[1].data).toEqual([25, null])
         expect(spec.datasets[1].states).toEqual([null, 'not_checked'])
-        expect(spec.type).toBe('heatmap')
+        // Calm default: the table first, the heatmap still offered.
+        expect(spec.type).toBe('table')
         expect(offered(spec)).toEqual(['heatmap', 'table'])
+        expect(defaultRepresentation(normalizeVizSpec(spec))).toBe('table')
     })
 
     it('keeps the heatmap with one engine and marks unconfigured engines', () => {

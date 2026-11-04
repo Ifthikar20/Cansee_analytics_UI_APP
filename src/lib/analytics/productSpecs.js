@@ -75,7 +75,10 @@ function shownEngines(payload) {
     )
 }
 
-/** Share of each engine's answers that name each product (rows). */
+/**
+ * Share of each engine's answers that name each product (rows). It starts
+ * as bars (calm, board_contract.md 10), with the heatmap still offered.
+ */
 export function productEngines(payload) {
     const products = productsOf(payload)
     return {
@@ -99,7 +102,7 @@ export function productEngines(payload) {
                 states: cells.map((c) => (c && num(c.answers) > 0 ? null : 'not_checked')),
             }
         }),
-        type: 'heatmap',
+        type: 'bar',
         representations: ['bar', 'heatmap'],
     }
 }

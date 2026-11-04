@@ -57,32 +57,51 @@
           />
         </section>
 
-        <VizChart :spec="specs.overTime" :loading="loading" :height="260" :heading-level="2" />
+        <!-- The focused section first (a board widget's panel), the rest in
+             their usual order; DOM order is the visual order. -->
+        <template v-for="section in sectionOrder" :key="section">
+          <VizChart
+            v-if="section === 'over-time'"
+            :spec="specs.overTime"
+            :loading="loading"
+            :height="260"
+            :heading-level="2"
+          />
 
-        <div class="an-two">
-          <VizChart :spec="specs.sov" :loading="loading" :empty="sovEmpty" :heading-level="2" />
-          <VizChart :spec="specs.sovTotal" :loading="loading" :empty="sovEmpty" selected="you" :heading-level="2" />
-        </div>
-        <router-link :to="{ name: 'competitors', params: { websiteId } }" class="an-compare">
-          Compare with your competitors on Google and in AI answers
-        </router-link>
+          <template v-else-if="section === 'share-of-voice'">
+            <div class="an-two">
+              <VizChart :spec="specs.sov" :loading="loading" :empty="sovEmpty" :heading-level="2" />
+              <VizChart :spec="specs.sovTotal" :loading="loading" :empty="sovEmpty" selected="you" :heading-level="2" />
+            </div>
+            <router-link :to="{ name: 'competitors', params: { websiteId } }" class="an-compare">
+              Compare with your competitors on Google and in AI answers
+            </router-link>
+          </template>
 
-        <VizChart :spec="specs.sentiment" :loading="loading" :empty="sentimentEmpty" :heading-level="2" />
+          <VizChart
+            v-else-if="section === 'sentiment'"
+            :spec="specs.sentiment"
+            :loading="loading"
+            :empty="sentimentEmpty"
+            :heading-level="2"
+          />
 
-        <div class="an-two">
-          <VizChart :spec="specs.citations" :loading="loading" :empty="citationsEmpty" :heading-level="2" />
-          <VizChart :spec="specs.domains" :loading="loading" :empty="domainsEmpty" :heading-level="2" />
-        </div>
+          <div v-else-if="section === 'citations'" class="an-two">
+            <VizChart :spec="specs.citations" :loading="loading" :empty="citationsEmpty" :heading-level="2" />
+            <VizChart :spec="specs.domains" :loading="loading" :empty="domainsEmpty" :heading-level="2" />
+          </div>
 
-        <VizChart :spec="specs.byEngine" :loading="loading" :heading-level="2" />
+          <VizChart v-else-if="section === 'by-engine'" :spec="specs.byEngine" :loading="loading" :heading-level="2" />
 
-        <VizChart
-          :spec="specs.byPrompt"
-          :loading="loading"
-          :empty="byPromptEmpty"
-          :heading-level="2"
-          @select="openPrompt"
-        />
+          <VizChart
+            v-else-if="section === 'by-prompt'"
+            :spec="specs.byPrompt"
+            :loading="loading"
+            :empty="byPromptEmpty"
+            :heading-level="2"
+            @select="openPrompt"
+          />
+        </template>
       </template>
     </template>
   </div>
@@ -91,7 +110,9 @@
 <script setup>
 // AI visibility over time (contract 5): how often the engines name the
 // project, its share of voice, the tone and the sources behind the
-// answers, by engine and by prompt. Filters live in the URL query.
+// answers, by engine and by prompt. Filters live in the URL query. Three
+// board widgets expand to this page; `focus` puts that widget's section
+// first.
 import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { CircleX } from '@lucide/vue'
@@ -99,6 +120,7 @@ import visibilityApi from '@/api/visibility'
 import { useAppStore } from '@/stores/app'
 import { useAnalyticsQuery } from '@/composables/analytics/useAnalyticsQuery'
 import { useQueryState } from '@/composables/analytics/useQueryState'
+import { boardLocation } from '@/lib/board/links'
 import { ENGINES } from '@/lib/engines'
 import {
   byEngine, byPromptHeatmap, citationsOverTime, hasBrandMentions, hasSentiment, headlineTiles,
@@ -117,10 +139,19 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 const props = defineProps({
   websiteId: { type: String, required: true },
+  // The section to show first: 'over-time', 'share-of-voice', 'sentiment',
+  // 'citations', 'by-engine' or 'by-prompt' (unknown or '' keeps the order).
+  focus: { type: String, default: '' },
 })
 
 const router = useRouter()
 const appStore = useAppStore()
+
+const SECTIONS = ['over-time', 'share-of-voice', 'sentiment', 'citations', 'by-engine', 'by-prompt']
+
+const sectionOrder = computed(() =>
+  SECTIONS.includes(props.focus) ? [props.focus, ...SECTIONS.filter((s) => s !== props.focus)] : SECTIONS,
+)
 
 const { period, engine, prompt } = useQueryState(
   { period: '30d', engine: '', prompt: '' },
@@ -152,8 +183,6 @@ const engineOptions = computed(() => data.value?.engines || [])
 const promptOptions = computed(() => data.value?.prompts || [])
 const days = computed(() => periodDays(data.value?.window?.period || period.value))
 
-const OVERVIEW = { name: 'dashboard' }
-
 const pageEmpty = computed(() => {
   const d = data.value
   if (!d) return null
@@ -162,8 +191,8 @@ const pageEmpty = computed(() => {
     return {
       kind: 'empty',
       title: 'No prompts tracked yet.',
-      body: 'Add the questions your buyers ask on the Overview. Cansee asks each AI engine and tracks the answers here.',
-      action: { label: 'Go to Overview', to: OVERVIEW },
+      body: 'Add the questions your buyers ask in Prompts. Cansee asks each AI engine and tracks the answers here.',
+      action: { label: 'Add prompts', to: boardLocation(props.websiteId, 'prompts', { add: '1' }) },
     }
   }
   if (reason === 'no_engines') {
@@ -178,7 +207,7 @@ const pageEmpty = computed(() => {
       kind: 'empty',
       title: `No AI answers in the last ${days.value} days.`,
       body: 'Answers appear after the engines are asked your prompts. Use Check now on a prompt, or start research in the Agent.',
-      action: { label: 'Go to Overview', to: OVERVIEW },
+      action: { label: 'Open prompts', to: boardLocation(props.websiteId, 'prompts') },
     }
   }
   return null
@@ -277,7 +306,8 @@ function openPrompt(event) {
   cursor: pointer;
 }
 
-@media (max-width: 1100px) {
+/* The page renders in the board's side panel: its width decides. */
+@container bd-panel (max-width: 760px) {
   .an-kpis {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -286,7 +316,7 @@ function openPrompt(event) {
   }
 }
 
-@media (max-width: 640px) {
+@container bd-panel (max-width: 480px) {
   .an-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

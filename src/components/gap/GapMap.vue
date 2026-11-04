@@ -14,8 +14,10 @@
 // Every checked prompt as a dot: Google position across (best on the
 // left, log scale so page one gets room), AI score up. The dashed guides
 // split page one from the rest and a strong AI score from a weak one, so
-// each corner reads as one gap class. The Overview draws it as the "Map"
-// of a VizChart, whose table and legend carry the same facts in words.
+// each corner reads as one gap class, named in words. Dots are gray and
+// the hovered one wears the accent: the corner says the class, the
+// tooltip and the table view say each prompt's. The Summary panel draws
+// it as the "Map" of a VizChart.
 import { computed } from 'vue'
 import { Scatter } from 'vue-chartjs'
 import { Chart as ChartJS, LinearScale, LogarithmicScale, PointElement, Tooltip } from 'chart.js'
@@ -49,16 +51,13 @@ const missLabel = computed(() => {
   return depths.size === 1 ? `Not in top ${[...depths][0]}` : 'Not ranked'
 })
 
-function tokenColor(cls, fallback = '#888888') {
-  const token = gapMeta(cls).color.match(/var\((--[^)]+)\)/)?.[1]
-  return token ? cssVar(token, fallback) : fallback
-}
-
 const chartData = computed(() => ({
   datasets: [{
     data: plotted.value.map((p) => ({ x: p.google.position || NOT_RANKED_X, y: p.gap.ai_score, prompt: p })),
-    pointBackgroundColor: plotted.value.map((p) => tokenColor(p.gap.class)),
-    pointBorderColor: cssVar('--card', '#ffffff'),
+    pointBackgroundColor: cssVar('--viz-other', '#a5a5a0'),
+    pointHoverBackgroundColor: cssVar('--viz-cat-1', '#2a78d6'),
+    pointBorderColor: cssVar('--viz-surface', cssVar('--card', '#ffffff')),
+    pointHoverBorderColor: cssVar('--viz-surface', cssVar('--card', '#ffffff')),
     pointBorderWidth: 2,
     pointRadius: 7,
     pointHoverRadius: 9,
@@ -89,8 +88,8 @@ const quadrants = {
     ctx.lineTo(area.right, yMid)
     ctx.stroke()
     ctx.setLineDash([])
-    // Phones: the corners are too tight for labels; the dot colours and
-    // the table below still carry the class.
+    // Narrow: the corners are too tight for labels; the tooltip and the
+    // table view still name each prompt's class.
     if (area.right - area.left < 480) {
       ctx.restore()
       return
@@ -103,8 +102,8 @@ const quadrants = {
       ['google_ahead', area.left + pad, yBottom - pad, 'left', 'bottom'],
       ['invisible_both', xRight - pad, yBottom - pad, 'right', 'bottom'],
     ]
+    ctx.fillStyle = cssVar('--viz-ink-2', cssVar('--muted-foreground', '#71717a'))
     for (const [cls, lx, ly, align, baseline] of labels) {
-      ctx.fillStyle = tokenColor(cls)
       ctx.textAlign = align
       ctx.textBaseline = baseline
       ctx.fillText(gapMeta(cls).label, lx, ly)

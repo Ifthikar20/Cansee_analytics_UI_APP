@@ -1,29 +1,36 @@
 <script setup>
-// "Agent | Analytics": two links drawn as the segmented control; the side
-// the sidebar shows is the current one. Analytics returns to the tab last
-// used for this project (lib/analyticsNav.js), else the Overview.
+// "Agent | Analytics": two links drawn as the segmented control; they change
+// the main area only (the sidebar is the same on both tabs). Agent returns
+// to the project's last chat, else a new chat; Analytics returns to the
+// project's board with no panel open. Agent is current on agent routes,
+// Analytics on the board and its /dashboard entry, neither on Settings.
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { analyticsHomeRoute } from '@/lib/analyticsNav'
+import { getLastChat } from '@/lib/agent/storage'
+import { boardLocation } from '@/lib/board/links'
+import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
   websiteId: { type: String, default: null },
-  // 'agent' | 'analytics'
-  side: { type: String, default: 'agent' },
 })
 
 const route = useRoute()
+const auth = useAuthStore()
 
-const agentTo = computed(() =>
-  props.websiteId ? { name: 'agent-home', params: { websiteId: props.websiteId } } : { name: 'agent' },
-)
-// The tab memory lives in sessionStorage and changes only on analytics
-// routes, so the link is read again on every navigation.
-const analyticsTo = computed(() => {
+// The last chat lives in localStorage, which is not reactive, so the link
+// is read again on every navigation.
+const agentTo = computed(() => {
   void route.fullPath
-  return analyticsHomeRoute(props.websiteId)
+  if (!props.websiteId) return { name: 'agent' }
+  const params = { websiteId: props.websiteId }
+  const uid = auth.user?.id
+  const chatId = uid === undefined || uid === null || uid === '' ? null : getLastChat(String(uid), props.websiteId)
+  return chatId ? { name: 'agent-chat', params: { ...params, chatId } } : { name: 'agent-home', params }
 })
-const analytics = computed(() => props.side === 'analytics')
+const analyticsTo = computed(() => (props.websiteId ? boardLocation(props.websiteId) : { name: 'dashboard' }))
+
+const agent = computed(() => String(route.name || '').startsWith('agent'))
+const analytics = computed(() => Boolean(route.meta?.board) || route.name === 'dashboard')
 </script>
 
 <template>
@@ -31,8 +38,8 @@ const analytics = computed(() => props.side === 'analytics')
     <router-link
       :to="agentTo"
       class="ag-ps-item"
-      :class="{ 'is-active': !analytics }"
-      :aria-current="analytics ? undefined : 'true'"
+      :class="{ 'is-active': agent }"
+      :aria-current="agent ? 'true' : undefined"
     >Agent</router-link>
     <router-link
       :to="analyticsTo"

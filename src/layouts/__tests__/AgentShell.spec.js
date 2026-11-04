@@ -5,7 +5,6 @@ import { defineComponent, h, nextTick, reactive } from 'vue'
 import { RouterView, createMemoryHistory, createRouter } from 'vue-router'
 import { useAgentUiStore } from '@/stores/agentUi'
 import { useAppStore } from '@/stores/app'
-import { ANALYTICS_SECTIONS, sectionLabel } from '@/lib/analyticsNav'
 
 const fakeAgent = reactive({})
 const fakePane = reactive({ toggleOpen: vi.fn() })
@@ -18,7 +17,8 @@ vi.mock('@/composables/useShellBootstrap', () => ({ useShellBootstrap: () => boo
 const { default: AgentShell } = await import('../AgentShell.vue')
 
 const Page = defineComponent({ render: () => h('div', { class: 'test-page' }, 'page') })
-// A page tall enough to scroll, and one that counts its mounts.
+const Board = defineComponent({ render: () => h('div', { class: 'test-board' }, 'board') })
+// A page with an anchor, and one that counts its mounts.
 let pageMounts = 0
 const CountedPage = defineComponent({
   setup() {
@@ -29,20 +29,6 @@ const CountedPage = defineComponent({
 const mounted = []
 let wide = true
 const realMatchMedia = window.matchMedia
-
-const at = (key) => ({ analytics: key, title: sectionLabel(key) })
-
-// Every analytics route name the sidebar links to, as in analyticsRoutes.js.
-const projectChildren = [
-  { path: 'prompts/:promptId', name: 'prompt', component: Page, meta: at('overview') },
-  { path: 'sources/detail', name: 'sources-url-detail', component: Page, meta: at('sources') },
-  ...ANALYTICS_SECTIONS.filter((s) => s.key !== 'overview').map((s) => ({
-    path: s.route === 'site-pages' ? 'pages' : s.route === 'sources-urls' ? 'sources' : s.route,
-    name: s.route,
-    component: s.key === 'crawler-access' ? CountedPage : Page,
-    meta: at(s.key),
-  })),
-]
 
 async function setup(path = '/projects/w1/agent') {
   const pinia = createPinia()
@@ -55,23 +41,26 @@ async function setup(path = '/projects/w1/agent') {
     history: createMemoryHistory(),
     routes: [
       { path: '/docs', name: 'docs', component: Page },
-      { path: '/support', name: 'support', component: Page },
       { path: '/agent', name: 'agent', component: Page },
       {
         path: '/dashboard',
         component: AgentShell,
-        children: [{ path: '', name: 'dashboard', component: Page, meta: at('overview') }],
+        children: [{ path: '', name: 'dashboard', component: Page, meta: { page: true, title: 'Analytics' } }],
       },
-      { path: '/projects/:websiteId', component: AgentShell, children: projectChildren },
+      {
+        path: '/projects/:websiteId',
+        component: AgentShell,
+        children: [{ path: 'analytics', name: 'analytics', component: Board, meta: { board: true } }],
+      },
       {
         path: '/settings',
         component: AgentShell,
         children: [
-          { path: '', name: 'settings', component: Page, meta: { settings: true, title: 'Settings' } },
+          { path: '', name: 'settings', component: CountedPage, meta: { settings: true, title: 'Settings' } },
           {
             path: 'usage-dashboard',
             name: 'settings-command-center',
-            component: Page,
+            component: CountedPage,
             meta: { settings: true, title: 'Usage dashboard' },
           },
         ],
@@ -87,7 +76,7 @@ async function setup(path = '/projects/w1/agent') {
         children: [
           { path: '', name: 'agent-home', component: Page },
           { path: 'c/:chatId', name: 'agent-chat', component: Page },
-          { path: 'context', name: 'agent-context', component: Page },
+          { path: 'context', name: 'agent-context', component: Page, meta: { title: 'Context' } },
           { path: 'agents', name: 'agent-agents', component: Page },
           { path: 'findings', name: 'agent-findings', component: Page },
           { path: 'reviews', name: 'agent-reviews', component: Page },
@@ -175,6 +164,9 @@ describe('AgentShell', () => {
     await router.push('/projects/w2/agent/reports')
     await flushPromises()
     expect(fakeAgent.init).toHaveBeenLastCalledWith('w2')
+    await router.push('/projects/w1/analytics')
+    await flushPromises()
+    expect(fakeAgent.init).toHaveBeenLastCalledWith('w1')
   })
 
   it('uses the active project on the projects page', async () => {
@@ -207,7 +199,7 @@ describe('AgentShell', () => {
     const drawer = document.body.querySelector('.ag-portal.ag-drawer')
     expect(drawer).not.toBeNull()
     expect(drawer.querySelector('nav[aria-label="Workspace"]')).not.toBeNull()
-    await router.push('/projects/w1/agent/context')
+    await router.push('/projects/w1/analytics')
     await flushPromises()
     expect(ui.drawerOpen).toBe(false)
   })
@@ -224,13 +216,20 @@ describe('AgentShell', () => {
 })
 
 describe('AgentShell page area', () => {
-  it('renders analytics and settings pages in the page area, agent pages as they are', async () => {
-    const { wrapper, router } = await setup('/projects/w1/pages')
-    const main = wrapper.find('main#ag-main')
+  it('renders the board unwrapped like the chat, and Settings and the entry in the page area', async () => {
+    const { wrapper, router } = await setup('/projects/w1/analytics')
+    let main = wrapper.find('main#ag-main')
+    expect(main.classes()).not.toContain('is-page')
+    expect(wrapper.find('.ws-page').exists()).toBe(false)
+    expect(wrapper.find('main#ag-main > .test-board').exists()).toBe(true)
+
+    await router.push('/settings')
+    await flushPromises()
+    main = wrapper.find('main#ag-main')
     expect(main.classes()).toContain('is-page')
     expect(main.find('.ws-page .ws-page-body .test-page').exists()).toBe(true)
 
-    await router.push('/settings')
+    await router.push('/dashboard')
     await flushPromises()
     expect(wrapper.find('main#ag-main').classes()).toContain('is-page')
     expect(wrapper.find('.ws-page-body .test-page').exists()).toBe(true)
@@ -238,21 +237,20 @@ describe('AgentShell page area', () => {
     await router.push('/projects/w1/agent')
     await flushPromises()
     expect(wrapper.find('main#ag-main').classes()).not.toContain('is-page')
-    expect(wrapper.find('.ws-page').exists()).toBe(false)
     expect(wrapper.find('main#ag-main > .test-page').exists()).toBe(true)
-    // One shell across both sides.
+    // One shell across both tabs.
     expect(bootstrap).toHaveBeenCalledTimes(1)
   })
 
   it('shows the page bar only while the sidebar is out of view, and it brings the sidebar back', async () => {
-    const { wrapper, ui, router } = await setup('/projects/w1/pages')
+    const { wrapper, ui, router } = await setup('/dashboard')
     expect(wrapper.find('.ws-bar').exists()).toBe(false)
 
     ui.setSidebarCollapsed(true)
     await nextTick()
     const bar = wrapper.find('.ws-bar')
     expect(bar.exists()).toBe(true)
-    expect(bar.text()).toContain('Analytics · Pages')
+    expect(bar.text()).toContain('Analytics')
     await bar.find('button[aria-label="Open sidebar"]').trigger('click')
     expect(ui.sidebarCollapsed).toBe(false)
 
@@ -264,48 +262,41 @@ describe('AgentShell page area', () => {
     expect(ui.drawerOpen).toBe(true)
   })
 
-  it('remembers the tab per project and the side, and titles the browser tab', async () => {
-    const { router } = await setup('/projects/w1/pages')
-    expect(JSON.parse(sessionStorage.getItem('cs-analytics-last'))).toEqual({ w1: 'pages' })
-    expect(sessionStorage.getItem('cs-sidebar-side')).toBe('analytics')
-    expect(document.title).toBe('Pages — Wrenfield — Cansee')
-
-    await router.push('/projects/w2/crawler-access')
-    await flushPromises()
-    expect(JSON.parse(sessionStorage.getItem('cs-analytics-last'))).toEqual({ w1: 'pages', w2: 'crawler-access' })
-    expect(document.title).toBe('Crawler access — Acme — Cansee')
-
+  it('titles the tab from route meta, and leaves the board to title itself', async () => {
+    const { router } = await setup('/settings')
+    expect(document.title).toBe('Settings — Cansee')
     await router.push('/projects/w2/agent/context')
     await flushPromises()
-    expect(sessionStorage.getItem('cs-sidebar-side')).toBe('agent')
-
-    // Settings remember nothing.
-    await router.push('/settings')
+    expect(document.title).toBe('Context — Acme — Cansee')
+    document.title = 'Analytics — Acme — Cansee'
+    await router.push('/projects/w2/analytics')
     await flushPromises()
-    expect(sessionStorage.getItem('cs-sidebar-side')).toBe('agent')
-    expect(document.title).toBe('Settings — Cansee')
+    expect(document.title).toBe('Analytics — Acme — Cansee')
+    await router.push('/dashboard')
+    await flushPromises()
+    expect(document.title).toBe('Analytics — Cansee')
   })
 
-  it('starts a new page at the top and keeps the place for a filter change', async () => {
-    const { wrapper, router } = await setup('/projects/w1/pages')
+  it('starts a new page at the top and keeps the place for a query change', async () => {
+    const { wrapper, router } = await setup('/settings')
     const main = wrapper.find('main#ag-main').element
     main.scrollTop = 240
-    await router.push({ path: '/projects/w1/pages', query: { filter: 'cited' } })
+    await router.push({ path: '/settings', query: { tab: 'usage' } })
     await flushPromises()
     expect(main.scrollTop).toBe(240)
 
-    await router.push('/projects/w1/visibility')
+    await router.push('/settings/usage-dashboard')
     await flushPromises()
     expect(main.scrollTop).toBe(0)
   })
 
   it('scrolls a hash target into view inside the page area', async () => {
-    const { router } = await setup('/projects/w1/pages')
+    const { router } = await setup('/settings')
     const original = HTMLElement.prototype.scrollIntoView
     const scrollIntoView = vi.fn()
     HTMLElement.prototype.scrollIntoView = scrollIntoView
     try {
-      await router.push('/projects/w1/crawler-access#anchor-target')
+      await router.push('/settings/usage-dashboard#anchor-target')
       await flushPromises()
       expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start' })
       expect(scrollIntoView.mock.contexts[0].id).toBe('anchor-target')
@@ -314,10 +305,10 @@ describe('AgentShell page area', () => {
     }
   })
 
-  it('mounts a page again when the project changes', async () => {
-    const { router } = await setup('/projects/w1/crawler-access')
+  it('mounts a page again at another address', async () => {
+    const { router } = await setup('/settings')
     expect(pageMounts).toBe(1)
-    await router.push('/projects/w2/crawler-access')
+    await router.push('/settings/usage-dashboard')
     await flushPromises()
     expect(pageMounts).toBe(2)
   })

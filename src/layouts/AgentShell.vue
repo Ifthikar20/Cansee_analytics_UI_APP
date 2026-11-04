@@ -22,9 +22,10 @@
       </AgDrawer>
 
       <main id="ag-main" ref="mainEl" class="ag-shell-main" :class="{ 'is-page': isPage }" tabindex="-1">
-        <!-- Analytics and settings pages: the main app's look, one scrolling
-             column, and a page bar while the sidebar is out of view. Keyed by
-             path like the old app shell, so another project's page mounts fresh. -->
+        <!-- Settings and the Analytics entry: the main app's look, one
+             scrolling column, and a page bar while the sidebar is out of view.
+             Keyed by path like the old app shell, so another page mounts fresh.
+             The Analytics board renders unwrapped below, like the chat. -->
         <div v-if="isPage" class="ws-page">
           <WorkspacePageBar v-if="ui.showSidebarToggle" :title="pageBarTitle" />
           <div class="ws-page-body">
@@ -46,11 +47,12 @@
 
 <script setup>
 // The frame of every signed-in page: a fixed, full-viewport grid with the
-// sidebar (docked or a drawer) and the routed page. Agent pages render as
-// they are: that router-view is neither keyed nor wrapped in a transition,
+// sidebar (docked or a drawer) and the routed page. Agent pages and the
+// Analytics board (route meta.board) render as they are, on the agent
+// surface: that router-view is neither keyed nor wrapped in a transition,
 // so a chat page survives /agent -> /agent/c/:id and its stream keeps
-// running; streams live in the store either way. Analytics and settings
-// pages (route meta.analytics / meta.settings) render in the page area.
+// running; streams live in the store either way. Settings and the
+// Analytics entry (route meta.settings / meta.page) render in the page area.
 import '@/assets/agent/tokens.css'
 import '@/assets/agent/base.css'
 import '@/assets/agent/portal.css'
@@ -65,7 +67,6 @@ import AgDrawer from '@/components/agent/common/AgDrawer.vue'
 import AgentAnnouncer from '@/components/agent/common/AgentAnnouncer.vue'
 import ShortcutsDialog from '@/components/agent/common/ShortcutsDialog.vue'
 import WorkspacePageBar from '@/components/agent/workspace/WorkspacePageBar.vue'
-import { rememberAnalyticsSection, rememberSidebarSide, sectionLabel } from '@/lib/analyticsNav'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentUiStore } from '@/stores/agentUi'
 import { useAppStore } from '@/stores/app'
@@ -118,8 +119,8 @@ watch(
   },
 )
 
-// Tab title for pages that do not set their own (route meta.title); the chat
-// and artifact pages title themselves.
+// Tab title for pages that do not set their own (route meta.title); the
+// chat, artifact and board pages title themselves.
 const pageTitle = computed(() => {
   const title = route.meta?.title
   if (!title) return ''
@@ -135,30 +136,10 @@ watch(
   { immediate: true },
 )
 
-/* ── Analytics and settings pages ── */
+/* ── Settings and the Analytics entry ── */
 
-const isPage = computed(() => Boolean(route.meta?.analytics || route.meta?.settings))
-const pageBarTitle = computed(() =>
-  route.meta?.settings ? 'Settings' : `Analytics · ${sectionLabel(route.meta?.analytics)}`,
-)
-
-// The tab last used per project, for the Analytics switch.
-watch(
-  () => [route.meta?.analytics, websiteId.value],
-  ([key, wid]) => {
-    if (key && wid) rememberAnalyticsSection(wid, key)
-  },
-  { immediate: true },
-)
-
-// The side last used, for routes of neither side (Settings).
-watch(
-  () => (route.meta?.analytics ? 'analytics' : String(route.name || '').startsWith('agent') ? 'agent' : ''),
-  (side) => {
-    if (side) rememberSidebarSide(side)
-  },
-  { immediate: true },
-)
+const isPage = computed(() => Boolean(route.meta?.settings || route.meta?.page))
+const pageBarTitle = computed(() => (route.meta?.settings ? 'Settings' : 'Analytics'))
 
 function scrollToHash(hash) {
   let target = null
@@ -246,7 +227,7 @@ function focusMain() {
   min-height: 0;
 }
 
-/* Analytics and settings pages scroll in <main>, on the main app's surface. */
+/* Settings and the Analytics entry scroll in <main>, on the main app's surface. */
 .ag-shell-main.is-page {
   overflow-x: hidden;
   overflow-y: auto;

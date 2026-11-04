@@ -106,7 +106,15 @@ const emit = defineEmits(['update:modelValue'])
   pointer-events: none;
 }
 
+/* The viewport rule serves Settings and the run dialogs; the container
+   rule serves the pages in the board's side panel. */
 @media (max-width: 640px) {
+  .an-select-input {
+    max-width: 200px;
+  }
+}
+
+@container bd-panel (max-width: 480px) {
   .an-select-input {
     max-width: 200px;
   }

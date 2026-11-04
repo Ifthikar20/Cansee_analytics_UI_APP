@@ -7,7 +7,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { MessageSquarePlus } from '@lucide/vue'
 import { askAgent } from '@/lib/agent/askAgent'
 import { ASK_TEMPLATES, askAgentKey, askText } from '@/lib/analytics/askTemplates'
-import { analyticsSectionOf } from '@/lib/analyticsNav'
 
 const props = defineProps({
   websiteId: { type: [String, Number], required: true },
@@ -21,10 +20,12 @@ const route = useRoute()
 const router = useRouter()
 const busy = ref(false)
 
-// The tab the draft comes from: the current section, else the template's own.
-const from = computed(
-  () => route.meta?.analytics || analyticsSectionOf(route.name) || ASK_TEMPLATES[props.template]?.from || '',
-)
+// Where the draft comes from: the board widget whose panel is open, else
+// the template's own.
+const from = computed(() => {
+  const widget = Array.isArray(route.query.widget) ? route.query.widget[0] : route.query.widget
+  return widget || ASK_TEMPLATES[props.template]?.from || ''
+})
 
 async function ask() {
   if (busy.value) return

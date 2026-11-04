@@ -3,14 +3,11 @@
     <ol v-if="brands.length" class="lb">
       <li v-for="(b, i) in brands" :key="b.name" class="lb-row" :class="{ 'is-you': b.is_you }">
         <span class="lb-rank">{{ i + 1 }}</span>
-        <span class="lb-avatar" :style="{ background: brandColor(b.name) }" aria-hidden="true">
-          {{ brandInitial(b.name) }}
-        </span>
         <span class="lb-name">
           {{ b.name }}
           <span v-if="b.is_you" class="lb-you">You</span>
         </span>
-        <span class="lb-bar" aria-hidden="true"><span :style="{ width: `${b.visibility_pct}%` }"></span></span>
+        <span class="lb-bar" aria-hidden="true"><span class="viz-fill" :style="{ width: `${b.visibility_pct}%` }"></span></span>
         <span class="lb-pct">{{ b.visibility_pct }}%</span>
       </li>
     </ol>
@@ -21,8 +18,7 @@
 <script setup>
 // Share of the latest AI answers that name each brand, across every
 // tracked prompt. Profound-style benchmark: where you stand in the field.
-import { brandColor, brandInitial } from '@/lib/brandLogo'
-
+// Calm on purpose: your bar is the accent, every other brand is gray.
 defineProps({
   brands: { type: Array, required: true },
 })
@@ -39,7 +35,7 @@ defineProps({
 
 .lb-row {
   display: grid;
-  grid-template-columns: 18px 24px minmax(0, 1fr) 30% 40px;
+  grid-template-columns: 18px minmax(0, 1fr) 30% 40px;
   align-items: center;
   gap: 10px;
   padding: 7px 8px;
@@ -47,26 +43,11 @@ defineProps({
   font-size: 13.5px;
 }
 
-.lb-row.is-you {
-  background: color-mix(in srgb, var(--gap-ai) 9%, transparent);
-}
-
 .lb-rank {
   color: var(--muted-foreground);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: right;
-}
-
-.lb-avatar {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 700;
 }
 
 .lb-name {
@@ -79,30 +60,27 @@ defineProps({
 
 .lb-you {
   margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--gap-ai);
-  color: var(--card);
-  font-size: 10.5px;
-  font-weight: 700;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 400;
 }
 
 .lb-bar {
   height: 6px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--muted);
+  background: var(--viz-nodata);
 }
 
 .lb-bar span {
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: var(--muted-foreground);
+  background: var(--viz-other);
 }
 
 .lb-row.is-you .lb-bar span {
-  background: var(--gap-ai);
+  background: var(--viz-cat-1);
 }
 
 .lb-pct {

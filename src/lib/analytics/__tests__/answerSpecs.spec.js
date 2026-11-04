@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeVizSpec, representationsFor, tableModel } from '@/lib/charts/spec'
+import { defaultRepresentation, normalizeVizSpec, representationsFor, tableModel } from '@/lib/charts/spec'
 import {
     factCheckTiles,
     sentimentByEngine,
@@ -120,11 +120,11 @@ describe('sentimentByEngine and sentimentByPrompt', () => {
         expect(table.rows[1].cells.slice(3).map((c) => c.text)).toEqual(['Not analyzed', 'Not analyzed'])
     })
 
-    it('shows tone per prompt as a heatmap named by prompt text', () => {
+    it('shows tone per prompt as a table named by prompt text, with the heatmap one switch away', () => {
         const spec = sentimentByPrompt(sentimentPayload())
         expect(spec).toMatchObject({
             id: 'sentiment.by_prompt',
-            type: 'heatmap',
+            type: 'table',
             labels: ['p1', 'p2'],
             label_names: { p1: 'best note taking app for teams', p2: 'notion alternatives for small startups' },
         })
@@ -134,6 +134,7 @@ describe('sentimentByEngine and sentimentByPrompt', () => {
             [5, 0],
         ])
         expect(offered(spec)).toContain('heatmap')
+        expect(defaultRepresentation(normalizeVizSpec(spec))).toBe('table')
     })
 })
 

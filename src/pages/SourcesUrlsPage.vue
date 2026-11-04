@@ -9,6 +9,9 @@
  * it (opportunities), then the evidence (retrievals chart, movers, types,
  * and the URL table with Google clicks for the brand's own pages). Every
  * metric has a tooltip definition; there are no dead controls.
+ *
+ * It is the board's Citations panel: there the panel's title replaces the
+ * breadcrumb, and a row opens its detail in the same panel.
  */
 import { ENGINES, engineMeta } from '@/lib/engines'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
@@ -21,6 +24,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 import { useAppStore } from '@/stores/app'
 import api from '@/api/client'
+import { useBoard, useInPanel } from '@/lib/board/context'
+import { boardLocation } from '@/lib/board/links'
 import { stableSlots } from '@/lib/charts/palette'
 import { retrievalsSpec, urlTypesSpec } from '@/lib/analytics/polishSpecs'
 import {
@@ -37,6 +42,14 @@ const route = useRoute()
 const router = useRouter()
 const websiteId = computed(() => route.params.websiteId)
 const brandLabel = computed(() => appStore.activeWebsite?.name || 'this brand')
+
+// In the board's panel the detail opens through the board (its own query keys).
+const inPanel = useInPanel()
+const board = inPanel ? useBoard() : null
+
+// No prompt has answers yet: open Prompts on the board with Add prompts.
+const addPromptsTo = computed(() => boardLocation(websiteId.value, 'prompts', { add: '1' }))
+const addPromptsPath = computed(() => router.resolve(addPromptsTo.value).fullPath)
 
 
 /* ── Metric definitions (tooltips) ── */
@@ -74,7 +87,7 @@ const retrievalsEmpty = computed(() =>
     : {
         title: 'No retrievals in this period yet',
         body: 'Retrievals appear as the AI engines answer the prompts you track.',
-        action: { label: 'Add prompts', to: '/dashboard' },
+        action: { label: 'Add prompts', to: addPromptsTo.value },
       },
 )
 
@@ -128,18 +141,20 @@ function domainBadgeClass(type) {
 }
 
 /* ── Filters ── */
-const topics = ref([])
-const selectedTopic = ref(route.query.topic || null)
-const selectedModel = ref(null)
-const periodDays = ref(30)
-const openMenu = ref(null)
-
 // The filter sends the backend provider id; only ChatGPT's (gpt4)
 // differs from its display key.
 const MODEL_OPTIONS = ENGINES.map(e => ({
   value: e.key === 'chatgpt' ? 'gpt4' : e.key,
   label: e.label,
 }))
+
+// Topic and engine live in the query (the Citations panel's own keys), so
+// a URL's detail and the way back to this list keep them.
+const topics = ref([])
+const selectedTopic = ref(route.query.topic || null)
+const selectedModel = ref(MODEL_OPTIONS.some(m => m.value === route.query.provider) ? route.query.provider : null)
+const periodDays = ref(30)
+const openMenu = ref(null)
 const PERIOD_OPTIONS = [
   { value: 7, label: 'Last 7 days' },
   { value: 30, label: 'Last 30 days' },
@@ -164,6 +179,7 @@ function selectTopic(name) {
 function selectModel(value) {
   selectedModel.value = value
   closeMenus()
+  router.replace({ query: { ...route.query, provider: value || undefined } })
   load()
 }
 function selectPeriod(value) {
@@ -306,15 +322,13 @@ function onDocClick(e) {
 }
 
 function openDetail(row) {
-  router.push({
-    name: 'sources-url-detail',
-    params: { websiteId: websiteId.value },
-    query: {
-      url: row.normalizedUrl || row.url,
-      ...(selectedTopic.value ? { topic: selectedTopic.value } : {}),
-      ...(selectedModel.value ? { provider: selectedModel.value } : {}),
-    },
-  })
+  const query = {
+    url: row.normalizedUrl || row.url,
+    ...(selectedTopic.value ? { topic: selectedTopic.value } : {}),
+    ...(selectedModel.value ? { provider: selectedModel.value } : {}),
+  }
+  if (board) board.open('citations', query)
+  else router.push({ name: 'sources-url-detail', params: { websiteId: websiteId.value }, query })
 }
 
 function openOpportunity(item) {
@@ -352,8 +366,8 @@ const headerFacts = computed(() => {
 
 <template>
   <div class="flex flex-col gap-6">
-    <!-- ── Breadcrumb ── -->
-    <div class="flex flex-wrap items-center justify-between gap-2">
+    <!-- ── Breadcrumb (the panel's title says it in the board) ── -->
+    <div v-if="!inPanel" class="flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2 text-sm text-muted-foreground">
         <span class="font-medium text-foreground">Sources</span>
         <ChevronRight class="size-3.5" />
@@ -494,7 +508,7 @@ const headerFacts = computed(() => {
     </VizChart>
 
     <!-- ── Movers + URL types ── -->
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-4 @3xl:grid-cols-2">
       <Card>
         <CardHeader class="space-y-3">
           <div class="flex items-center justify-between">
@@ -662,7 +676,7 @@ const headerFacts = computed(() => {
                     title="No URLs yet"
                     body="Pages appear here as the AI engines answer the prompts you track."
                     cta-label="Add prompts"
-                    cta-to="/dashboard"
+                    :cta-to="addPromptsPath"
                   />
                 </td>
               </tr>

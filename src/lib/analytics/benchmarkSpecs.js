@@ -197,7 +197,11 @@ function promptsOf(payload) {
     return Array.isArray(payload?.by_prompt) ? payload.by_prompt : []
 }
 
-/** AI visibility of every brand, prompt by prompt (rows). */
+/**
+ * AI visibility of every brand, prompt by prompt (rows). The two by-prompt
+ * views start as the table (calm, board_contract.md 10); the heatmap stays
+ * one switch away.
+ */
 export function aiByPrompt(payload) {
     const prompts = promptsOf(payload)
     return {
@@ -216,7 +220,7 @@ export function aiByPrompt(payload) {
             data: prompts.map((p) => (num(p.answers) > 0 ? num(p.ai?.[b.key]) : null)),
             states: prompts.map((p) => (num(p.answers) > 0 ? null : 'not_checked')),
         })),
-        type: 'heatmap',
+        type: 'table',
         representations: ['heatmap'],
     }
 }
@@ -242,7 +246,7 @@ export function googleByPrompt(payload) {
             })
             return { ...measure(b.key, brandName(b), 'rank', points), entity: `brand:${b.key}` }
         }),
-        type: 'heatmap',
+        type: 'table',
         representations: ['heatmap'],
         state_labels: { not_found: 'Not on page one' },
         footnote: GOOGLE_FOOTNOTE,

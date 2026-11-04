@@ -2,7 +2,7 @@
   <BaseModal
     :model-value="open"
     title="Add prompts"
-    subtitle="The questions your buyers ask, one per line. Don't include your brand name: a prompt measures whether AI brings you up on its own."
+    subtitle="Prompts are the questions your buyers ask Google or an AI assistant, one per line. Cansee checks where Google ranks you for each one and asks each AI engine the same question, then tracks the answers. Leave your brand name out: a prompt measures whether AI brings you up on its own."
     @update:model-value="open = $event"
   >
     <div class="apd">
@@ -11,7 +11,8 @@
         v-model="text"
         class="apd-text"
         rows="6"
-        placeholder="One question per line"
+        aria-label="Prompts, one per line"
+        placeholder="One question per line, for example: best note taking app for small teams"
       ></textarea>
 
       <div class="apd-row">
@@ -21,6 +22,32 @@
         </select>
         <span class="apd-count">{{ lines.length }} {{ lines.length === 1 ? 'prompt' : 'prompts' }}</span>
       </div>
+
+      <p v-if="costNote" class="apd-cost">{{ costNote }}</p>
+
+      <!-- Lines that read as requests about the user's own data (on Add). -->
+      <section v-if="notice" class="apd-notice" role="alert" aria-labelledby="apd-notice-title">
+        <p id="apd-notice-title" class="apd-notice-title">{{ notice.title }}</p>
+        <ul v-if="notice.lines.length" class="apd-notice-lines">
+          <li v-for="(line, i) in notice.lines" :key="i">{{ line }}</li>
+        </ul>
+        <p v-if="notice.more" class="apd-notice-more">and {{ notice.more }} more</p>
+        <p class="apd-notice-body">{{ notice.body }}</p>
+        <div class="apd-notice-actions">
+          <template v-if="notice.kind === 'all'">
+            <Button size="sm" :disabled="busy" @click="askTheAgent">Ask the agent</Button>
+            <Button size="sm" variant="outline" :disabled="busy" @click="save(lines)">
+              {{ lines.length === 1 ? 'Track as a prompt anyway' : 'Track as prompts anyway' }}
+            </Button>
+          </template>
+          <template v-else>
+            <Button size="sm" :disabled="busy" @click="save(notice.questions)">
+              Add {{ notice.questions.length }} {{ notice.questions.length === 1 ? 'question' : 'questions' }}
+            </Button>
+            <Button size="sm" variant="outline" :disabled="busy" @click="save(lines)">Add all {{ lines.length }}</Button>
+          </template>
+        </div>
+      </section>
 
       <p v-if="error" class="apd-error">{{ error }}</p>
     </div>
@@ -33,7 +60,7 @@
         </Button>
         <div class="apd-footer-right">
           <Button variant="outline" :disabled="busy" @click="open = false">Cancel</Button>
-          <Button :disabled="busy || !lines.length" @click="save">{{ saveLabel }}</Button>
+          <Button v-if="!notice" :disabled="busy || !lines.length" @click="add">{{ saveLabel }}</Button>
         </div>
       </div>
     </template>
@@ -41,15 +68,27 @@
 </template>
 
 <script setup>
+// Add prompts (board_contract.md 8): one buyer question per line, the
+// country Google and the web-search engines search from, and what adding
+// them costs now (each configured engine answers each prompt once; Google
+// runs only on Check Google, and nothing repeats without a schedule). On
+// Add, lines that read as requests about the user's own data are held
+// back with a notice that points to the agent; Ask the agent drafts them
+// in a new chat and never sends.
 import { computed, nextTick, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { Sparkles } from '@lucide/vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import { Button } from '@/components/ui/button'
 import api from '@/api/client'
 import { useToast } from '@/composables/useToast'
+import { askAgent } from '@/lib/agent/askAgent'
+import { splitPromptLines } from '@/lib/analytics/promptIntent'
 
 const props = defineProps({
   websiteId: { type: String, required: true },
+  // How many AI engines are configured (the overview's engines); null when unknown.
+  engineCount: { type: Number, default: null },
 })
 const emit = defineEmits(['added'])
 const open = defineModel('open', { type: Boolean, default: false })
@@ -67,6 +106,10 @@ const COUNTRIES = [
   { code: '', label: 'Global' },
 ]
 
+// Lines a notice lists before "and {m} more".
+const LISTED = 3
+
+const router = useRouter()
 const toast = useToast()
 const text = ref('')
 const location = ref('us')
@@ -74,6 +117,8 @@ const saving = ref(false)
 const suggesting = ref(false)
 const error = ref('')
 const textareaRef = ref(null)
+// The request notice, set on Add and cleared by any edit.
+const notice = ref(null)
 
 const busy = computed(() => saving.value || suggesting.value)
 const lines = computed(() =>
@@ -86,11 +131,36 @@ const saveLabel = computed(() => {
   return `Add ${n} ${n === 1 ? 'prompt' : 'prompts'}`
 })
 
+function plural(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`
+}
+
+// What adding costs now: each configured engine answers each prompt once.
+const costNote = computed(() => {
+  const e = props.engineCount
+  if (e === null || e === undefined || !Number.isFinite(e)) {
+    return 'Adding prompts asks each connected AI engine now, charged to your AI allowance.'
+  }
+  if (e <= 0) return "AI engines aren't available yet."
+  const n = lines.value.length
+  if (!n) return ''
+  return (
+    `Adding ${plural(n, 'prompt', 'prompts')} asks ${plural(n * e, 'AI answer', 'AI answers')} now ` +
+    `(${plural(e, 'engine', 'engines')}), charged to your AI allowance. ` +
+    'Google is checked when you choose Check Google, and nothing runs again unless you set a schedule.'
+  )
+})
+
 watch(open, async (isOpen) => {
   if (!isOpen) return
   error.value = ''
+  notice.value = null
   await nextTick()
   textareaRef.value?.focus()
+})
+
+watch([text, location], () => {
+  notice.value = null
 })
 
 // The API answers some failures with a bare code ({"error": "code"}) and
@@ -100,24 +170,63 @@ function errorCode(err) {
   return typeof e === 'string' ? e : e?.code || ''
 }
 
-function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`
+// Add: buyer questions go straight in; requests for the agent wait for a choice.
+function add() {
+  const all = lines.value
+  if (!all.length) return
+  const { requests, questions } = splitPromptLines(all)
+  if (!requests.length) {
+    save(all)
+    return
+  }
+  if (!questions.length) {
+    notice.value = {
+      kind: 'all',
+      title: 'This looks like a request for the agent.',
+      body: 'Prompts are questions buyers ask, such as "best CRM for a small team". Cansee asks them to every AI engine and tracks the answers. To ask about your own data, ask the agent.',
+      lines: [],
+      more: 0,
+      questions: [],
+    }
+    return
+  }
+  const k = requests.length
+  notice.value = {
+    kind: 'some',
+    title:
+      k === 1
+        ? '1 of these looks like a request, not a buyer question.'
+        : `${k} of these look like requests, not buyer questions.`,
+    body: "They won't be tracked unless you choose Add all.",
+    lines: requests.slice(0, LISTED),
+    more: Math.max(0, k - LISTED),
+    questions,
+  }
+}
+
+// Hands the lines to the agent as a new chat's draft; nothing is saved or sent.
+async function askTheAgent() {
+  const handed = await askAgent(router, { websiteId: props.websiteId, from: 'prompts', text: lines.value.join('\n') })
+  if (handed) open.value = false
 }
 
 // Requests are silent: every failure renders inline in the dialog.
-async function save() {
+async function save(toSave) {
+  const list = Array.isArray(toSave) ? toSave : lines.value
+  if (!list.length) return
   saving.value = true
   error.value = ''
   try {
     const res = await api.post(
       `/prompt-library/websites/${props.websiteId}/prompts/`,
-      { text: lines.value.join('\n'), location: location.value },
+      { text: list.join('\n'), location: location.value },
       { _silentError: true },
     )
-    const added = `Added ${plural(res.data?.created_count ?? lines.value.length, 'prompt', 'prompts')}.`
+    const added = `Added ${plural(res.data?.created_count ?? list.length, 'prompt', 'prompts')}.`
     // A run is only queued when the API returns its id.
     toast.success(res.data?.scan_audit_id ? `${added} The AI engines are being asked now.` : added)
     text.value = ''
+    notice.value = null
     open.value = false
     emit('added')
   } catch (err) {
@@ -210,6 +319,50 @@ async function suggest() {
   margin-left: auto;
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
+}
+
+.apd-cost {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.apd-notice {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.apd-notice-title {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.apd-notice-lines {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--foreground);
+  list-style: disc;
+  overflow-wrap: anywhere;
+}
+
+.apd-notice-more,
+.apd-notice-body {
+  color: var(--muted-foreground);
+}
+
+.apd-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
 }
 
 .apd-error {

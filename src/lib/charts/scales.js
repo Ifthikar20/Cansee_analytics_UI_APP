@@ -1,10 +1,12 @@
-// Value bins for the heatmap and the tile map: five steps of the
-// sequential ramp (--viz-seq-1..5), so a cell's shade reads against the
-// scale legend under it.
+// Value bins for the heatmap and the world map: steps of the sequential
+// ramp (--viz-seq-1..5), so a cell's shade reads against the scale legend
+// under it.
 //   percent  fixed: 0-19%, 20-39%, 40-59%, 60-79%, 80-100%
 //   rank     ordinal, best first: #1-3, #4-10, #11-20, #21-50, #51-100;
 //            the best bin is the strongest shade (level 5)
-//   count, number, usd  five equal bins from 0 to a rounded max
+//   count, number, usd  five equal bins from 0 to a rounded max; with
+//            `scale: 'log'` (one country dominates) up to five decade
+//            bins instead: 1-99, 100-999, ..., up to the largest value
 // Each bin is { min, max, label, level, integer }: `level` is the ramp step
 // (1..5, 5 strongest). Integer bins hold whole values from min to max
 // inclusive and values are rounded before binning, so a cell that reads
@@ -47,8 +49,28 @@ function rangeLabel(min, max, kind, integer) {
   return min === max ? fmt(min) : `${fmt(min)}-${fmt(max)}`
 }
 
+// Ramp steps for n decade bins: spread across the ramp, the top always 5.
+const LOG_LEVELS = Object.freeze({ 1: [5], 2: [3, 5], 3: [1, 3, 5], 4: [1, 2, 4, 5], 5: [1, 2, 3, 4, 5] })
+const LOG_KINDS = ['count', 'number', 'usd']
+const WHOLE = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
+
+// Decade bins up to `top` (at least 1): n = min(5, digits of top), the
+// first bin from 1 (from 0 when a measured zero is drawn) and the last up
+// to top itself, labelled in full integers ("1,000-9,999").
+function logBins(top, { zero, kind }) {
+  const d = Math.floor(Math.log10(top))
+  const n = Math.min(5, d + 1)
+  const fmt = (v) => `${kind === 'usd' ? '$' : ''}${WHOLE.format(v)}`
+  return LOG_LEVELS[n].map((level, i) => {
+    const min = i === 0 ? (zero ? 0 : 1) : 10 ** (d - n + 1 + i)
+    const max = i === n - 1 ? Math.ceil(top) : 10 ** (d - n + 2 + i) - 1
+    return { min, max, label: min === max ? fmt(min) : `${fmt(min)}-${fmt(max)}`, level, integer: true }
+  })
+}
+
 /**
- * The five bins for `dataset` of `spec` (or for all of its datasets).
+ * The bins for `dataset` of `spec` (or for all of its datasets): five, or
+ * up to five decades for a `scale: 'log'` count, number or usd measure.
  * -> [{ min, max, label, level, integer }], in reading order.
  */
 export function binsFor(spec, dataset = null) {
@@ -61,6 +83,10 @@ export function binsFor(spec, dataset = null) {
 
   const values = list.flatMap((d) => d.data).filter((v) => v !== null)
   const top = Math.max(0, s.max ?? 0, ...values)
+  // log10 of a largest value under 1 has no decade to start from.
+  if (s.scale === 'log' && LOG_KINDS.includes(kind) && top >= 1) {
+    return logBins(top, { zero: values.some((v) => Math.round(v) <= 0), kind })
+  }
   const integer = kind === 'count' || (kind === 'number' && values.every((v) => Number.isInteger(v)))
   const step = niceStep(top / 5, integer)
   return [0, 1, 2, 3, 4].map((i) => {

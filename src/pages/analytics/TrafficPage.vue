@@ -64,10 +64,10 @@
 
         <div class="an-two">
           <VizChart :spec="referrersChart" :loading="loading" :empty="referrersEmpty" :heading-level="2" />
-          <VizChart :spec="pagesChart" :loading="loading" :empty="pagesEmpty" :heading-level="2" />
+          <VizChart :spec="pagesChart" :loading="loading" :empty="pagesEmpty" :heading-level="2" @retry="reload" />
         </div>
 
-        <VizChart :spec="devicesChart" :loading="loading" :empty="devicesEmpty" :heading-level="2" />
+        <VizChart :spec="devicesChart" :loading="loading" :empty="devicesEmpty" :heading-level="2" @retry="reload" />
       </template>
     </template>
 
@@ -138,6 +138,13 @@ function notMeasured(note) {
   return { title: `Not measured by ${label.value}.`, body: note || '' }
 }
 
+// Pages and devices are null only when Cloudflare's breakdown query failed
+// (the requests by day and country still came): a failure, not a gap.
+function breakdownFailed() {
+  const source = data.value?.source_label || 'This source'
+  return { kind: 'error', title: `${source}'s breakdown couldn't be loaded just now.`, action: { label: 'Try again' } }
+}
+
 const seriesSpec = computed(() => trafficSeries(data.value))
 
 const countriesSpec = computed(() => countriesMap(data.value))
@@ -161,14 +168,14 @@ const referrersEmpty = computed(() => {
 const pagesChart = computed(() => pagesSpec(data.value))
 const pagesEmpty = computed(() => {
   const rows = data.value?.pages
-  if (rows === null || rows === undefined) return notMeasured()
+  if (rows === null || rows === undefined) return breakdownFailed()
   return rows.length ? null : { title: 'No pages recorded in this period.' }
 })
 
 const devicesChart = computed(() => devicesSpec(data.value))
 const devicesEmpty = computed(() => {
   const rows = data.value?.devices
-  if (rows === null || rows === undefined) return notMeasured()
+  if (rows === null || rows === undefined) return breakdownFailed()
   return rows.length ? null : { title: 'No devices recorded in this period.' }
 })
 </script>
@@ -237,13 +244,14 @@ const devicesEmpty = computed(() => {
   cursor: pointer;
 }
 
-@media (max-width: 1100px) {
+/* The page renders in the board's side panel: its width decides. */
+@container bd-panel (max-width: 760px) {
   .an-two {
     grid-template-columns: minmax(0, 1fr);
   }
 }
 
-@media (max-width: 640px) {
+@container bd-panel (max-width: 480px) {
   .an-kpis {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -1,32 +1,25 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
 
 vi.mock('@/api/client', () => ({
-    default: { get: vi.fn(), post: vi.fn(), put: vi.fn(), patch: vi.fn(), delete: vi.fn() },
+    default: {
+        get: vi.fn(async () => ({ data: { next_route: 'app' } })),
+        post: vi.fn(),
+        put: vi.fn(),
+        patch: vi.fn(),
+        delete: vi.fn(),
+    },
     authHeaders: () => ({}),
     refreshAccessToken: async () => '',
 }))
 vi.mock('@/api/websites', () => ({ default: { list: vi.fn() } }))
 
 // The shell and every page are stand-ins: these tests check which module
-// each route loads, not the pages themselves.
+// each route loads and where every old address lands, not the pages.
 const stub = (name) => ({ default: { name, render: () => null } })
 vi.mock('@/layouts/AgentShell.vue', () => stub('AgentShell'))
-vi.mock('@/pages/OverviewPage.vue', () => stub('OverviewPage'))
-vi.mock('@/pages/PromptPage.vue', () => stub('PromptPage'))
-vi.mock('@/pages/SourcesUrlsPage.vue', () => stub('SourcesUrlsPage'))
-vi.mock('@/pages/SourcesUrlDetailPage.vue', () => stub('SourcesUrlDetailPage'))
-vi.mock('@/pages/analytics/CompetitorsPage.vue', () => stub('CompetitorsPage'))
-vi.mock('@/pages/analytics/CountriesPage.vue', () => stub('CountriesPage'))
-vi.mock('@/pages/analytics/VisibilityPage.vue', () => stub('VisibilityPage'))
-vi.mock('@/pages/analytics/SentimentPage.vue', () => stub('SentimentPage'))
-vi.mock('@/pages/analytics/FactCheckPage.vue', () => stub('FactCheckPage'))
-vi.mock('@/pages/analytics/FanoutsPage.vue', () => stub('FanoutsPage'))
-vi.mock('@/pages/analytics/PromptResearchPage.vue', () => stub('PromptResearchPage'))
-vi.mock('@/pages/analytics/SitePagesPage.vue', () => stub('SitePagesPage'))
-vi.mock('@/pages/analytics/CrawlerAccessPage.vue', () => stub('CrawlerAccessPage'))
-vi.mock('@/pages/analytics/AiTrafficPage.vue', () => stub('AiTrafficPage'))
-vi.mock('@/pages/analytics/TrafficPage.vue', () => stub('TrafficPage'))
-vi.mock('@/pages/analytics/ProductsPage.vue', () => stub('ProductsPage'))
+vi.mock('@/pages/board/AnalyticsBoardPage.vue', () => stub('AnalyticsBoardPage'))
+vi.mock('@/pages/board/AnalyticsEntryPage.vue', () => stub('AnalyticsEntryPage'))
 vi.mock('@/pages/SettingsPage.vue', () => stub('SettingsPage'))
 vi.mock('@/pages/settings/ProjectSettings.vue', () => stub('ProjectSettings'))
 vi.mock('@/pages/settings/ConnectionsPage.vue', () => stub('ConnectionsPage'))
@@ -34,25 +27,65 @@ vi.mock('@/pages/settings/BrandFactsSettings.vue', () => stub('BrandFactsSetting
 vi.mock('@/pages/settings/CommandCenterPage.vue', () => stub('CommandCenterPage'))
 vi.mock('@/pages/BillingPage.vue', () => stub('BillingPage'))
 
+const { default: websitesApi } = await import('@/api/websites')
 const { default: router } = await import('@/router')
 const { analyticsRoutes, settingsRoutes } = await import('../analyticsRoutes')
+const { resolveAnalyticsEntry } = await import('../analyticsEntry')
+const { useAppStore } = await import('@/stores/app')
+const { useAuthStore } = await import('@/stores/auth')
+const { setLastProject } = await import('@/lib/agent/storage')
 
-// [name, path, page module, section]
-const PROJECT_PAGES = [
-    ['competitors', '/projects/w1/competitors', 'CompetitorsPage', 'competitors'],
-    ['countries', '/projects/w1/countries', 'CountriesPage', 'countries'],
-    ['visibility', '/projects/w1/visibility', 'VisibilityPage', 'visibility'],
-    ['sentiment', '/projects/w1/sentiment', 'SentimentPage', 'sentiment'],
-    ['fact-check', '/projects/w1/fact-check', 'FactCheckPage', 'fact-check'],
-    ['sources-urls', '/projects/w1/sources', 'SourcesUrlsPage', 'sources'],
-    ['sources-url-detail', '/projects/w1/sources/detail', 'SourcesUrlDetailPage', 'sources'],
-    ['fan-outs', '/projects/w1/fan-outs', 'FanoutsPage', 'fan-outs'],
-    ['prompt-research', '/projects/w1/prompt-research', 'PromptResearchPage', 'prompt-research'],
-    ['site-pages', '/projects/w1/pages', 'SitePagesPage', 'pages'],
-    ['crawler-access', '/projects/w1/crawler-access', 'CrawlerAccessPage', 'crawler-access'],
-    ['ai-traffic', '/projects/w1/ai-traffic', 'AiTrafficPage', 'ai-traffic'],
-    ['traffic', '/projects/w1/traffic', 'TrafficPage', 'traffic'],
-    ['products', '/projects/w1/products', 'ProductsPage', 'products'],
+const SITES = [
+    { id: 'w1', name: 'Wrenfield' },
+    { id: 'w2', name: 'Acme' },
+]
+
+// [old path, where it lands]: board_contract.md 2, row by row.
+const REDIRECTS = [
+    ['/projects/w1', '/projects/w1/analytics'],
+    ['/projects/w1/prompts/p9', '/projects/w1/analytics?prompt=p9&widget=prompts'],
+    ['/projects/w1/competitors', '/projects/w1/analytics?widget=competitors'],
+    ['/projects/w1/countries', '/projects/w1/analytics?widget=countries'],
+    ['/projects/w1/visibility', '/projects/w1/analytics?widget=visibility'],
+    ['/projects/w1/sentiment', '/projects/w1/analytics?widget=sentiment'],
+    ['/projects/w1/fact-check', '/projects/w1/analytics?widget=fact-check'],
+    ['/projects/w1/fan-outs', '/projects/w1/analytics?widget=fan-outs'],
+    ['/projects/w1/prompt-research', '/projects/w1/analytics?widget=prompt-research'],
+    ['/projects/w1/crawler-access', '/projects/w1/analytics?widget=crawler-access'],
+    ['/projects/w1/ai-traffic', '/projects/w1/analytics?widget=ai-traffic'],
+    ['/projects/w1/traffic', '/projects/w1/analytics?widget=traffic'],
+    ['/projects/w1/products', '/projects/w1/analytics?widget=products'],
+    ['/projects/w1/sources', '/projects/w1/analytics?widget=citations'],
+    [
+        '/projects/w1/sources/detail?url=https%3A%2F%2Fa.test%2Fx&topic=pricing&provider=gpt4',
+        '/projects/w1/analytics?url=https://a.test/x&topic=pricing&provider=gpt4&widget=citations',
+    ],
+    ['/projects/w1/pages', '/projects/w1/analytics?widget=pages'],
+    ['/analytics/w1', '/projects/w1/analytics'],
+    ['/llm-ranking/w1/prompt-library?tab=x', '/projects/w1/analytics?tab=x'],
+    ['/llm-ranking/w1/brand-research/deep/path', '/projects/w1/analytics'],
+    // The three named llm-ranking redirects chain into the board.
+    ['/llm-ranking/w1/prompts/p9/detail', '/projects/w1/analytics?prompt=p9&widget=prompts'],
+    ['/llm-ranking/w1/urls?topic=pricing', '/projects/w1/analytics?topic=pricing&widget=citations'],
+    ['/llm-ranking/w1/urls/detail?url=https%3A%2F%2Fa.test%2F', '/projects/w1/analytics?url=https://a.test/&widget=citations'],
+]
+
+// The route names on the redirect records, as RouterLinks and pushes use them.
+const NAMED = [
+    ['competitors', 'competitors'],
+    ['countries', 'countries'],
+    ['visibility', 'visibility'],
+    ['sentiment', 'sentiment'],
+    ['fact-check', 'fact-check'],
+    ['fan-outs', 'fan-outs'],
+    ['prompt-research', 'prompt-research'],
+    ['crawler-access', 'crawler-access'],
+    ['ai-traffic', 'ai-traffic'],
+    ['traffic', 'traffic'],
+    ['products', 'products'],
+    ['sources-urls', 'citations'],
+    ['sources-url-detail', 'citations'],
+    ['site-pages', 'pages'],
 ]
 
 // [name, path, page module, tab title]
@@ -72,48 +105,135 @@ async function loaded(record) {
     return (mod.default || mod).name
 }
 
-describe('analytics routes', () => {
-    it.each(PROJECT_PAGES)('%s is a lazy page of a project inside the workspace shell', async (name, path, page, section) => {
-        const target = router.resolve({ name, params: { websiteId: 'w1' } })
-        expect(target.path).toBe(path)
-        expect(target.params).toEqual({ websiteId: 'w1' })
-        expect(router.resolve(path).name).toBe(name)
-        expect(target.meta.requiresAuth).toBe(true)
-        expect(target.meta.analytics).toBe(section)
-        expect(target.meta.settings).toBeUndefined()
+beforeEach(() => {
+    setActivePinia(createPinia())
+    localStorage.clear()
+    const auth = useAuthStore()
+    auth.accessToken = 'token'
+    auth.user = { id: 7 }
+    auth.session = { next_route: 'app', onboarding: { needs_onboarding: false } }
+    useAppStore().setWebsites(SITES)
+    websitesApi.list.mockReset()
+    websitesApi.list.mockResolvedValue({ data: SITES })
+})
+
+afterEach(() => {
+    vi.restoreAllMocks()
+})
+
+describe('the board route', () => {
+    it('renders the board of a project inside the workspace shell, untitled', async () => {
+        const target = router.resolve({ name: 'analytics', params: { websiteId: 'w1' } })
+        expect(target.path).toBe('/projects/w1/analytics')
+        expect(router.resolve('/projects/w1/analytics').name).toBe('analytics')
+        expect(target.meta).toEqual({ requiresAuth: true, workspace: true, board: true })
         const record = target.matched.at(-1)
-        // The page receives websiteId as a prop.
         expect(record.props.default).toBe(true)
-        expect(await loaded(record)).toBe(page)
+        expect(await loaded(record)).toBe('AnalyticsBoardPage')
         expect(await loaded(target.matched[0])).toBe('AgentShell')
     })
 
-    it('keeps the Overview and a prompt page under Overview', async () => {
-        const overview = router.resolve({ name: 'dashboard' })
-        expect(overview.path).toBe('/dashboard')
-        expect(overview.meta).toMatchObject({ requiresAuth: true, analytics: 'overview', title: 'Overview' })
-        expect(await loaded(overview.matched.at(-1))).toBe('OverviewPage')
-        expect(await loaded(overview.matched[0])).toBe('AgentShell')
+    it('renders the entry page in the page area at /dashboard, behind its guard', async () => {
+        const target = router.resolve({ name: 'dashboard' })
+        expect(target.path).toBe('/dashboard')
+        expect(target.meta).toMatchObject({ requiresAuth: true, workspace: true, page: true, title: 'Analytics' })
+        const record = target.matched.at(-1)
+        expect(record.beforeEnter).toBe(resolveAnalyticsEntry)
+        expect(await loaded(record)).toBe('AnalyticsEntryPage')
+        expect(await loaded(target.matched[0])).toBe('AgentShell')
+    })
+})
 
-        const prompt = router.resolve({ name: 'prompt', params: { websiteId: 'w1', promptId: 'p1' } })
-        expect(prompt.path).toBe('/projects/w1/prompts/p1')
-        expect(prompt.meta.analytics).toBe('overview')
-        expect(prompt.matched.at(-1).props.default).toBe(true)
-        expect(await loaded(prompt.matched.at(-1))).toBe('PromptPage')
+describe('old analytics addresses', () => {
+    it.each(REDIRECTS)('%s lands on %s', async (from, to) => {
+        await router.push(from)
+        expect(router.currentRoute.value.fullPath).toBe(to)
+        expect(router.currentRoute.value.name).toBe('analytics')
     })
 
-    it('titles each tab with its label', () => {
-        expect(router.resolve({ name: 'site-pages', params: { websiteId: 'w1' } }).meta.title).toBe('Pages')
-        expect(router.resolve({ name: 'sources-urls', params: { websiteId: 'w1' } }).meta.title).toBe('Citations')
-        expect(router.resolve({ name: 'fan-outs', params: { websiteId: 'w1' } }).meta.title).toBe('Query fan-outs')
+    it('keeps the query and the hash, and sets widget last', async () => {
+        await router.push('/projects/w1/visibility?period=90d&widget=nope#trend')
+        expect(router.currentRoute.value.fullPath).toBe('/projects/w1/analytics?period=90d&widget=visibility#trend')
+        await router.push('/projects/w2/prompts/p4?from=email#top')
+        expect(router.currentRoute.value.fullPath).toBe('/projects/w2/analytics?from=email&prompt=p4&widget=prompts#top')
     })
 
+    it('passes only the project on from the llm-ranking catch-all (the query stays, as every redirect keeps it)', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+        await router.push('/llm-ranking/w2/a/b/c?x=1')
+        expect(router.currentRoute.value.fullPath).toBe('/projects/w2/analytics?x=1')
+        expect(router.currentRoute.value.params).toEqual({ websiteId: 'w2' })
+        expect(warn).not.toHaveBeenCalled()
+    })
+
+    it.each(NAMED)('keeps the name %s, which now opens the %s panel', async (name, widget) => {
+        const resolved = router.resolve({ name, params: { websiteId: 'w1' } })
+        expect(resolved.name).toBe(name)
+        await router.push({ name, params: { websiteId: 'w1' }, query: { prompt: 'p1', check: '1' } })
+        expect(router.currentRoute.value.query).toEqual({ prompt: 'p1', check: '1', widget })
+    })
+
+    it('opens a prompt by its old route name', async () => {
+        expect(router.resolve({ name: 'prompt', params: { websiteId: 'w1', promptId: 'p1' } }).path).toBe('/projects/w1/prompts/p1')
+        await router.push({ name: 'prompt', params: { websiteId: 'w1', promptId: 'p1' } })
+        expect(router.currentRoute.value.fullPath).toBe('/projects/w1/analytics?prompt=p1&widget=prompts')
+    })
+
+    it('opens the board from /dashboard, keeping the query and the hash', async () => {
+        useAppStore().setActiveWebsite(SITES[1])
+        await router.push('/dashboard?widget=prompts&add=1#x')
+        expect(router.currentRoute.value.fullPath).toBe('/projects/w2/analytics?widget=prompts&add=1#x')
+    })
+})
+
+describe('resolveAnalyticsEntry', () => {
+    const to = (overrides = {}) => ({ params: {}, query: {}, hash: '', ...overrides })
+
+    it('renders the entry page during onboarding, without asking for projects', async () => {
+        useAuthStore().session = { onboarding: { needs_onboarding: true } }
+        useAppStore().setWebsites([])
+        await expect(resolveAnalyticsEntry(to())).resolves.toBe(true)
+        expect(websitesApi.list).not.toHaveBeenCalled()
+    })
+
+    it('renders the entry page without projects or when the list fails', async () => {
+        useAppStore().setWebsites([])
+        websitesApi.list.mockResolvedValue({ data: [] })
+        await expect(resolveAnalyticsEntry(to())).resolves.toBe(true)
+        websitesApi.list.mockRejectedValue(Object.assign(new Error('500'), { response: { status: 500 } }))
+        await expect(resolveAnalyticsEntry(to())).resolves.toBe(true)
+    })
+
+    it('opens the active project, else the last project, else the first', async () => {
+        const app = useAppStore()
+        app.setActiveWebsite(SITES[1])
+        await expect(resolveAnalyticsEntry(to({ query: { widget: 'traffic' }, hash: '#h' }))).resolves.toEqual({
+            name: 'analytics',
+            params: { websiteId: 'w2' },
+            query: { widget: 'traffic' },
+            hash: '#h',
+        })
+
+        // A cold load: nothing active yet, the list loads, the last project wins.
+        setActivePinia(createPinia())
+        useAuthStore().user = { id: 7 }
+        setLastProject(7, 'w2')
+        expect((await resolveAnalyticsEntry(to())).params).toEqual({ websiteId: 'w2' })
+
+        setActivePinia(createPinia())
+        useAuthStore().user = { id: 7 }
+        setLastProject(7, 'gone')
+        expect((await resolveAnalyticsEntry(to())).params).toEqual({ websiteId: 'w1' })
+    })
+})
+
+describe('settings routes', () => {
     it.each(SETTINGS_PAGES)('%s is a settings page inside the workspace shell', async (name, path, page, title) => {
         const target = router.resolve({ name })
         expect(target.path).toBe(path)
         expect(router.resolve(path).name).toBe(name)
         expect(target.meta).toMatchObject({ requiresAuth: true, settings: true, title })
-        expect(target.meta.analytics).toBeUndefined()
+        expect(target.meta.board).toBeUndefined()
         expect(await loaded(target.matched.at(-1))).toBe(page)
         expect(await loaded(target.matched[0])).toBe('AgentShell')
     })
@@ -127,30 +247,13 @@ describe('analytics routes', () => {
         }
     })
 
-    it('sends the bare project address to the Overview', () => {
-        expect(router.resolve('/projects/w1').matched.at(-1).redirect).toEqual({ name: 'dashboard' })
-    })
-
-    it('keeps the query a page reads (prompt and check on Countries)', () => {
-        const target = router.resolve({
-            name: 'countries',
-            params: { websiteId: 'w1' },
-            query: { prompt: 'p1', check: '1' },
-        })
-        expect(target.fullPath).toBe('/projects/w1/countries?prompt=p1&check=1')
-    })
-
     it('sends old Google Analytics returns to Connections, and the rest to project settings', () => {
         const record = router.getRoutes().find((r) => r.path === '/websites/:id')
-        const to = (query) => ({ params: { id: 'w9' }, query })
-        expect(record.redirect(to({ ga4: 'connected' }))).toEqual({
+        const from = (query) => ({ params: { id: 'w9' }, query })
+        expect(record.redirect(from({ ga4: 'connected' }))).toEqual({
             name: 'settings-connections',
             query: { ga4: 'connected', website: 'w9' },
         })
-        expect(record.redirect(to({ ga4: 'error', reason: 'denied' }))).toEqual({
-            name: 'settings-connections',
-            query: { ga4: 'error', reason: 'denied', website: 'w9' },
-        })
-        expect(record.redirect(to({}))).toEqual({ name: 'settings-project' })
+        expect(record.redirect(from({}))).toEqual({ name: 'settings-project' })
     })
 })

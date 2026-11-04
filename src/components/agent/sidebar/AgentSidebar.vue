@@ -1,13 +1,12 @@
 <script setup>
 // The workspace sidebar: project switcher and inbox, the Agent | Analytics
-// switch, then the agent sections and recent chats (Agent side) or the
-// analytics tabs (Analytics side), and the footer. The side follows the
-// route; Settings show the side used last. Docked at >= 1024px, otherwise
-// rendered inside the shell's drawer (variant="drawer").
+// switch, the workspace sections, recent chats and the footer. It is the
+// same on both tabs: the switch changes the main area, never the
+// navigation. Docked at >= 1024px, otherwise rendered inside the shell's
+// drawer (variant="drawer").
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
-import { sidebarSide } from '@/lib/analyticsNav'
 import ActivityButton from './ActivityButton.vue'
 import ProductSwitch from './ProductSwitch.vue'
 import SidebarFooter from './SidebarFooter.vue'
@@ -32,8 +31,6 @@ const websiteId = computed(() => {
 const website = computed(
   () => app.websites.find((w) => String(w.id) === websiteId.value) || (websiteId.value ? app.activeWebsite : null) || null,
 )
-
-const side = computed(() => sidebarSide(route))
 </script>
 
 <template>
@@ -42,8 +39,8 @@ const side = computed(() => sidebarSide(route))
       <WorkspaceSwitcher :website="website" />
       <ActivityButton :website-id="websiteId" />
     </div>
-    <ProductSwitch :website-id="websiteId" :side="side" />
-    <!-- The same sidebar on both sides: the switch changes the main area,
+    <ProductSwitch :website-id="websiteId" />
+    <!-- The same sidebar on both tabs: the switch changes the main area,
          never the navigation. Analytics has no list of tabs. -->
     <SidebarNav :website-id="websiteId" />
     <SidebarRecents :website-id="websiteId" />

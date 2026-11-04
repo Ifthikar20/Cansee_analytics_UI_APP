@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
     GAP_MAP_CLASSES,
     aiUsageSpec,
-    engineHeatmapSpec,
     gapMapSpec,
     googleHistorySpec,
     isoDays,
@@ -36,12 +35,6 @@ function row(id, fields = {}) {
     }
 }
 
-const ENGINES = [
-    { key: 'chatgpt', label: 'ChatGPT', configured: true },
-    { key: 'claude', label: 'Claude', configured: true },
-    { key: 'gemini', label: 'Gemini', configured: false },
-]
-
 const norm = (spec) => normalizeVizSpec(spec)
 
 describe('overviewTiles', () => {
@@ -57,7 +50,7 @@ describe('overviewTiles', () => {
         invisible_both: 1,
     }
 
-    it('keeps the five tiles and hints, with a measured zero as 0', () => {
+    it('keeps the five tiles and hints, with a measured zero as 0 and no colour', () => {
         const tiles = overviewTiles(kpis)
         expect(tiles.map((t) => [t.label, t.value, t.kind, t.hint])).toEqual([
             ['AI visibility', 34, 'percent', 'Share of recent AI answers that name you'],
@@ -66,7 +59,7 @@ describe('overviewTiles', () => {
             ['Google ahead', 0, 'count', 'Google ranks you higher than AI'],
             ['Invisible in both', 1, 'count', 'Neither surfaces you'],
         ])
-        expect(tiles[2].tone).toBe('var(--gap-ai)')
+        expect(tiles.some((t) => 'tone' in t)).toBe(false)
         expect(tiles[0].delta).toBeNull()
     })
 
@@ -74,6 +67,12 @@ describe('overviewTiles', () => {
         const unchecked = overviewTiles({ ...kpis, ai_visibility_pct: null, avg_google_position: null, google_checked: 0 })
         expect(unchecked[0]).toMatchObject({ value: null, stateText: 'No answers yet' })
         expect(unchecked[1]).toMatchObject({ value: null, stateText: 'Not checked', hint: '0 of 12 checked' })
+        // No Google check yet: the gap classes are unknown, never 0.
+        expect(unchecked.slice(2).map((t) => [t.value, t.stateText])).toEqual([
+            [null, 'Not checked'],
+            [null, 'Not checked'],
+            [null, 'Not checked'],
+        ])
         // Checked, and every check missed you: measured, not "Not checked".
         // The hint claims only the depth Google was searched to.
         const missedRows = [
@@ -141,28 +140,6 @@ describe('leaderboardSpec', () => {
         expect([0, 1, 2].map((j) => pointText(spec, 0, j))).toEqual(['60%', '25%', '0%'])
         expect(yourBrand(brands)).toBe('Notion')
         expect(yourBrand([])).toBe('')
-    })
-})
-
-describe('engineHeatmapSpec', () => {
-    it('takes the prompts with the largest absolute gap, in gap order', () => {
-        const rows = Array.from({ length: 20 }, (_, i) => row(`p${i}`, { gap: { ai_score: 50, value: i % 2 ? -i : i, class: 'even' } }))
-        rows.push(row('none', { gap: { ai_score: null, value: null, class: 'no_data' } }))
-        const spec = engineHeatmapSpec(rows, ENGINES)
-        expect(spec.labels).toHaveLength(15)
-        expect(spec.labels.slice(0, 3)).toEqual(['p19', 'p18', 'p17'])
-        expect(spec.labels).not.toContain('none')
-    })
-
-    it('marks unconfigured engines and engines without answers with their state', () => {
-        const spec = norm(engineHeatmapSpec([row('a')], ENGINES))
-        expect(representationsFor(spec)).toEqual(['heatmap', 'table'])
-        expect(spec.datasets.map((d) => [d.key, d.entity, d.data[0], d.states[0]])).toEqual([
-            ['chatgpt', 'engine:chatgpt', 67, null],
-            ['claude', 'engine:claude', null, 'not_checked'],
-            ['gemini', 'engine:gemini', null, 'not_configured'],
-        ])
-        expect(tableModel(spec).rows[0].cells.map((c) => c.text)).toEqual(['67%', 'Not checked', 'Not configured'])
     })
 })
 

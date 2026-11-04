@@ -67,7 +67,7 @@ const COPY = Object.freeze({
   scanFailed: "We couldn't read this site.",
   tooManyScans: 'Too many scans in a row. Wait a minute and try again.',
   saveFailed: "We couldn't save your project. Please try again.",
-  promptsNotTracked: "Your project is saved, but we couldn't add its starter prompts. Add them from the Overview.",
+  promptsNotTracked: "Your project is saved, but we couldn't add its starter prompts. Add them from Prompts on Analytics.",
 })
 
 const clip = (value, max) => String(value ?? '').trim().slice(0, max).trim()

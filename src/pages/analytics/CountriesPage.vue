@@ -57,8 +57,8 @@
       v-else-if="resultsState === 'no_prompts'"
       kind="empty"
       title="Track a prompt first."
-      body="Country checks run your tracked prompts. Add prompts on the Overview."
-      :action="{ label: 'Go to Overview', to: { name: 'dashboard' } }"
+      body="Country checks run your tracked prompts. Add prompts in Prompts."
+      :action="{ label: 'Add prompts', to: addPrompts }"
     />
 
     <VizState
@@ -199,10 +199,10 @@
 
 <script setup>
 // Rankings by country (contract 2): Google and the AI engines asked the
-// tracked prompts as if from other countries, on a map and in a table,
-// with the dialog that estimates and starts a check and the panel that
-// follows it. ?prompt=<id> preselects a prompt; ?check=1 opens the dialog
-// once.
+// tracked prompts as if from other countries, on the world map and in a
+// table, with the dialog that estimates and starts a check and the panel
+// that follows it. ?prompt=<id> preselects a prompt; ?check=1 opens the
+// dialog once. The board's Countries widget opens it in its side panel.
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CircleX, Globe } from '@lucide/vue'
@@ -211,11 +211,13 @@ import trafficApi from '@/api/traffic'
 import { useAnalyticsQuery } from '@/composables/analytics/useAnalyticsQuery'
 import { useQueryState } from '@/composables/analytics/useQueryState'
 import { useCountryRun } from '@/composables/analytics/useCountryRun'
+import { useBoard } from '@/lib/board/context'
+import { boardLocation } from '@/lib/board/links'
 import { ENGINES } from '@/lib/engines'
 import {
   countriesMap as countriesMapSpec, isActiveRun, localizationRows, promptsByCountry,
 } from '@/lib/analytics/countrySpecs'
-import { countriesMap as visitorsMapSpec, trafficEmpty } from '@/lib/analytics/trafficSpecs'
+import { countriesMap as visitorsMapSpec, countriesTitle, trafficEmpty } from '@/lib/analytics/trafficSpecs'
 import AnalyticsHeader from '@/components/analytics/AnalyticsHeader.vue'
 import FilterRow from '@/components/analytics/FilterRow.vue'
 import PromptSelect from '@/components/analytics/PromptSelect.vue'
@@ -238,6 +240,10 @@ const props = defineProps({
 
 const route = useRoute()
 const router = useRouter()
+const board = useBoard()
+
+// No prompt yet: Add prompts opens the Prompts panel with its dialog.
+const addPrompts = computed(() => boardLocation(props.websiteId, 'prompts', { add: '1' }))
 
 const { prompt, engine } = useQueryState(
   { prompt: '', engine: '' },
@@ -405,10 +411,11 @@ function onTile(event) {
   if (event?.label) highlight.value = String(event.label).toLowerCase()
 }
 
+// A prompt opens in the Prompts panel.
 function openPrompt(event) {
   const promptId = event?.label
   if (!promptId) return
-  router.push({ name: 'prompt', params: { websiteId: props.websiteId, promptId } })
+  board.open('prompts', { prompt: String(promptId) })
 }
 
 function clearFilters() {
@@ -435,12 +442,13 @@ const visitorsEmpty = computed(() => {
   return null
 })
 
+// The title follows the metric: Cloudflare's requests are never visitors.
 const visitorsSpec = computed(() => {
   const t = traffic.value
   const notes = (t?.notes || []).filter((n) => typeof n === 'string' && n).join(' ')
   return visitorsMapSpec(t, {
     id: 'countries.visitors',
-    title: 'Visitors by country',
+    title: countriesTitle(t),
     subtitle: t?.source_label ? `${t.source_label} · last 30 days` : 'Last 30 days',
     footnote: notes,
   })
@@ -568,7 +576,8 @@ const visitorsSpec = computed(() => {
   line-height: 1.5;
 }
 
-@media (max-width: 640px) {
+/* The page renders in the board's side panel: its width decides. */
+@container bd-panel (max-width: 480px) {
   .an-card {
     padding: 16px;
   }
