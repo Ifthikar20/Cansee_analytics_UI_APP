@@ -49,6 +49,18 @@
         </div>
       </section>
 
+      <!-- Past the plan's tracked-prompt cap (403 tracked_prompt_limit). The
+           server adds all or nothing, so nothing was added; the text stays. -->
+      <section v-if="limitNotice" class="apd-notice" role="alert" aria-labelledby="apd-limit-title">
+        <p id="apd-limit-title" class="apd-notice-title">Your plan is full.</p>
+        <p class="apd-notice-body">{{ limitNotice }}</p>
+        <div class="apd-notice-actions">
+          <Button as-child size="sm" variant="outline">
+            <router-link :to="{ name: 'billing' }">See plans</router-link>
+          </Button>
+        </div>
+      </section>
+
       <p v-if="error" class="apd-error">{{ error }}</p>
     </div>
 
@@ -119,6 +131,8 @@ const error = ref('')
 const textareaRef = ref(null)
 // The request notice, set on Add and cleared by any edit.
 const notice = ref(null)
+// The server's words when the plan's tracked-prompt cap refused the lines.
+const limitNotice = ref('')
 
 const busy = computed(() => saving.value || suggesting.value)
 const lines = computed(() =>
@@ -151,16 +165,39 @@ const costNote = computed(() => {
   )
 })
 
+// What had focus when the dialog opened. BaseModal does not give it back,
+// so a keyboard user was left on the page's body after Cancel or Add.
+let opener = null
+
+// Closing (the dialog is still in the DOM): focus goes back to the opener,
+// unless it has moved on outside the dialog (Ask the agent opens a chat)
+// or the opener is gone or out of reach.
+function giveFocusBack() {
+  const back = opener
+  opener = null
+  const card = textareaRef.value?.closest('[role="dialog"]')
+  const active = document.activeElement
+  const inDialog = !active || active === document.body || Boolean(card?.contains(active))
+  if (inDialog && back?.isConnected && !back.closest('[inert]')) back.focus()
+}
+
 watch(open, async (isOpen) => {
-  if (!isOpen) return
+  if (!isOpen) {
+    giveFocusBack()
+    return
+  }
+  const active = document.activeElement
+  opener = active && active !== document.body ? active : null
   error.value = ''
   notice.value = null
+  limitNotice.value = ''
   await nextTick()
   textareaRef.value?.focus()
 })
 
 watch([text, location], () => {
   notice.value = null
+  limitNotice.value = ''
 })
 
 // The API answers some failures with a bare code ({"error": "code"}) and
@@ -216,6 +253,7 @@ async function save(toSave) {
   if (!list.length) return
   saving.value = true
   error.value = ''
+  limitNotice.value = ''
   try {
     const res = await api.post(
       `/prompt-library/websites/${props.websiteId}/prompts/`,
@@ -234,6 +272,10 @@ async function save(toSave) {
       error.value = "AI engines aren't available yet."
       // Refresh the list in case the prompts were saved before the run was refused.
       emit('added')
+    } else if (errorCode(err) === 'tracked_prompt_limit') {
+      // The request notice gives way; the server's words say what is tracked.
+      notice.value = null
+      limitNotice.value = err.response?.data?.error?.message || err.displayMessage || ''
     } else {
       error.value = err.displayMessage || "We couldn't add those prompts. Please try again."
     }

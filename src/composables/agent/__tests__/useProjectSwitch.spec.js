@@ -62,7 +62,7 @@ describe('projectTarget', () => {
 
   it('keeps the board, its panel and filters, and drops the keys that name records', () => {
     const params = { websiteId: 'w2' }
-    expect(PROJECT_QUERY_KEYS).toEqual(['prompt', 'check', 'product', 'verdict', 'topic', 'filter', 'url'])
+    expect(PROJECT_QUERY_KEYS).toEqual(['prompt', 'check', 'product', 'verdict', 'topic', 'filter', 'url', 'run'])
     expect(projectTarget('analytics', 'w2', { widget: 'pages', filter: 'cited', period: '90d' })).toEqual({
       name: 'analytics',
       params,
@@ -85,6 +85,17 @@ describe('projectTarget', () => {
       name: 'analytics',
       params,
       query: { widget: 'products' },
+    })
+    // An Ask AI run belongs to one project; Prompt ranking's order is a filter.
+    expect(projectTarget('analytics', 'w2', { widget: 'prompt-box', run: 'r1' })).toEqual({
+      name: 'analytics',
+      params,
+      query: { widget: 'prompt-box' },
+    })
+    expect(projectTarget('analytics', 'w2', { widget: 'ranking', order: 'weakest' })).toEqual({
+      name: 'analytics',
+      params,
+      query: { widget: 'ranking', order: 'weakest' },
     })
     expect(projectTarget('analytics', 'w2')).toEqual({ name: 'analytics', params, query: {} })
   })

@@ -2,8 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { DEFAULT_LAYOUT, SIZES, SIZE_LABELS, WIDGETS, panelTitle, widgetMeta } from '../widgets'
 import { boardLocation } from '../links'
 
-// board_contract.md 3, row by row: key, title, one line, default size, allowed sizes.
+// board_contract.md 3 with autopilot_contract.md 6 first, row by row: key,
+// title, one line, default size, allowed sizes.
 const CONTRACT = [
+  [
+    'prompt-box',
+    'Ask AI',
+    "Ask a buyer's question several times and see how often each engine names you.",
+    'full',
+    ['half', 'full'],
+  ],
+  ['ranking', 'Prompt ranking', 'Your tracked prompts, ranked by how often AI names you.', 'full', ['half', 'full']],
   ['summary', 'Summary', 'Google and the AI engines at a glance.', 'full', ['half', 'full']],
   ['prompts', 'Prompts', 'Where Google ranks you next to what AI says, per question.', 'full', ['half', 'full']],
   ['countries', 'Countries', 'Where you rank and where your traffic comes from, country by country.', 'half', ['half', 'full']],
@@ -26,8 +35,9 @@ const CONTRACT = [
 ]
 
 describe('the widget catalog', () => {
-  it('lists the 19 widgets of the contract, in catalog order, with their sizes and one-liners', () => {
+  it('lists the 21 widgets of the contracts, in catalog order, with their sizes and one-liners', () => {
     expect(WIDGETS.map((w) => [w.key, w.title, w.description, w.size, [...w.sizes]])).toEqual(CONTRACT)
+    expect(WIDGETS).toHaveLength(21)
   })
 
   it('allows each default size and only the three sizes', () => {
@@ -39,12 +49,10 @@ describe('the widget catalog', () => {
     expect(SIZE_LABELS).toEqual({ third: 'One third', half: 'Half', full: 'Full width' })
   })
 
-  it('starts a board with Summary, Prompts, Countries and Traffic', () => {
+  it('starts a board with Ask AI, then Prompt ranking', () => {
     expect(DEFAULT_LAYOUT.map((w) => ({ ...w }))).toEqual([
-      { key: 'summary', size: 'full' },
-      { key: 'prompts', size: 'full' },
-      { key: 'countries', size: 'half' },
-      { key: 'traffic', size: 'half' },
+      { key: 'prompt-box', size: 'full' },
+      { key: 'ranking', size: 'full' },
     ])
     expect(Object.isFrozen(DEFAULT_LAYOUT)).toBe(true)
     expect(Object.isFrozen(WIDGETS[0])).toBe(true)
@@ -61,6 +69,8 @@ describe('the widget catalog', () => {
     expect(panelTitle('prompts', {})).toBe('Prompts')
     expect(panelTitle('prompts', { prompt: 'p1' })).toBe('Prompt')
     expect(panelTitle('countries', { prompt: 'p1' })).toBe('Countries')
+    expect(panelTitle('prompt-box', { run: 'r1' })).toBe('Ask AI')
+    expect(panelTitle('ranking', { order: 'weakest' })).toBe('Prompt ranking')
     expect(panelTitle('nope')).toBe('')
   })
 })

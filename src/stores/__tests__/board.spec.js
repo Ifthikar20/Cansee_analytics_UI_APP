@@ -9,18 +9,17 @@ vi.mock('@/composables/useToast', () => ({ useToast: () => toast }))
 const { useBoardStore, SAVE_DEBOUNCE_MS, CONFLICT_TOAST } = await import('../board')
 const { useAuthStore } = await import('@/stores/auth')
 
-// Payloads of board_contract.md 6.
+// Payloads of board_contract.md 6, with the default of autopilot_contract.md 6.
 const DEFAULT_PAYLOAD = {
   saved: false,
   version: 0,
   updated_at: null,
   widgets: [
-    { key: 'summary', size: 'full' },
-    { key: 'prompts', size: 'full' },
-    { key: 'countries', size: 'half' },
-    { key: 'traffic', size: 'half' },
+    { key: 'prompt-box', size: 'full' },
+    { key: 'ranking', size: 'full' },
   ],
 }
+const DEFAULT_KEYS = ['prompt-box', 'ranking']
 const SAVED = (version, widgets) => ({ saved: true, version, updated_at: '2026-11-04T10:12:00Z', widgets })
 const CACHE_KEY = 'cs-board-v1:7:w1'
 
@@ -63,7 +62,7 @@ describe('loading a board', () => {
     api.get.mockReturnValue(answer.promise)
     const done = store.load('w1')
     expect(store.layoutOf('w1')).toMatchObject({ status: 'loading', version: 0, source: 'default' })
-    expect(keys(store)).toEqual(['summary', 'prompts', 'countries', 'traffic'])
+    expect(keys(store)).toEqual(DEFAULT_KEYS)
     expect(api.get).toHaveBeenCalledWith('w1')
 
     answer.resolve(SAVED(3, [{ key: 'countries', size: 'full' }, { key: 'nope', size: 'full' }, { key: 'pages', size: 'third' }]))
@@ -119,7 +118,7 @@ describe('loading a board', () => {
     api.get.mockImplementation(() => fail(500, { code: 'error', message: 'x' }))
     await store.load('w1')
     expect(store.layoutOf('w1')).toMatchObject({ status: 'error', source: 'default' })
-    expect(keys(store)).toEqual(['summary', 'prompts', 'countries', 'traffic'])
+    expect(keys(store)).toEqual(DEFAULT_KEYS)
 
     localStorage.setItem('cs-board-v1:7:w2', JSON.stringify({ widgets: [{ key: 'products', size: 'half' }], version: 5 }))
     await store.load('w2')
@@ -136,8 +135,8 @@ describe('loading a board', () => {
     api.get.mockReturnValue(new Promise(() => {}))
     store.load('w1')
     expect(store.add('w1', 'pages')).toBe(false)
-    expect(store.remove('w1', 'summary')).toBe(false)
-    expect(keys(store)).toEqual(['summary', 'prompts', 'countries', 'traffic'])
+    expect(store.remove('w1', 'ranking')).toBe(false)
+    expect(keys(store)).toEqual(DEFAULT_KEYS)
   })
 
   it('keeps a change of ours over a load that answers after it', async () => {
@@ -150,16 +149,16 @@ describe('loading a board', () => {
     answer.resolve(SAVED(2, [{ key: 'summary', size: 'full' }]))
     await Promise.resolve()
     await Promise.resolve()
-    expect(keys(store)).toEqual(['summary', 'prompts', 'countries', 'traffic', 'pages'])
+    expect(keys(store)).toEqual([...DEFAULT_KEYS, 'pages'])
     expect(store.layoutOf('w1').version).toBe(0)
   })
 
   it('tells whether a widget is on the board', async () => {
     api.get.mockReturnValue(ok(DEFAULT_PAYLOAD))
     await store.load('w1')
-    expect(store.has('w1', 'countries')).toBe(true)
+    expect(store.has('w1', 'ranking')).toBe(true)
     expect(store.has('w1', 'pages')).toBe(false)
-    expect(store.has('w9', 'countries')).toBe(false)
+    expect(store.has('w9', 'ranking')).toBe(false)
   })
 })
 
@@ -172,11 +171,11 @@ describe('saving a board', () => {
   it('applies an edit at once and saves it 400ms later, once for a burst', async () => {
     api.save.mockImplementation((wid, body) => ok(SAVED(body.version + 1, body.widgets)))
     expect(store.add('w1', 'ai-crawlers')).toBe(true)
-    expect(keys(store)).toEqual(['summary', 'prompts', 'countries', 'traffic', 'ai-crawlers'])
+    expect(keys(store)).toEqual([...DEFAULT_KEYS, 'ai-crawlers'])
     expect(JSON.parse(localStorage.getItem(CACHE_KEY)).widgets.at(-1)).toEqual({ key: 'ai-crawlers', size: 'third' })
     expect(store.move('w1', 'ai-crawlers', -1)).toBe(true)
     expect(store.resize('w1', 'ai-crawlers', 'half')).toBe(true)
-    expect(store.move('w1', 'summary', -1)).toBe(false)
+    expect(store.move('w1', 'prompt-box', -1)).toBe(false)
 
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS - 1)
     expect(api.save).not.toHaveBeenCalled()
@@ -185,11 +184,9 @@ describe('saving a board', () => {
     expect(api.save).toHaveBeenCalledWith('w1', {
       version: 0,
       widgets: [
-        { key: 'summary', size: 'full' },
-        { key: 'prompts', size: 'full' },
-        { key: 'countries', size: 'half' },
+        { key: 'prompt-box', size: 'full' },
         { key: 'ai-crawlers', size: 'half' },
-        { key: 'traffic', size: 'half' },
+        { key: 'ranking', size: 'full' },
       ],
     })
     await vi.runAllTimersAsync()
@@ -200,27 +197,27 @@ describe('saving a board', () => {
   it('saves one at a time and sends a change made meanwhile after it, with the returned version', async () => {
     const first = deferred()
     api.save.mockReturnValueOnce(first.promise)
-    store.remove('w1', 'traffic')
+    store.remove('w1', 'ranking')
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS)
     expect(store.layoutOf('w1').save).toBe('saving')
 
-    store.remove('w1', 'countries')
+    store.add('w1', 'pages')
     await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 3)
     expect(api.save).toHaveBeenCalledTimes(1)
 
     api.save.mockImplementationOnce((wid, body) => ok(SAVED(body.version + 1, body.widgets)))
-    first.resolve(SAVED(1, [DEFAULT_PAYLOAD.widgets[0], DEFAULT_PAYLOAD.widgets[1], DEFAULT_PAYLOAD.widgets[2]]))
+    first.resolve(SAVED(1, [DEFAULT_PAYLOAD.widgets[0]]))
     await vi.runAllTimersAsync()
     expect(api.save).toHaveBeenCalledTimes(2)
     expect(api.save.mock.calls[1][1]).toEqual({
       version: 1,
       widgets: [
-        { key: 'summary', size: 'full' },
-        { key: 'prompts', size: 'full' },
+        { key: 'prompt-box', size: 'full' },
+        { key: 'pages', size: 'half' },
       ],
     })
     expect(store.layoutOf('w1')).toMatchObject({ version: 2, save: 'idle' })
-    expect(keys(store)).toEqual(['summary', 'prompts'])
+    expect(keys(store)).toEqual(['prompt-box', 'pages'])
   })
 
   it('takes the latest layout on a conflict, drops the pending change and says so', async () => {
@@ -246,10 +243,10 @@ describe('saving a board', () => {
 
   it('keeps the layout on screen when a save fails, and Try again sends it', async () => {
     api.save.mockImplementationOnce(() => fail(500, { code: 'error', message: 'Something went wrong.' }))
-    store.remove('w1', 'summary')
+    store.remove('w1', 'prompt-box')
     await vi.runAllTimersAsync()
     expect(store.layoutOf('w1').save).toBe('failed')
-    expect(keys(store)).toEqual(['prompts', 'countries', 'traffic'])
+    expect(keys(store)).toEqual(['ranking'])
     expect(toast.info).not.toHaveBeenCalled()
 
     api.save.mockImplementationOnce((wid, body) => ok(SAVED(body.version + 1, body.widgets)))
@@ -269,7 +266,7 @@ describe('saving a board', () => {
     const answer = deferred()
     api.reset.mockReturnValueOnce(answer.promise)
     const done = store.reset('w1')
-    expect(keys(store)).toEqual(['summary', 'prompts', 'countries', 'traffic'])
+    expect(keys(store)).toEqual(DEFAULT_KEYS)
     await Promise.resolve()
     expect(api.reset).not.toHaveBeenCalled()
 
@@ -282,7 +279,7 @@ describe('saving a board', () => {
     // The products edit was pending: dropped, never sent.
     expect(api.save).toHaveBeenCalledTimes(1)
     expect(store.layoutOf('w1')).toMatchObject({ version: 2, saved: true, save: 'idle', status: 'ready' })
-    expect(keys(store)).toEqual(['summary', 'prompts', 'countries', 'traffic'])
+    expect(keys(store)).toEqual(DEFAULT_KEYS)
   })
 
   it('keeps the default on screen when the reset fails, and Try again saves it', async () => {
@@ -291,7 +288,7 @@ describe('saving a board', () => {
     api.reset.mockImplementationOnce(() => fail(500, { code: 'error', message: 'x' }))
     await store.reset('w1')
     expect(store.layoutOf('w1').save).toBe('failed')
-    expect(keys(store)).toEqual(['summary', 'prompts', 'countries', 'traffic'])
+    expect(keys(store)).toEqual(DEFAULT_KEYS)
     expect(api.save).not.toHaveBeenCalled()
     api.save.mockImplementationOnce((wid, body) => ok(SAVED(body.version + 1, body.widgets)))
     await store.retrySave('w1')

@@ -128,6 +128,7 @@
                 @click="confirmUpgradeNow"
               >{{ upgrading ? 'Starting…' : `Start ${currentPlanName} now` }}</button>
               <button
+                v-if="isLegacyPro"
                 class="bp-btn bp-btn--ghost"
                 :disabled="upgrading || switchingCycle"
                 @click="confirmSwitchCycle"
@@ -154,8 +155,10 @@
             :disabled="portalLoading"
             @click="openPortal"
           >{{ portalLoading ? 'Opening…' : 'Manage billing' }}</button>
+          <!-- The monthly/annual switch is a legacy Pro option only; the
+               100 and 200 prompt plans are monthly. -->
           <button
-            v-if="hasManagedSub && !isTrialing && subscription?.subscription_status === 'active' && !subscription?.cancel_at_period_end"
+            v-if="isLegacyPro && hasManagedSub && !isTrialing && subscription?.subscription_status === 'active' && !subscription?.cancel_at_period_end"
             class="bp-btn bp-btn--ghost"
             :disabled="switchingCycle"
             @click="confirmSwitchCycle"
@@ -187,87 +190,37 @@
         </div>
       </section>
 
-      <!-- ── Pricing tiers: only while unsubscribed. Subscribed users
-           change plans through the Polar portal (Manage billing). ── -->
-      <template v-if="!currentPlanCode">
-        <div
-          v-if="subscription && subscription.billing_ready === false"
-          class="bp-error"
-          style="margin: 6px 0 2px;"
-        >
-          Upgrades aren't available right now.
-          <a class="bp-link" :href="supportHref">Contact support</a>.
-        </div>
+      <!-- ── The pricing window: the same two cards as /pricing. Without a
+           paid plan a card starts the checkout; with one it moves the
+           subscription to the other plan (ChangePlanDialog). ── -->
+      <p class="set-label">Plans</p>
+      <p v-if="plansState === 'loading'" class="bp-current-note">Loading plans...</p>
 
-        <p v-if="plansState === 'loading'" class="bp-current-note">Loading plans…</p>
+      <p v-else-if="plansState === 'failed'" class="bp-current-note is-warn">
+        We couldn't load the plans.
+        <button type="button" class="bp-link" @click="loadPlans">Try again</button>
+      </p>
 
-        <p v-else-if="plansState === 'failed'" class="bp-current-note is-warn">
-          We couldn't load the plans.
-          <button type="button" class="bp-link" @click="loadPlans">Try again</button>
-        </p>
+      <div v-else-if="hasSelfServe" class="bp-cards">
+        <PricingCards
+          :plans="plans"
+          :current="currentPlanCode"
+          :busy="checkingOut"
+          :billing-ready="subscription?.billing_ready !== false"
+          signed-in
+          @choose="choosePlan"
+        />
+      </div>
 
-        <template v-else-if="selfServePlans.length">
-          <div class="bp-toggle" role="tablist" aria-label="Billing cycle">
-            <button
-              type="button"
-              class="bp-toggle-opt"
-              :class="{ 'is-active': !annual }"
-              @click="annual = false"
-            >Monthly</button>
-            <button
-              type="button"
-              class="bp-toggle-opt"
-              :class="{ 'is-active': annual }"
-              @click="annual = true"
-            >
-              Annual
-              <span v-if="annualSavingPct" class="bp-toggle-save">Save {{ annualSavingPct }}%</span>
-            </button>
-          </div>
+      <p v-else class="bp-current-note">Upgrades aren't available right now.</p>
 
-          <p class="set-label">Plans</p>
-          <section class="bp-tiers">
-            <article v-for="plan in selfServePlans" :key="plan.id" class="bp-tier">
-              <div class="bp-tier-head">
-                <h3 class="bp-tier-name">{{ plan.name }}</h3>
-              </div>
-
-              <div class="bp-tier-price">
-                <span class="bp-tier-amount">{{ priceFor(plan, annual) }}</span>
-                <span class="bp-tier-period">{{ annual ? '/year' : '/month' }}</span>
-              </div>
-              <p class="bp-tier-note">{{ planNote(plan) }}</p>
-
-              <ul v-if="plan.features?.length" class="bp-tier-features">
-                <li v-for="f in plan.features" :key="f">
-                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 8.5l3.2 3 6.3-6.5"/>
-                  </svg>
-                  <span>{{ f }}</span>
-                </li>
-              </ul>
-
-              <button
-                type="button"
-                class="bp-btn bp-btn--primary"
-                :disabled="checkingOut === plan.id || subscription?.billing_ready === false"
-                @click="startCheckout(plan)"
-              >
-                <span v-if="checkingOut === plan.id" class="bp-spinner" aria-hidden="true"></span>
-                <span v-else>{{ planCta(plan) }}</span>
-              </button>
-            </article>
-          </section>
-        </template>
-
-        <p v-else-if="subscription?.billing_ready !== false" class="bp-current-note">
-          Upgrades aren't available right now.
-        </p>
-
-        <p v-if="plansState === 'ready' && customPlan" class="bp-enterprise">
-          Need more? <a :href="salesHref">Talk to us about {{ customPlan.name }}</a>
-        </p>
-      </template>
+      <ChangePlanDialog
+        v-model:open="changeOpen"
+        :plan="changeTarget"
+        :current-price="currentPrice"
+        :tracked-used="trackedUsed"
+        @changed="afterPlanChange"
+      />
     </template>
   </div>
   </SettingsShell>
@@ -276,13 +229,14 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import api from '@/api/client'
 import billingApi from '@/api/billing'
+import ChangePlanDialog from '@/components/billing/ChangePlanDialog.vue'
+import PricingCards from '@/components/billing/PricingCards.vue'
 import SettingsShell from '@/components/settings/SettingsShell.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
-import { SALES_EMAIL, SUPPORT_EMAIL, SUPPORT_SUBJECT } from '@/constants/support'
-import { describeSubscription } from '@/lib/plan'
+import { SUPPORT_EMAIL, SUPPORT_SUBJECT } from '@/constants/support'
+import { describeSubscription, paidPlanId } from '@/lib/plan'
 import { isPolarUrl } from '@/utils/polarRedirect'
 
 const route = useRoute()
@@ -294,8 +248,11 @@ const loading = ref(true)
 // True while a return from Polar checkout is being verified.
 const verifyingCheckout = ref(false)
 const subscription = ref(null)
-const annual = ref(false)
+// The plan whose checkout is opening (PricingCards' `busy`).
 const checkingOut = ref(null)
+// The plan ChangePlanDialog moves to.
+const changeOpen = ref(false)
+const changeTarget = ref(null)
 const portalLoading = ref(false)
 const cancelling = ref(false)
 const upgrading = ref(false)
@@ -320,12 +277,9 @@ const orgSupportHref = computed(() => {
   const acct = authStore.user?.email
   return mailto(SUPPORT_EMAIL, SUPPORT_SUBJECT, acct ? `Account email: ${acct}\n\n` : '')
 })
-const supportHref = computed(() => mailto(SUPPORT_EMAIL, SUPPORT_SUBJECT))
 
-// price_monthly is 0 for Free and -1 for a custom-quoted plan.
-const selfServePlans = computed(() => plans.value.filter(p => p.price_monthly > 0))
-const customPlan = computed(() => plans.value.find(p => p.price_monthly < 0) || null)
-const salesHref = computed(() => mailto(SALES_EMAIL, `${customPlan.value?.name || 'Business'} plan inquiry`))
+// The pricing window shows the self-serve plans (PricingCards).
+const hasSelfServe = computed(() => plans.value.some(p => p?.self_serve === true))
 
 function money(amount) {
   return `$${Number(amount).toLocaleString('en-US')}`
@@ -337,52 +291,35 @@ function priceFor(plan, yearly) {
   return money(yearly ? plan.price_yearly : plan.price_monthly)
 }
 
-// What a year paid up front saves against twelve monthly payments.
-function yearlySaving(plan) {
-  if (!plan || !(plan.price_monthly > 0) || !(plan.price_yearly > 0)) return 0
-  return plan.price_monthly * 12 - plan.price_yearly
-}
+// The paid plan the account is on, or null. A payment hiccup is not a
+// downgrade: a past-due row keeps its paid plan with a "Past due" pill
+// (the top-level `plan` reports free then, so the shared reader falls back
+// to the raw subscription plan).
+const currentPlanCode = computed(() => paidPlanId(subscription.value))
 
-const annualSavingPct = computed(() => {
-  const plan = selfServePlans.value[0]
-  const saving = yearlySaving(plan)
-  return saving > 0 ? Math.round((saving / (plan.price_monthly * 12)) * 100) : 0
+// Legacy Pro ($45) is not listed any more; the overview's plan_details
+// still describes it.
+const currentPlan = computed(() => {
+  const code = currentPlanCode.value
+  if (!code) return null
+  const listed = plans.value.find(p => p.id === code)
+  if (listed) return listed
+  const details = subscription.value?.plan_details
+  return details?.id === code ? details : null
 })
 
-function planNote(plan) {
-  const parts = []
-  if (plan.trial_days) parts.push(`${plan.trial_days}-day free trial`)
-  const saving = yearlySaving(plan)
-  if (annual.value) parts.push(saving > 0 ? `Save ${money(saving)} a year` : 'Billed yearly')
-  else parts.push('Cancel anytime')
-  return parts.join(' · ')
-}
+// The monthly/annual switch stays for legacy Pro subscriptions only.
+const isLegacyPro = computed(() => String(subscription.value?.subscription_plan || '').toLowerCase() === 'pro')
 
-function planCta(plan) {
-  return plan.trial_days ? `Start ${plan.trial_days}-day free trial` : `Choose ${plan.name}`
-}
-
-const currentPlanCode = computed(() => {
-  const s = subscription.value
-  const status = s?.subscription_status
-  if (status === 'active' || status === 'trialing') {
-    const code = s?.plan || s?.plan_code || null
-    return code && code !== 'free' ? code : null
-  }
-  if (status === 'past_due') {
-    // A payment hiccup is not a downgrade: keep showing the paid plan
-    // with a "Past due" pill instead of dumping a paying customer onto
-    // the Free card. The top-level `plan` reports free here, so read
-    // the raw subscription plan (legacy values normalize to pro).
-    const raw = String(s?.subscription_plan || '').toLowerCase()
-    return raw === 'business' || raw === 'enterprise' || raw === 'scale' || raw === 'team'
-      ? 'business'
-      : 'pro'
-  }
-  return null
+// ChangePlanDialog: what the account pays now and how many prompts it tracks.
+const currentPrice = computed(() => {
+  const price = Number(currentPlan.value?.price_monthly)
+  return Number.isFinite(price) && price > 0 ? price : null
 })
-
-const currentPlan = computed(() => plans.value.find(p => p.id === currentPlanCode.value) || null)
+const trackedUsed = computed(() => {
+  const used = subscription.value?.limits?.tracked_prompts?.used
+  return typeof used === 'number' ? used : null
+})
 
 const statusClass = computed(() => {
   const s = subscription.value?.subscription_status
@@ -404,7 +341,7 @@ const hasManagedSub = computed(() => !!subscription.value?.managed)
 const isAnnualSub = computed(() => {
   const sub = subscription.value
   if (sub?.interval) return sub.interval === 'year'
-  if (!sub?.current_period_start || !sub?.current_period_end) return annual.value
+  if (!sub?.current_period_start || !sub?.current_period_end) return false
   const ms = new Date(sub.current_period_end) - new Date(sub.current_period_start)
   return ms > 1000 * 60 * 60 * 24 * 60   // > 60 days  →  annual
 })
@@ -458,18 +395,14 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-async function startCheckout(plan) {
-  checkingOut.value = plan.id
+async function startCheckout(planId) {
+  checkingOut.value = planId
   try {
     // Polar hosted checkout — the backend creates the session and we
     // redirect. Silent: every outcome below is reported once.
-    const res = await api.post(
-      '/billing/checkout/',
-      { plan: plan.id, annual: annual.value },
-      { _silentError: true },
-    )
+    const res = await billingApi.checkout({ plan: planId })
     // CheckoutView's payload is {"success", "data": {"checkout_url"}}.
-    const url = res.data?.data?.checkout_url
+    const url = res.data?.data?.checkout_url || res.data?.checkout_url
     if (url && isPolarUrl(url)) {
       window.location.href = url
       return
@@ -488,6 +421,38 @@ async function startCheckout(plan) {
   } finally {
     checkingOut.value = null
   }
+}
+
+// A card's button: checkout without a paid plan, else a change of plan
+// (legacy Pro included) after the dialog's confirm.
+function choosePlan(planId) {
+  if (!currentPlanCode.value) {
+    startCheckout(planId)
+    return
+  }
+  if (planId === currentPlanCode.value) return
+  const target = plans.value.find(p => p.id === planId && p.self_serve === true)
+  if (!target) return
+  changeTarget.value = target
+  changeOpen.value = true
+}
+
+async function afterPlanChange() {
+  // The dialog refreshed the session; the overview follows.
+  await refresh()
+}
+
+// /billing?plan=<id> (from /pricing or after signing in): a checkout for an
+// account without a paid plan, once; with a paid plan, the change dialog.
+// The query goes either way, so a reload starts nothing.
+function takePlanFromQuery() {
+  const wanted = route.query.plan ? String(route.query.plan) : ''
+  if (!wanted) return
+  const { plan: _plan, ...rest } = route.query
+  router.replace({ query: rest })
+  const known = plans.value.some(p => p.id === wanted && p.self_serve === true)
+  if (!known || overviewError.value || subscription.value?.billing_ready === false) return
+  choosePlan(wanted)
 }
 
 async function openPortal() {
@@ -625,7 +590,7 @@ onMounted(async () => {
     loading.value = false
     return
   }
-  loadPlans()
+  const plansLoaded = loadPlans()
   const checkoutParam = route.query.checkout
   const checkoutId = route.query.checkout_id ? String(route.query.checkout_id) : ''
   if (checkoutParam) {
@@ -668,6 +633,8 @@ onMounted(async () => {
   }
   await refresh()
   loading.value = false
+  await plansLoaded
+  takePlanFromQuery()
 })
 </script>
 
@@ -810,115 +777,15 @@ onMounted(async () => {
 .bp-pill--danger  { background: rgba(239, 68, 68, 0.10); color: #b91c1c; border-color: rgba(239, 68, 68, 0.30); }
 .bp-pill--neutral { background: var(--bp-surface); color: var(--bp-muted); }
 
-/* ── Pill toggle (mirrors paywall) ────────────────────────── */
-.bp-toggle {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px;
-  border-radius: 999px;
-  background: var(--bp-surface);
-  border: 1px solid var(--bp-border);
-  margin: 0 0 20px;
-  gap: 2px;
-}
-.bp-toggle-opt {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 18px;
-  border: none;
-  background: transparent;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--bp-muted);
-  border-radius: 999px;
-  cursor: pointer;
-  transition: color 0.25s var(--bp-spring), background 0.25s var(--bp-spring);
-}
-.bp-toggle-opt.is-active {
-  background: var(--bp-bg);
-  color: var(--bp-fg);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-}
-.bp-toggle-save {
-  font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--bp-accent-soft);
-  color: var(--bp-accent);
-  font-weight: 600;
-}
-
-/* ── Tier cards ───────────────────────────────────────────── */
-.bp-tiers {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px;
+/* ── The pricing window: PricingCards on this page's surface ── */
+.bp-cards {
+  --pc-fg: var(--bp-fg);
+  --pc-muted: var(--bp-muted);
+  --pc-border: var(--bp-border);
+  --pc-card-bg: var(--bp-bg);
+  --pc-btn-bg: var(--bp-fg);
+  --pc-btn-fg: var(--bp-bg);
   margin-bottom: 24px;
-}
-.bp-tier {
-  position: relative;
-  padding: 26px;
-  background: var(--bp-bg);
-  border: 1px solid var(--bp-border);
-  border-radius: 22px;
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.25s var(--bp-spring), box-shadow 0.25s var(--bp-spring), border-color 0.25s var(--bp-spring);
-}
-.bp-tier:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
-}
-.bp-tier-head { margin-bottom: 18px; }
-.bp-tier-name {
-  margin: 0 0 4px;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-}
-.bp-tier-price {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-bottom: 4px;
-}
-.bp-tier-amount {
-  font-size: 34px;
-  font-weight: 600;
-  letter-spacing: -0.025em;
-}
-.bp-tier-period {
-  font-size: 13px;
-  color: var(--bp-muted);
-  font-weight: 500;
-}
-.bp-tier-note {
-  margin: 0 0 20px;
-  font-size: 12px;
-  color: var(--bp-muted);
-}
-.bp-tier-features {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  flex-grow: 1;
-}
-.bp-tier-features li {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 13px;
-  line-height: 1.45;
-}
-.bp-tier-features svg {
-  flex-shrink: 0;
-  margin-top: 3px;
-  color: var(--bp-accent);
 }
 
 .bp-btn {
@@ -966,31 +833,6 @@ onMounted(async () => {
 }
 .bp-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 
-.bp-spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  border-right-color: transparent;
-  animation: bp-spin 0.7s linear infinite;
-}
-@keyframes bp-spin { to { transform: rotate(360deg); } }
-
-.bp-enterprise {
-  margin: 0 0 28px;
-  font-size: 14px;
-  color: var(--bp-muted);
-}
-.bp-enterprise a {
-  color: var(--bp-fg);
-  font-weight: 500;
-  text-decoration: none;
-  border-bottom: 1px solid var(--bp-border);
-  transition: border-color 0.2s;
-}
-.bp-enterprise a:hover { border-color: var(--bp-accent); }
-.bp-error { margin: 0 0 16px; color: var(--bp-accent); font-size: 13px; }
-
 .bp-link {
   color: var(--bp-fg);
   font-weight: 500;
@@ -1021,6 +863,5 @@ onMounted(async () => {
     align-items: flex-start;
   }
   .bp-current-actions { width: 100%; justify-content: flex-start; }
-  .bp-tiers { grid-template-columns: 1fr; }
 }
 </style>

@@ -29,7 +29,7 @@ const STAY = new Set([
 ])
 
 // Panel keys that name records of one project; they do not carry over.
-export const PROJECT_QUERY_KEYS = Object.freeze(['prompt', 'check', 'product', 'verdict', 'topic', 'filter', 'url'])
+export const PROJECT_QUERY_KEYS = Object.freeze(['prompt', 'check', 'product', 'verdict', 'topic', 'filter', 'url', 'run'])
 
 function carriedQuery(query) {
   const out = { ...(query || {}) }

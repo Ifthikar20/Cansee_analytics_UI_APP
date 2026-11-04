@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DOMWrapper, flushPromises, mount } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
@@ -19,7 +19,13 @@ const body = () => new DOMWrapper(document.body)
 const button = (label) => body().findAll('button').find((b) => b.text() === label)
 
 async function render(props = {}) {
-  const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: Blank }] })
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', component: Blank },
+      { path: '/billing', name: 'billing', component: Blank },
+    ],
+  })
   await router.push('/')
   const wrapper = mount(AddPromptsDialog, {
     props: { websiteId: 'w1', open: true, ...props },
@@ -162,6 +168,84 @@ describe('AddPromptsDialog', () => {
     await button('Add all 2').trigger('click')
     await flushPromises()
     expect(client.post.mock.calls[0][1].text).toBe('best crm\nhow is my site doing')
+  })
+
+  it('gives focus back to what opened it once it closes', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: Blank }] })
+    await router.push('/')
+    const Host = defineComponent({
+      setup() {
+        const open = ref(false)
+        return () => [
+          h('button', { type: 'button', class: 'host-open', onClick: () => (open.value = true) }, 'Add prompts'),
+          h(AddPromptsDialog, { websiteId: 'w1', engineCount: 2, open: open.value, 'onUpdate:open': (v) => (open.value = v) }),
+        ]
+      },
+    })
+    const wrapper = mount(Host, { global: { plugins: [router] }, attachTo: document.body })
+    mounted.push(wrapper)
+    const opener = wrapper.find('button.host-open')
+
+    opener.element.focus()
+    await opener.trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(body().find('textarea').element)
+    await button('Cancel').trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(opener.element)
+
+    // After an Add too.
+    opener.element.focus()
+    await opener.trigger('click')
+    await flushPromises()
+    await type('best crm for a small team')
+    await button('Add 1 prompt').trigger('click')
+    await flushPromises()
+    expect(body().find('textarea').exists()).toBe(false)
+    expect(document.activeElement).toBe(opener.element)
+  })
+
+  it('says the plan is full when the server refuses past the cap, and adds nothing', async () => {
+    const { wrapper, router } = await render({ engineCount: 2 })
+    const message = 'Your plan tracks up to 5 prompts and 5 are tracked. Archive some or choose the 100 or 200 prompt plan.'
+    client.post.mockRejectedValue({
+      response: { status: 403, data: { error: { code: 'tracked_prompt_limit', message, details: { limit: 5, used: 5, adding: 2 } } } },
+      displayMessage: message,
+    })
+    await type('best crm\ncrm for startups')
+    await button('Add 2 prompts').trigger('click')
+    await flushPromises()
+
+    const notice = body().find('.apd-notice')
+    expect(notice.attributes('role')).toBe('alert')
+    expect(notice.find('.apd-notice-title').text()).toBe('Your plan is full.')
+    expect(notice.find('.apd-notice-body').text()).toBe(message)
+    const link = notice.find('a')
+    expect(link.text()).toBe('See plans')
+    expect(link.attributes('href')).toBe('/billing')
+    // Nothing was added: the text stays, the dialog stays open, no toast.
+    expect(body().find('textarea').element.value).toBe('best crm\ncrm for startups')
+    expect(wrapper.emitted('added')).toBeUndefined()
+    expect(wrapper.emitted('update:open')).toBeUndefined()
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(body().find('.apd-error').exists()).toBe(false)
+
+    await link.trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('billing')
+  })
+
+  it('drops the plan notice once the text changes', async () => {
+    await render({ engineCount: 2 })
+    client.post.mockRejectedValue({
+      response: { status: 403, data: { error: { code: 'tracked_prompt_limit', message: 'Your plan tracks up to 5 prompts and 5 are tracked.' } } },
+    })
+    await type('best crm')
+    await button('Add 1 prompt').trigger('click')
+    await flushPromises()
+    expect(body().find('.apd-notice-title').text()).toBe('Your plan is full.')
+    await type('best crm for startups')
+    expect(body().find('.apd-notice').exists()).toBe(false)
   })
 
   it('drops the notice once the text changes', async () => {

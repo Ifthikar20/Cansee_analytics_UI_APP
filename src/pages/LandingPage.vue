@@ -42,6 +42,7 @@
       </nav>
 
       <div class="lp-actions">
+        <router-link to="/pricing" class="lp-pricing">Pricing</router-link>
         <router-link to="/login" class="lp-start">Sign in</router-link>
         <button
           type="button"
@@ -65,6 +66,7 @@
             </router-link>
           </div>
           <div class="lp-sheet-group">
+            <router-link to="/pricing" @click="closeAll">Pricing</router-link>
             <router-link to="/login" @click="closeAll">Sign in</router-link>
           </div>
         </div>
@@ -163,9 +165,9 @@ const menus = [
     key: 'product',
     label: 'Product',
     items: [
-      { label: 'Overview', blurb: 'Your Google rank against five AI engines, prompt by prompt.', to: '/docs#overview' },
-      { label: 'Prompt page', blurb: 'Each engine next to Google, and what to change.', to: '/docs#prompt' },
-      { label: 'Sources', blurb: 'The pages AI pulls up while answering.', to: '/docs#sources' },
+      { label: 'Analytics', blurb: 'One board: your Google rank against five AI engines, prompt by prompt.', to: '/docs#overview' },
+      { label: 'Prompt detail', blurb: 'Each engine next to Google, and what to change.', to: '/docs#prompt' },
+      { label: 'Citations', blurb: 'The pages AI pulls up while answering.', to: '/docs#sources' },
       { label: 'Brand facts', blurb: 'What is true about you, checked against the answers.', to: '/docs#brand-facts' },
     ],
   },
@@ -199,6 +201,7 @@ const steps = [
 ]
 
 const footerLinks = [
+  { label: 'Pricing', to: '/pricing' },
   { label: 'Privacy', to: '/privacy' },
   { label: 'Terms', to: '/terms' },
   { label: 'Cookies', to: '/cookies' },
@@ -435,6 +438,26 @@ function renewCookieConsent() {
 .lp-start:hover {
   background: #1d1d23;
   border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* Pricing, beside Sign in: a plain text link. */
+.lp-pricing {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 4px;
+  color: var(--lp-ink);
+  font-size: 15px;
+  font-weight: 500;
+  transition: color 0.15s ease;
+}
+
+.lp-pricing:hover {
+  color: #ffffff;
+}
+
+.lp-pricing:focus-visible {
+  border-radius: 999px;
 }
 
 .lp-burger {
@@ -860,7 +883,8 @@ function renewCookieConsent() {
 }
 
 @media (max-width: 420px) {
-  .lp-start {
+  .lp-start,
+  .lp-pricing {
     display: none;
   }
 }

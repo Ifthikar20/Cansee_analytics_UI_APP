@@ -117,6 +117,10 @@
           We do not share LLM prompt-run data, content briefs, brand vault data, or website
           analytics with advertisers or data brokers.
         </p>
+        <p id="sms">
+          Mobile numbers and text message consent are used only to send the texts you ask for.
+          They are never shared with third parties or affiliates for marketing.
+        </p>
       </section>
 
       <section id="subprocessors">

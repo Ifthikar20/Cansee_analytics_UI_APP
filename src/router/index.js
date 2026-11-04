@@ -83,6 +83,13 @@ const routes = [
         component: () => import('@/pages/DocsPage.vue'),
         meta: { public: true }
     },
+    /* ── The pricing window (public: the two plans, signed out too) ── */
+    {
+        path: '/pricing',
+        name: 'pricing',
+        component: () => import('@/pages/PricingPage.vue'),
+        meta: { public: true }
+    },
 
     /* ── Public Integrations Showcase ── hidden for now; redirect to landing ── */
     { path: '/integrations',          redirect: '/' },
@@ -172,6 +179,14 @@ const routes = [
         component: () => import('@/pages/PaywallPage.vue'),
         meta: { requiresAuth: true, layout: 'auth' }
     },
+    /* ── The daily text's link: {FRONTEND_URL}/r/{code} opens the project's
+       Prompt ranking. Signed out, it goes through login and back. ── */
+    {
+        path: '/r/:code',
+        name: 'run-link',
+        component: () => import('@/pages/RunLinkPage.vue'),
+        meta: { requiresAuth: true }
+    },
 
     /* ── Agent workspace (the same shell; see agentRoutes.js) ── */
     ...agentRoutes,
@@ -260,7 +275,7 @@ let sessionRestored = false
 // drop the checkout_id and strand the activation.
 const GATE_EXEMPT = new Set([
     'login', 'register', 'forgot-password',
-    'landing', 'terms', 'privacy', 'support',
+    'landing', 'terms', 'privacy', 'support', 'pricing',
     'dashboard', 'paywall', 'billing', 'not-found',
 ])
 

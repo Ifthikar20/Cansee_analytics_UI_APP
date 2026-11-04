@@ -94,6 +94,8 @@ describe('askAgent', () => {
 
   it("labels every board widget by its title, the Agents page and the old Citations tab's key", () => {
     expect(ASK_FROM_LABELS).toMatchObject({
+      'prompt-box': 'Ask AI',
+      ranking: 'Prompt ranking',
       summary: 'Summary',
       prompts: 'Prompts',
       visibility: 'AI visibility over time',
@@ -109,8 +111,8 @@ describe('askAgent', () => {
       agents: 'Agents',
       sources: 'Citations',
     })
-    // 19 widgets, the Agents page and the legacy key; the Overview is gone.
-    expect(Object.keys(ASK_FROM_LABELS)).toHaveLength(21)
+    // 21 widgets, the Agents page and the legacy key; the Overview is gone.
+    expect(Object.keys(ASK_FROM_LABELS)).toHaveLength(23)
     expect(ASK_FROM_LABELS.overview).toBeUndefined()
   })
 
@@ -118,5 +120,9 @@ describe('askAgent', () => {
     const router = await makeRouter()
     await askAgent(router, { websiteId: 'w1', agent: 'aeo_article', from: 'citations', text: 'Hi' })
     expect(router.currentRoute.value.query).toEqual({ agent: 'aeo_article', from: 'citations' })
+    // Ask AI's request notice hands its question over with no agent preset.
+    await askAgent(router, { websiteId: 'w1', from: 'prompt-box', text: 'how is my visibility doing' })
+    expect(router.currentRoute.value.query).toEqual({ from: 'prompt-box' })
+    expect(localStorage.getItem(draftKey)).toBe('how is my visibility doing')
   })
 })

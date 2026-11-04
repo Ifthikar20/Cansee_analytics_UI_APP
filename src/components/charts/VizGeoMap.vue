@@ -1,5 +1,5 @@
 <template>
-  <div ref="mapEl" class="viz-geo" :class="{ 'is-selectable': selectable }">
+  <div ref="mapEl" class="viz-geo" :class="{ 'is-selectable': selectable }" @focusin="onFocusIn" @focusout="onFocusOut">
     <div v-if="status === 'loading'" class="viz-geo-loading" aria-hidden="true"></div>
 
     <template v-else-if="status === 'failed'">
@@ -28,8 +28,6 @@
         @mousemove="onMove(shape, $event)"
         @mouseleave="onLeave"
         @click="onClick(shape)"
-        @focus="onFocus(shape, $event)"
-        @blur="onBlur"
       />
       <circle
         v-for="dot in tinyDots"
@@ -60,8 +58,6 @@
         @mousemove="onMove(dot, $event)"
         @mouseleave="onLeave"
         @click="onClick(dot)"
-        @focus="onFocus(dot, $event)"
-        @blur="onBlur"
       />
       <component :is="hoverMark.tag" v-if="hoverMark" v-bind="hoverMark.attrs" class="viz-geo-hover" aria-hidden="true" />
       <component
@@ -396,6 +392,27 @@ function onBlur() {
   focusedItem = null
   focusVisible.value = false
   tip.value = null
+}
+
+// Focus is followed from the frame (focusin and focusout bubble), never
+// with listeners on the shapes: Chrome makes any SVG shape with a focus
+// listener focusable, which put every country, unmeasured ones included,
+// in the tab order.
+function markOf(target) {
+  const code = target?.getAttribute?.('data-code')
+  if (!code || !markCodes.value.has(code)) return null
+  const geo = shapesByCode.value.get(code) || pointsByCode.value.get(code)
+  const reading = readings.value.get(code)
+  return geo && reading ? { code, cx: geo.cx, cy: geo.cy, reading } : null
+}
+
+function onFocusIn(event) {
+  const item = markOf(event.target)
+  if (item) onFocus(item, event)
+}
+
+function onFocusOut(event) {
+  if (event.target?.getAttribute?.('data-code')) onBlur()
 }
 
 // ── Measured countries the map cannot draw ──

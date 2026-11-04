@@ -22,6 +22,7 @@ vi.mock('@/pages/board/AnalyticsBoardPage.vue', () => stub('AnalyticsBoardPage')
 vi.mock('@/pages/board/AnalyticsEntryPage.vue', () => stub('AnalyticsEntryPage'))
 vi.mock('@/pages/SettingsPage.vue', () => stub('SettingsPage'))
 vi.mock('@/pages/settings/ProjectSettings.vue', () => stub('ProjectSettings'))
+vi.mock('@/pages/settings/AutopilotSettings.vue', () => stub('AutopilotSettings'))
 vi.mock('@/pages/settings/ConnectionsPage.vue', () => stub('ConnectionsPage'))
 vi.mock('@/pages/settings/BrandFactsSettings.vue', () => stub('BrandFactsSettings'))
 vi.mock('@/pages/settings/CommandCenterPage.vue', () => stub('CommandCenterPage'))
@@ -92,6 +93,7 @@ const NAMED = [
 const SETTINGS_PAGES = [
     ['settings', '/settings', 'SettingsPage', 'Settings'],
     ['settings-project', '/settings/project', 'ProjectSettings', 'Project settings'],
+    ['settings-autopilot', '/settings/autopilot', 'AutopilotSettings', 'Autopilot'],
     ['settings-connections', '/settings/connections', 'ConnectionsPage', 'Connections'],
     ['settings-brand-facts', '/settings/brand-facts', 'BrandFactsSettings', 'Brand facts'],
     ['settings-command-center', '/settings/usage-dashboard', 'CommandCenterPage', 'Usage dashboard'],

@@ -15,7 +15,7 @@
     <main class="pw-main">
       <div class="pw-content">
         <div class="pw-stagger">
-          <span class="pw-eyebrow">{{ plan?.trial_days ? `Your ${plan.trial_days}-day free trial` : 'Upgrade' }}</span>
+          <span class="pw-eyebrow">Upgrade</span>
           <h1 class="pw-title">Get serious about how AI sees you.</h1>
 
           <p v-if="onbSummary" class="pw-sub">
@@ -28,64 +28,23 @@
             recommend instead.
           </p>
 
-          <p v-if="plansState === 'loading'" class="pw-plans-note">Loading plans…</p>
+          <p v-if="plansState === 'loading'" class="pw-plans-note">Loading plans...</p>
           <p v-else-if="plansState === 'failed'" class="pw-plans-note">
             We couldn't load the plans.
             <button type="button" class="pw-retry" @click="loadPlans">Try again</button>
           </p>
-          <p v-else-if="!plan" class="pw-plans-note">Upgrades aren't available right now.</p>
+          <p v-else-if="!hasSelfServe" class="pw-plans-note">Upgrades aren't available right now.</p>
 
-          <!-- Two compact plan rows; annual preselected. -->
-          <div v-else class="pw-plans" role="radiogroup" aria-label="Billing cycle">
-            <button
-              type="button"
-              role="radio"
-              class="pw-plan-row"
-              :class="{ 'is-active': annual }"
-              :aria-checked="annual"
-              @click="annual = true"
-            >
-              <span class="pw-plan-radio" aria-hidden="true"></span>
-              <span class="pw-plan-info">
-                <span class="pw-plan-name">
-                  Annual
-                  <span v-if="annualSaving > 0" class="pw-plan-badge">Save {{ money(annualSaving) }}</span>
-                </span>
-                <span class="pw-plan-sub">{{ money(plan.price_yearly) }}/year · billed annually</span>
-              </span>
-              <span class="pw-plan-price">{{ money(annualPerMonth) }}<i>/mo</i></span>
-            </button>
-
-            <button
-              type="button"
-              role="radio"
-              class="pw-plan-row"
-              :class="{ 'is-active': !annual }"
-              :aria-checked="!annual"
-              @click="annual = false"
-            >
-              <span class="pw-plan-radio" aria-hidden="true"></span>
-              <span class="pw-plan-info">
-                <span class="pw-plan-name">Monthly</span>
-                <span class="pw-plan-sub">{{ money(plan.price_monthly) }}/month · billed monthly</span>
-              </span>
-              <span class="pw-plan-price">{{ money(plan.price_monthly) }}<i>/mo</i></span>
-            </button>
+          <!-- The pricing window: the same two cards as /pricing. -->
+          <div v-else class="pw-cards">
+            <PricingCards
+              :plans="plans"
+              :busy="submitting"
+              :billing-ready="billingReady"
+              signed-in
+              @choose="startCheckout"
+            />
           </div>
-
-          <button
-            type="button"
-            class="pw-submit"
-            :disabled="submitting || !plan"
-            @click="startTrial"
-          >
-            <span v-if="submitting" class="pw-spinner" aria-hidden="true"></span>
-            <span v-else>{{ plan?.trial_days ? `Start my ${plan.trial_days}-day free trial` : 'Continue to checkout' }}</span>
-          </button>
-
-          <p class="pw-charge-note">
-            <template v-if="plan?.trial_days">You won't be charged until your trial ends · </template>Cancel anytime
-          </p>
 
           <p v-if="error" class="pw-error" role="alert">{{ error }}</p>
 
@@ -96,19 +55,6 @@
                 <path d="M5 7V5a3 3 0 016 0v2"/>
               </svg>
               Secure checkout by Polar
-            </li>
-            <li v-if="plan?.trial_days">
-              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <circle cx="8" cy="8" r="6"/>
-                <path d="M8 5v3.5l2.2 1.6"/>
-              </svg>
-              $0 due today
-            </li>
-            <li>
-              <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M3 8.5l3.2 3 6.3-6.5"/>
-              </svg>
-              Cancel anytime
             </li>
           </ul>
 
@@ -121,14 +67,10 @@
             >
               <span v-if="dismissing" class="pw-spinner pw-spinner--sm" aria-hidden="true"></span>
               <span>Continue with the free plan for now</span>
-              <svg v-if="!dismissing" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg v-if="!dismissing" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M3 8h10M9 4l4 4-4 4"/>
               </svg>
             </button>
-
-            <p v-if="customPlan" class="pw-enterprise">
-              Need more? <a :href="salesHref">Talk to us about {{ customPlan.name }}</a>
-            </p>
           </div>
         </div>
       </div>
@@ -149,28 +91,34 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import api from '@/api/client'
 import billingApi from '@/api/billing'
+import PricingCards from '@/components/billing/PricingCards.vue'
 import WatercolorBackdrop from '@/components/onboarding/WatercolorBackdrop.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
-import { SALES_EMAIL } from '@/constants/support'
 import { isPolarUrl } from '@/utils/polarRedirect'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const toast = useToast()
 
-// Plans come from GET /billing/plans/. The page offers the self-serve
-// plan; a custom-quoted plan stays a contact-sales line at the bottom.
+// Plans come from GET /billing/plans/. The page offers the self-serve plans
+// in the pricing window; its footnote carries the contact-sales line.
 const plans = ref([])
 const plansState = ref('loading') // loading | ready | failed
-// price_monthly is 0 for Free and -1 for a custom-quoted plan.
-const plan = computed(() => plans.value.find(p => p.price_monthly > 0) || null)
-const customPlan = computed(() => plans.value.find(p => p.price_monthly < 0) || null)
-const salesHref = computed(() =>
-  `mailto:${SALES_EMAIL}?subject=${encodeURIComponent(`${customPlan.value?.name || 'Business'} plan inquiry`)}`,
-)
+const hasSelfServe = computed(() => plans.value.some(p => p?.self_serve === true))
+// False until Polar checkout is set up on the server (GET /billing/
+// billing_ready). Unknown reads as ready: the checkout then says why.
+const billingReady = ref(true)
+
+async function loadBillingState() {
+  try {
+    const res = await billingApi.getCurrent({ _silentError: true })
+    billingReady.value = res.data?.billing_ready !== false
+  } catch {
+    billingReady.value = true
+  }
+}
 
 async function loadPlans() {
   plansState.value = 'loading'
@@ -183,29 +131,12 @@ async function loadPlans() {
   }
 }
 
-const annual = ref(true) // annual preselected — the better deal leads
-const submitting = ref(false)
+// The plan whose checkout is opening (PricingCards' `busy`), or null.
+const submitting = ref(null)
 const dismissing = ref(false)
 const error = ref('')
 
 const email = computed(() => authStore.user?.email || '')
-
-function money(amount) {
-  const n = Number(amount)
-  return `$${n.toLocaleString('en-US', {
-    minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
-    maximumFractionDigits: 2,
-  })}`
-}
-
-const annualPerMonth = computed(() => (plan.value ? plan.value.price_yearly / 12 : 0))
-
-// What a year paid up front saves against twelve monthly payments.
-const annualSaving = computed(() => {
-  const p = plan.value
-  if (!p || !(p.price_yearly > 0)) return 0
-  return p.price_monthly * 12 - p.price_yearly
-})
 
 // Personalization handoff written by the onboarding flow in the same
 // tab (sessionStorage). Used only when fresh and non-empty; left in
@@ -224,19 +155,15 @@ const onbSummary = (() => {
   }
 })()
 
-async function startTrial() {
-  if (!plan.value) return
-  submitting.value = true
+async function startCheckout(planId) {
+  if (!planId || submitting.value) return
+  submitting.value = planId
   error.value = ''
   try {
     // Polar hosted checkout — the backend creates the session and we
     // redirect. Silent: a failure is shown once, inline below.
-    const res = await api.post(
-      '/billing/checkout/',
-      { plan: plan.value.id, annual: annual.value },
-      { _silentError: true },
-    )
-    const url = res.data?.data?.checkout_url
+    const res = await billingApi.checkout({ plan: planId })
+    const url = res.data?.data?.checkout_url || res.data?.checkout_url
     if (url && isPolarUrl(url)) {
       window.location.href = url
       return
@@ -254,7 +181,7 @@ async function startTrial() {
     }
     error.value = e?.displayMessage || "We couldn't start checkout. Please try again."
   } finally {
-    submitting.value = false
+    submitting.value = null
   }
 }
 
@@ -287,6 +214,7 @@ onMounted(() => {
     return
   }
   loadPlans()
+  loadBillingState()
 })
 </script>
 
@@ -370,7 +298,7 @@ onMounted(() => {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Layout: one narrow white card over the video ────────── */
+/* ── Layout: one white card over the video ───────────────── */
 .pw-main {
   position: relative;
   z-index: 1;
@@ -381,7 +309,7 @@ onMounted(() => {
   padding: 8px 24px 16px;
 }
 .pw-content {
-  width: min(520px, 100%);
+  width: min(760px, 100%);
   background: var(--pw-bg);
   border-radius: 24px;
   box-shadow:
@@ -437,91 +365,16 @@ onMounted(() => {
 }
 .pw-sub strong { color: var(--pw-fg); font-weight: 600; }
 
-/* ── Plan rows ───────────────────────────────────────────── */
-.pw-plans {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+/* ── The pricing window: PricingCards on the white card ──── */
+.pw-cards {
+  --pc-fg: var(--pw-fg);
+  --pc-muted: var(--pw-muted);
+  --pc-border: var(--pw-border);
+  --pc-card-bg: var(--pw-bg);
+  --pc-btn-bg: var(--pw-fg);
+  --pc-btn-fg: var(--pw-bg);
+  --pc-ring: var(--pw-accent);
   margin-bottom: 14px;
-}
-.pw-plan-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 13px 16px;
-  border: 1.5px solid var(--pw-border);
-  border-radius: 14px;
-  background: var(--pw-bg);
-  font: inherit;
-  color: var(--pw-fg);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.2s var(--pw-spring), background 0.2s var(--pw-spring), transform 0.2s var(--pw-spring), box-shadow 0.2s ease;
-}
-.pw-plan-row:hover { border-color: rgba(10, 10, 10, 0.28); transform: translateY(-1px); }
-.pw-plan-row.is-active {
-  border-color: var(--pw-fg);
-  background: var(--pw-surface);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-}
-.pw-plan-radio {
-  position: relative;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1.5px solid rgba(10, 10, 10, 0.3);
-  flex-shrink: 0;
-  transition: border-color 0.2s;
-}
-.pw-plan-radio::after {
-  content: '';
-  position: absolute;
-  inset: 2.5px;
-  border-radius: 50%;
-  background: var(--pw-accent);
-  transform: scale(0);
-  transition: transform 0.25s var(--pw-spring-pop);
-}
-.pw-plan-row.is-active .pw-plan-radio { border-color: var(--pw-accent); }
-.pw-plan-row.is-active .pw-plan-radio::after { transform: scale(1); }
-.pw-plan-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-.pw-plan-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13.5px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-}
-.pw-plan-badge {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--pw-accent-soft);
-  color: var(--pw-accent);
-  white-space: nowrap;
-}
-.pw-plan-sub { font-size: 11.5px; color: var(--pw-muted); }
-.pw-plan-price {
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.pw-plan-price i {
-  font-style: normal;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--pw-muted);
 }
 
 .pw-plans-note {
@@ -541,42 +394,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-/* ── CTA + fine print ────────────────────────────────────── */
-.pw-submit {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 46px;
-  padding: 12px 18px;
-  border-radius: 12px;
-  border: 1px solid var(--pw-fg);
-  background: var(--pw-fg);
-  color: var(--pw-bg);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.005em;
-  cursor: pointer;
-  transition: transform 0.25s var(--pw-spring-pop), background 0.25s var(--pw-spring), border-color 0.25s var(--pw-spring), box-shadow 0.25s ease;
-}
-.pw-submit:hover:not(:disabled) {
-  transform: translateY(-2px);
-  background: var(--pw-accent);
-  border-color: var(--pw-accent);
-  box-shadow: 0 12px 28px rgba(255, 106, 44, 0.35);
-}
-.pw-submit:active:not(:disabled) { transform: translateY(0) scale(0.99); box-shadow: 0 4px 14px rgba(255, 106, 44, 0.25); }
-.pw-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-
-.pw-charge-note {
-  margin: 10px 0 0;
-  text-align: center;
-  font-size: 11.5px;
-  color: var(--pw-muted);
-}
-
+/* ── Fine print ──────────────────────────────────────────── */
 .pw-error {
   margin: 10px 0 0;
   text-align: center;
@@ -603,7 +421,7 @@ onMounted(() => {
 }
 .pw-trust svg { color: var(--pw-muted); }
 
-/* ── Free escape + Business ──────────────────────────────── */
+/* ── Free escape ───────────────────────────────────────── */
 .pw-after { text-align: center; margin-top: 18px; }
 .pw-free-link {
   display: inline-flex;
@@ -624,20 +442,6 @@ onMounted(() => {
 .pw-free-link:hover:not(:disabled) { color: var(--pw-fg); text-decoration: underline; }
 .pw-free-link:hover:not(:disabled) svg { transform: translateX(3px); }
 .pw-free-link:disabled { opacity: 0.6; cursor: progress; }
-
-.pw-enterprise {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: var(--pw-muted);
-}
-.pw-enterprise a {
-  color: var(--pw-fg);
-  font-weight: 500;
-  text-decoration: none;
-  border-bottom: 1px solid var(--pw-border);
-  transition: border-color 0.2s;
-}
-.pw-enterprise a:hover { border-color: var(--pw-accent); }
 
 /* ── Footer (legal links over the video) ─────────────────── */
 .pw-footer {
@@ -707,6 +511,5 @@ onMounted(() => {
   .pw-content { padding: 26px 20px 24px; border-radius: 18px; }
   .pw-footer { padding: 12px 16px 14px; }
   .pw-title { font-size: clamp(21px, 6vw, 24px); }
-  .pw-plan-price { font-size: 13px; }
 }
 </style>

@@ -5,7 +5,8 @@
  * Polar converts the subscription at trial end. Every surface that names
  * the plan (Settings allowance, Add project, Billing) reads
  * from here so a trial is always "Free trial", a charged subscription is
- * "Pro plan", and a lapsed or unpaid row never poses as either.
+ * "100 prompts", "200 prompts" (the two monthly plans) or "Pro plan"
+ * (legacy), and a lapsed or unpaid row never poses as either.
  *
  * Accepts either payload shape:
  *   GET /auth/session/  -> { status, plan, tier, is_paying, is_trialing,
@@ -16,14 +17,41 @@
  */
 
 const BUSINESS_ALIASES = ['business', 'enterprise', 'scale', 'team']
+// The two monthly plans of the pricing window. Their names already say
+// what they are, so they are never followed by "plan".
+const PROMPT_PLANS = ['prompts_100', 'prompts_200']
 
 function normalizeTier(value) {
   const v = String(value || '').toLowerCase()
   if (!v || v === 'free' || v === 'none') return null
+  if (PROMPT_PLANS.includes(v)) return v
   return BUSINESS_ALIASES.includes(v) ? 'business' : 'pro'
 }
 
-const TIER_NAMES = { pro: 'Pro', business: 'Business' }
+const TIER_NAMES = { pro: 'Pro', business: 'Business', prompts_100: '100 prompts', prompts_200: '200 prompts' }
+
+// "Pro plan", "Business plan", but "100 prompts".
+function planTitle(tier, tierName) {
+  return PROMPT_PLANS.includes(tier) ? tierName : `${tierName} plan`
+}
+
+/**
+ * The paid plan a subscription payload is on (`prompts_100`, `prompts_200`,
+ * `pro`, `business`), or null for Free. Active and trialing rows give their
+ * access plan; a past-due row keeps its paid plan (a payment hiccup is not a
+ * downgrade). Accepts the session's and the billing overview's shapes.
+ */
+export function paidPlanId(sub) {
+  const s = sub || {}
+  const status = s.status ?? s.subscription_status ?? null
+  if (status === 'active' || status === 'trialing') {
+    const code = String(s.plan || s.plan_code || '').toLowerCase()
+    if (!code || code === 'free' || code === 'none') return null
+    return PROMPT_PLANS.includes(code) ? code : normalizeTier(code)
+  }
+  if (status === 'past_due') return normalizeTier(s.subscription_plan ?? s.tier ?? s.plan) || 'pro'
+  return null
+}
 
 function toDate(value) {
   if (!value) return null
@@ -37,7 +65,7 @@ function formatShortDate(date) {
 
 /**
  * @returns {{
- *   status: string|null, tier: 'pro'|'business'|null, tierName: string|null,
+ *   status: string|null, tier: 'prompts_100'|'prompts_200'|'pro'|'business'|null, tierName: string|null,
  *   isPaying: boolean, isTrialing: boolean, isActive: boolean, isPastDue: boolean,
  *   cancelAtPeriodEnd: boolean, trialEnd: Date|null, periodEnd: Date|null,
  *   daysLeft: number|null,
@@ -65,11 +93,12 @@ export function describeSubscription(sub, now = new Date()) {
   // so none of the personal trial/past-due arithmetic applies. Personal
   // subscriptions (source 'user' or absent) fall through untouched.
   if (s.source === 'organization') {
+    const orgTier = tier || 'business'
     const orgTierName = tierName || 'Business'
-    const orgTitle = `${orgTierName} plan`
+    const orgTitle = planTitle(orgTier, orgTierName)
     return {
       status,
-      tier: tier || 'business',
+      tier: orgTier,
       tierName: orgTierName,
       isPaying: true,
       isTrialing: false,
@@ -105,13 +134,13 @@ export function describeSubscription(sub, now = new Date()) {
     tierLabel = `${tierName || 'Pro'} trial`
     statusLabel = 'Free trial'
   } else if (isActive) {
-    title = `${tierName || 'Pro'} plan`
+    title = planTitle(tier || 'pro', tierName || 'Pro')
     detail = cancelAtPeriodEnd && periodEnd ? `ends ${formatShortDate(periodEnd)}` : null
     badge = { text: tierName || 'Pro', tone: 'gold' }
     tierLabel = title
     statusLabel = 'Active'
   } else if (isPastDue) {
-    title = `${tierName || 'Pro'} plan`
+    title = planTitle(tier || 'pro', tierName || 'Pro')
     detail = 'payment issue'
     badge = { text: tierName || 'Pro', tone: 'warn' }
     tierLabel = title

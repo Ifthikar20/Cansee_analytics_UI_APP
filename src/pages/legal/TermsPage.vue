@@ -34,7 +34,7 @@
           <li><a href="#eligibility">Eligibility & Account Registration</a></li>
           <li><a href="#service">Description of Service</a></li>
           <li><a href="#plans">Plans, Billing & Payments</a></li>
-          <li><a href="#trial">Free Trial</a></li>
+          <li><a href="#trial">Free plan</a></li>
           <li><a href="#acceptable-use">Acceptable Use Policy</a></li>
           <li><a href="#data-ownership">Data Ownership & Licensing</a></li>
           <li><a href="#ai">AI-Generated Content</a></li>
@@ -45,6 +45,7 @@
           <li><a href="#indemnification">Indemnification</a></li>
           <li><a href="#disputes">Dispute Resolution</a></li>
           <li><a href="#changes">Changes to Terms</a></li>
+          <li><a href="#sms">Text messages</a></li>
           <li><a href="#contact">Contact Information</a></li>
         </ol>
       </div>
@@ -99,14 +100,14 @@
       <!-- ── 4. Plans, Billing & Payments ── -->
       <section id="plans">
         <h2>4. Plans, Billing & Payments</h2>
-        <h3>4.1 Individual Plan ($14/month)</h3>
-        <p>The Individual Plan is billed monthly at $14 USD. It includes up to 3 projects, 50,000 pageviews/month, 100 AI credits/month, and 2 platform integrations. All payments are processed through Stripe. By subscribing, you authorize us to charge your payment method on a recurring monthly basis.</p>
+        <h3>4.1 Monthly plans</h3>
+        <p>The 100 prompts plan is $80 a month and the 200 prompts plan is $140 a month, billed in advance by Polar. Each includes the tracked prompts its name says, the AI usage shown on the pricing page and daily checks. By subscribing, you authorize us to charge your payment method on a recurring monthly basis.</p>
 
         <h3>4.2 Enterprise Plan (Custom Pricing)</h3>
         <p>Enterprise plans are custom-quoted based on team size, usage requirements, and feature needs. Enterprise pricing is agreed upon via a separate order form or service agreement. Contact <a href="mailto:sales@cansee.ai">sales@cansee.ai</a> for details.</p>
 
         <h3>4.3 Payment Processing</h3>
-        <p>All payments are processed securely by Stripe, Inc. We never store, access, or handle your credit card numbers directly. Your payment information is subject to Stripe's <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Privacy Policy</a> and <a href="https://stripe.com/legal" target="_blank" rel="noopener">Terms of Service</a>.</p>
+        <p>All payments are processed securely by Polar. We never store, access, or handle your credit card numbers directly. Your payment information is subject to Polar's privacy policy and terms of service.</p>
 
         <h3>4.4 Refund Policy</h3>
         <p>Subscription fees are non-refundable. If you cancel your subscription, you will retain access to paid features until the end of your current billing period. We do not provide prorated refunds for partial months.</p>
@@ -118,11 +119,10 @@
         <p>We reserve the right to change subscription prices with 30 days' advance written notice. Price changes will take effect at the start of your next billing cycle following the notice period.</p>
       </section>
 
-      <!-- ── 5. Free Trial ── -->
+      <!-- ── 5. Free plan (the id stays #trial so old links still land here) ── -->
       <section id="trial">
-        <h2>5. Free Trial</h2>
-        <p>New users receive a 7-day free trial with full access to all Individual Plan features. No credit card is required to start a trial. At the end of the trial period, you will be prompted to subscribe to continue using premium features. If you do not subscribe, your account will automatically transition to the free tier with limited functionality.</p>
-        <p>We reserve the right to modify, limit, or discontinue the free trial offer at any time.</p>
+        <h2>5. Free plan</h2>
+        <p>The Free plan stays free with its limits. The 100 and 200 prompt plans have no free trial.</p>
       </section>
 
       <!-- ── 6. Acceptable Use Policy ── -->
@@ -261,9 +261,20 @@
         <p>We may update these Terms from time to time. When we make material changes, we will notify you by email to the address associated with your account and post the updated Terms on this page with a revised "Last updated" date. Your continued use of the Service after the effective date of the revised Terms constitutes acceptance of the changes.</p>
       </section>
 
-      <!-- ── 16. Contact ── -->
+      <!-- ── 16. Text messages (linked from the consent box as /terms#sms) ── -->
+      <section id="sms">
+        <h2>16. Text messages</h2>
+        <p>The program name is Cansee Autopilot texts.</p>
+        <p>You get one text a day per project you turn on in Autopilot, plus the verification codes and replies you ask for. Texts go only to the mobile number you verified.</p>
+        <p>Msg &amp; data rates may apply. Reply STOP to cancel, HELP for help.</p>
+        <p>Carriers are not liable for delayed or undelivered messages.</p>
+        <p>Consent to receive text messages is not a condition of purchase.</p>
+        <p>Our <router-link to="/privacy">Privacy Policy</router-link> says how we use your mobile number.</p>
+      </section>
+
+      <!-- ── 17. Contact ── -->
       <section id="contact">
-        <h2>16. Contact Information</h2>
+        <h2>17. Contact Information</h2>
         <p>If you have any questions about these Terms, you can reach us at:</p>
         <div class="contact-card mt-3 rounded-xl bg-muted px-6 py-5">
           <p><strong>Alicorr LLC</strong> (operator of Cansee)</p>

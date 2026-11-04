@@ -1,4 +1,5 @@
-// The Analytics board's widget catalog (board_contract.md 3), in catalog
+// The Analytics board's widget catalog (board_contract.md 3, with Ask AI
+// and Prompt ranking first, autopilot_contract.md 6), in catalog
 // order. The keys and default sizes are shared with the backend
 // (apps/boards/layout.py WIDGETS); both sides test them against the
 // contract table. `size` is the default, `sizes` the sizes a user may pick.
@@ -14,6 +15,14 @@ const W = (key, title, description, size, sizes) =>
     Object.freeze({ key, title, description, size, sizes: Object.freeze(sizes) })
 
 export const WIDGETS = Object.freeze([
+    W(
+        'prompt-box',
+        'Ask AI',
+        "Ask a buyer's question several times and see how often each engine names you.",
+        'full',
+        ['half', 'full']
+    ),
+    W('ranking', 'Prompt ranking', 'Your tracked prompts, ranked by how often AI names you.', 'full', ['half', 'full']),
     W('summary', 'Summary', 'Google and the AI engines at a glance.', 'full', ['half', 'full']),
     W('prompts', 'Prompts', 'Where Google ranks you next to what AI says, per question.', 'full', ['half', 'full']),
     W(
@@ -42,13 +51,11 @@ export const WIDGETS = Object.freeze([
 ])
 
 // The board a project starts with, and the one the server sends while
-// nothing is saved: Summary, Prompts, then Countries and Traffic side by side.
+// nothing is saved (autopilot_contract.md 6): Ask AI, then Prompt ranking.
 export const DEFAULT_LAYOUT = Object.freeze(
     [
-        { key: 'summary', size: 'full' },
-        { key: 'prompts', size: 'full' },
-        { key: 'countries', size: 'half' },
-        { key: 'traffic', size: 'half' },
+        { key: 'prompt-box', size: 'full' },
+        { key: 'ranking', size: 'full' },
     ].map((w) => Object.freeze(w))
 )
 

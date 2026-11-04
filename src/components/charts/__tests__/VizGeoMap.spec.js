@@ -123,10 +123,37 @@ describe('VizGeoMap', () => {
 
   it('shows the tooltip on focus and hides it on blur', async () => {
     const wrapper = await render()
-    await mark(wrapper, 'FR').trigger('focus')
+    mark(wrapper, 'FR').element.focus()
+    await nextTick()
     expect(wrapper.find('.viz-tip').text()).toBe('France · Not in top 10')
-    await mark(wrapper, 'FR').trigger('blur')
+    // Moving between marks keeps one tooltip, on the newly focused one.
+    mark(wrapper, 'SG').element.focus()
+    await nextTick()
+    expect(wrapper.findAll('.viz-tip')).toHaveLength(1)
+    expect(wrapper.find('.viz-tip').text()).toBe('Singapore · 40%')
+    mark(wrapper, 'SG').element.blur()
+    await nextTick()
     expect(wrapper.find('.viz-tip').exists()).toBe(false)
+  })
+
+  // Chrome makes an SVG shape with a focus listener focusable, so a listener
+  // on every country put all 176 of them, aria-hidden ones included, in the
+  // tab order. Focus is followed from the map's frame instead.
+  it('puts no focus listener on a shape, so only the marks are focusable', async () => {
+    const focusTypes = new Set(['focus', 'blur', 'focusin', 'focusout'])
+    const real = EventTarget.prototype.addEventListener
+    const svgTargets = []
+    const spy = vi.spyOn(EventTarget.prototype, 'addEventListener').mockImplementation(function (type, ...rest) {
+      if (focusTypes.has(type) && this instanceof SVGElement) svgTargets.push(`${this.tagName}:${type}`)
+      return real.call(this, type, ...rest)
+    })
+    try {
+      const wrapper = await render({ selectable: true })
+      expect(wrapper.findAll('path.viz-geo-country')).toHaveLength(176)
+      expect(svgTargets).toEqual([])
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('shows the tooltip on hover, unmeasured countries included, never for what is not a country', async () => {

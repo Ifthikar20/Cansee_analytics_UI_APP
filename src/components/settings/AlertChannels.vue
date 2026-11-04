@@ -53,7 +53,7 @@
           </div>
         </div>
 
-        <p class="intg-tile-desc">Text Cansee a question from your phone and get an answer from your account data.</p>
+        <p class="intg-tile-desc">Get Autopilot's daily text, and text Cansee a question from your phone.</p>
 
         <!-- available=false → muted note, no Connect -->
         <p v-if="smsState === 'unavailable'" class="sms-unavailable">Text messages aren't available yet.</p>
@@ -75,6 +75,11 @@
             </Button>
           </div>
           <p v-if="smsError" class="sms-error">{{ smsError }}</p>
+          <!-- What sending the code agrees to (autopilot_contract.md 3b). -->
+          <p class="sms-consent-note">
+            By sending the code you agree to receive texts from Cansee at this number: verification codes and the daily Autopilot texts you turn on. Msg &amp; data rates may apply. Reply STOP to cancel, HELP for help.
+            <a href="/terms#sms" target="_blank" rel="noopener">Text message terms</a>
+          </p>
           <button type="button" class="sms-quiet-link" @click="cancelSmsConnect">Cancel</button>
         </div>
 
@@ -106,6 +111,9 @@
         <template v-else-if="smsState === 'verified'">
           <div class="sms-form">
             <p class="sms-form-hint">Texting <strong>{{ smsSub.phone_masked }}</strong></p>
+            <p class="sms-form-hint">
+              Daily texts are set per project in <router-link :to="{ name: 'settings-autopilot' }" class="sms-link">Autopilot</router-link>.
+            </p>
             <label v-for="t in smsToggles" :key="t.key" class="pref-check">
               <input
                 type="checkbox"
@@ -369,6 +377,7 @@ const integrations = reactive([
 // "What gets sent" list: only messages the backend delivers today.
 const sentItems = [
   { title: 'Daily report', desc: 'Every morning: AI visibility for your projects and any open brand-security findings.' },
+  { title: 'Autopilot daily text', desc: 'One text a day per project with what ran and which prompts keep you visible.' },
 ]
 
 // ── Load saved connections from the API ──
@@ -828,6 +837,21 @@ function showToast(msg, kind = 'success') {
   color: var(--destructive);
   line-height: 1.4;
   margin: 6px 0 0;
+}
+
+.sms-consent-note {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+.sms-consent-note a,
+.sms-link {
+  color: var(--foreground);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .sms-quiet-link {

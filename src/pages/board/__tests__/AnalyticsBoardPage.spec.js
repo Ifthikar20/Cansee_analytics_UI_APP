@@ -38,12 +38,12 @@ const { useAuthStore } = await import('@/stores/auth')
 const { useBoardStore } = await import('@/stores/board')
 const { default: AnalyticsBoardPage } = await import('../AnalyticsBoardPage.vue')
 
+// The default board (autopilot_contract.md 6): Ask AI, then Prompt ranking.
 const DEFAULT = [
-  { key: 'summary', size: 'full' },
-  { key: 'prompts', size: 'full' },
-  { key: 'countries', size: 'half' },
-  { key: 'traffic', size: 'half' },
+  { key: 'prompt-box', size: 'full' },
+  { key: 'ranking', size: 'full' },
 ]
+const DEFAULT_KEYS = DEFAULT.map((w) => w.key)
 const payload = (widgets = DEFAULT, version = 0) => ({ data: { saved: version > 0, version, updated_at: null, widgets } })
 
 const mounted = []
@@ -108,15 +108,16 @@ describe('AnalyticsBoardPage', () => {
     const header = wrapper.find('header.ag-page-header')
     expect(header.find('h1#bd-title').text()).toBe('Analytics')
     expect(wrapper.find('section.bd-main').attributes('aria-labelledby')).toBe('bd-title')
-    expect(cells(wrapper)).toEqual(['summary', 'prompts', 'countries', 'traffic'])
-    expect(wrapper.findAll('.bd-skel')).toHaveLength(4)
+    expect(cells(wrapper)).toEqual(['prompt-box', 'ranking'])
+    expect(wrapper.findAll('.bd-skel')).toHaveLength(2)
     expect(loaded).toEqual([])
     expect(addButton(wrapper).attributes('disabled')).toBeDefined()
 
     answer(payload([{ key: 'traffic', size: 'third' }, { key: 'sentiment', size: 'third' }], 2))
     await flushPromises()
     expect(cells(wrapper)).toEqual(['traffic', 'sentiment'])
-    expect(loaded).toEqual(['traffic', 'sentiment'])
+    // Each card's code loads once the layout is known (in whatever order Vue mounts them).
+    expect([...loaded].sort()).toEqual(['sentiment', 'traffic'])
     expect(addButton(wrapper).attributes('disabled')).toBeUndefined()
     expect(addButton(wrapper).attributes('aria-label')).toBe('Add widget')
     expect(addButton(wrapper).text()).toBe('Add widget')
@@ -128,7 +129,7 @@ describe('AnalyticsBoardPage', () => {
     await settle()
     expect(wrapper.find('aside.bd-panel h2').text()).toBe('Products')
     expect(store.has('w1', 'products')).toBe(false)
-    expect(cells(wrapper)).toEqual(['summary', 'prompts', 'countries', 'traffic'])
+    expect(cells(wrapper)).toEqual(DEFAULT_KEYS)
     await new Promise((r) => setTimeout(r, 500))
     expect(api.save).not.toHaveBeenCalled()
   })
@@ -171,13 +172,13 @@ describe('AnalyticsBoardPage', () => {
     const dialog = document.body.querySelector('[role="alertdialog"]')
     expect(dialog.textContent).toContain('Reset this board?')
     expect(dialog.textContent).toContain(
-      'Your board goes back to Summary, Prompts, Countries and Traffic. Widgets you added are removed; their data is not touched.',
+      'Your board goes back to Ask AI and Prompt ranking. Widgets you added are removed; their data is not touched.',
     )
     expect(api.reset).not.toHaveBeenCalled()
     ;[...dialog.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Reset board').click()
     await settle()
     expect(api.reset).toHaveBeenCalledWith('w1')
-    expect(cells(wrapper)).toEqual(['summary', 'prompts', 'countries', 'traffic'])
+    expect(cells(wrapper)).toEqual(DEFAULT_KEYS)
     expect(store.layoutOf('w1').version).toBe(4)
     // The dialog gives focus back to the menu button it came from.
     expect(document.activeElement).toBe(wrapper.find('button[aria-label="Board options"]').element)
@@ -244,7 +245,7 @@ describe('AnalyticsBoardPage', () => {
   it('says when the saved board could not be loaded, and Try again asks again', async () => {
     api.get.mockImplementationOnce(() => Promise.reject(Object.assign(new Error('500'), { response: { status: 500 } })))
     const { wrapper } = await setup()
-    expect(cells(wrapper)).toEqual(['summary', 'prompts', 'countries', 'traffic'])
+    expect(cells(wrapper)).toEqual(DEFAULT_KEYS)
     expect(wrapper.findAll('.bd-skel')).toHaveLength(0)
     const state = wrapper.find('.bd-save-head')
     expect(state.text()).toContain("We couldn't load your saved board. Showing the default.")

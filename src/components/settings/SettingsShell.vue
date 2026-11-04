@@ -78,7 +78,7 @@ import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps({
-  /** Key of the active nav item: account | subscription | notifications | project | connections | brand-facts | usage | command-center | appearance | contact | team | domains */
+  /** Key of the active nav item: account | subscription | notifications | project | autopilot | connections | brand-facts | usage | command-center | appearance | contact | team | domains */
   active: { type: String, required: true },
 })
 
@@ -141,6 +141,11 @@ const NAV_BASE = [
           'M2 12h20',
           'M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z',
         ],
+      },
+      {
+        key: 'autopilot', label: 'Autopilot',
+        to: { path: '/settings/autopilot' },
+        icon: ['M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z', 'M12 6v6l4 2'],
       },
       {
         key: 'connections', label: 'Connections',

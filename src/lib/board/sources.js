@@ -25,6 +25,8 @@ export const SOURCES = Object.freeze({
     crawlerAccess: (wid) => insightsApi.crawlerAccess(wid).then(payload),
     products: (wid) => insightsApi.products(wid).then(payload),
     promptIdeas: (wid) => insightsApi.promptIdeas(wid, { status: 'new' }).then(payload),
+    // Prompt ranking (autopilot_contract.md 3c): the last 7 UTC days.
+    ranking: (wid) => api.get(`/autopilot/websites/${wid}/ranking/`, { _silentError: true }).then(payload),
 })
 
 export const SOURCE_KEYS = Object.freeze(Object.keys(SOURCES))

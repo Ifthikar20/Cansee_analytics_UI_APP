@@ -13,7 +13,7 @@ vi.mock('@/composables/board/useBoardSource', () => sources)
 // whether it knows it renders in the panel. Products has no view.
 vi.mock('@/components/board/widgetComponents', async () => {
   const vue = await import('vue')
-  const { IN_PANEL } = await import('@/lib/board/context')
+  const { IN_PANEL, useBoard } = await import('@/lib/board/context')
   const module = (component) => () => Promise.resolve({ __esModule: true, default: component })
   const Card = vue.defineComponent({
     props: { websiteId: String, size: String },
@@ -23,10 +23,13 @@ vi.mock('@/components/board/widgetComponents', async () => {
     props: { websiteId: String, focus: { type: String, default: '' } },
     setup(props) {
       const inPanel = vue.inject(IN_PANEL, false)
+      const board = useBoard()
       return () =>
         vue.h('div', { class: 'stub-view', style: 'height: 2000px' }, [
           vue.h('span', { class: 'stub-view-props' }, `${props.websiteId}|${props.focus}|${inPanel}`),
           vue.h('button', { type: 'button', class: 'stub-view-button' }, 'Inside'),
+          // A view opening a record of its own (a prompt's detail, say).
+          vue.h('button', { type: 'button', class: 'stub-view-open', onClick: () => board.open('traffic', { period: '7d' }) }, 'Record'),
         ])
     },
   })
@@ -253,6 +256,30 @@ describe('BoardPanel', () => {
     expect(window.history.state.bdPanel).toBe(true)
     expect(panel(wrapper).find('h2').text()).toBe('Countries')
     expect(document.activeElement).toBe(panel(wrapper).find('h2').element)
+  })
+
+  it('gives focus back to the card that switched a docked panel, and keeps the board where it was', async () => {
+    const { wrapper, router } = await setup('/projects/w1/analytics', { width: 1400 })
+    const title = (key) => wrapper.find(`.bd-cell[data-widget="${key}"] button.bd-card-open`)
+    title('summary').element.focus()
+    await title('summary').trigger('click')
+    await settle()
+    // The board stays in reach beside a docked panel: another card switches it.
+    title('traffic').element.focus()
+    await title('traffic').trigger('click')
+    await settle()
+    expect(query(router).widget).toBe('traffic')
+    // A record opened from inside the panel keeps the card that opened it.
+    const record = panel(wrapper).find('.stub-view-open')
+    record.element.focus()
+    await record.trigger('click')
+    await settle()
+    expect(query(router)).toEqual({ widget: 'traffic', period: '7d' })
+
+    await panel(wrapper).find('button[aria-label="Close Traffic"]').trigger('click')
+    await vi.waitFor(() => expect(query(router).widget).toBeUndefined())
+    await settle()
+    expect(document.activeElement).toBe(title('traffic').element)
   })
 
   it('offers Add to board only while the widget is off the board', async () => {

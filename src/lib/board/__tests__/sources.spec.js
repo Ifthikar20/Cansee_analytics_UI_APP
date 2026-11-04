@@ -38,7 +38,7 @@ beforeEach(() => {
 })
 
 describe('SOURCES', () => {
-  it('has exactly the keys of contract 5', () => {
+  it('has exactly the keys of contract 5, and the ranking of autopilot contract 6', () => {
     expect(SOURCE_KEYS).toEqual([
       'overview',
       'visibility',
@@ -53,7 +53,14 @@ describe('SOURCES', () => {
       'crawlerAccess',
       'products',
       'promptIdeas',
+      'ranking',
     ])
+  })
+
+  it('reads Prompt ranking from Autopilot, quietly, and resolves with the payload', async () => {
+    client.get = answer({ from: 'ranking' })
+    await expect(SOURCES.ranking('w1')).resolves.toEqual({ from: 'ranking' })
+    expect(client.get).toHaveBeenCalledWith('/autopilot/websites/w1/ranking/', { _silentError: true })
   })
 
   it('asks each endpoint for the fixed window the cards read, and resolves with the payload', async () => {

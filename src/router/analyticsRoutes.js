@@ -20,6 +20,7 @@ const AnalyticsEntryPage = () => import('@/pages/board/AnalyticsEntryPage.vue')
 
 const SettingsPage = () => import('@/pages/SettingsPage.vue')
 const ProjectSettings = () => import('@/pages/settings/ProjectSettings.vue')
+const AutopilotSettings = () => import('@/pages/settings/AutopilotSettings.vue')
 const ConnectionsPage = () => import('@/pages/settings/ConnectionsPage.vue')
 const BrandFactsSettings = () => import('@/pages/settings/BrandFactsSettings.vue')
 const CommandCenterPage = () => import('@/pages/settings/CommandCenterPage.vue')
@@ -106,6 +107,8 @@ export const settingsRoutes = [
         children: [
             { path: '', name: 'settings', component: SettingsPage, meta: settings('Settings') },
             { path: 'project', name: 'settings-project', component: ProjectSettings, meta: settings('Project settings') },
+            // The active project's daily run, its text and the runs so far.
+            { path: 'autopilot', name: 'settings-autopilot', component: AutopilotSettings, meta: settings('Autopilot') },
             { path: 'connections', name: 'settings-connections', component: ConnectionsPage, meta: settings('Connections') },
             { path: 'brand-facts', name: 'settings-brand-facts', component: BrandFactsSettings, meta: settings('Brand facts') },
             // "Command Center" is the design's working name; people see "Usage dashboard".

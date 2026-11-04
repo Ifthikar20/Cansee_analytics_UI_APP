@@ -59,7 +59,21 @@ describe('Summary', () => {
         const { kpis } = overviewPayload()
         expect(summaryHeadline(kpis)).toBe('AI ranks you higher than Google on 1 prompt. Google ranks you higher on 0.')
         expect(summaryHeadline({ ...kpis, google_checked: 0 })).toBe('Tracking 3 prompts. Check Google to see the gap.')
-        expect(summaryHeadline({ ...kpis, ai_ahead: 0 })).toBe('Google and the AI engines agree on every checked prompt.')
+        expect(summaryHeadline({ ...kpis, ai_ahead: 0, even: 1 })).toBe('Google and the AI engines agree on every checked prompt.')
+    })
+
+    it('never says they agree while a checked prompt is not definite', () => {
+        const { kpis } = overviewPayload()
+        // Both checked prompts missed Google's top 10, and the AI score sits
+        // inside the range that leaves: no class, so no agreement either.
+        const unsure = { ...kpis, ai_ahead: 0, strong_both: 0, not_definite: 2, no_data: 3 }
+        expect(summaryHeadline(unsure)).toBe('Neither Google nor the AI engines rank you clearly higher on any checked prompt.')
+        expect(summaryHeadline({ ...unsure, not_definite: 1, invisible_both: 1, no_data: 2 })).toBe(
+            'Neither Google nor the AI engines rank you clearly higher on any checked prompt.',
+        )
+        expect(summaryHeadline({ ...unsure, not_definite: 0, invisible_both: 1, even: 1, no_data: 1 })).toBe(
+            'Google and the AI engines agree on every checked prompt.',
+        )
     })
 
     it('says the other classes, and nothing before a Google check', () => {

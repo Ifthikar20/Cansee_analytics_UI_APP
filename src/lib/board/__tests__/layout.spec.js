@@ -89,9 +89,23 @@ describe('layout edits', () => {
     expect(sameLayout(null, [])).toBe(false)
   })
 
-  it('copies the default layout', () => {
+  it('copies the default layout: Ask AI, then Prompt ranking', () => {
     const a = defaultLayout()
     a[0].size = 'half'
-    expect(defaultLayout()[0]).toEqual({ key: 'summary', size: 'full' })
+    expect(defaultLayout()).toEqual([
+      { key: 'prompt-box', size: 'full' },
+      { key: 'ranking', size: 'full' },
+    ])
+  })
+
+  it('lets Ask AI and Prompt ranking be half or full width, never a third', () => {
+    const board = [
+      { key: 'prompt-box', size: 'full' },
+      { key: 'ranking', size: 'full' },
+    ]
+    expect(resizeWidget(board, 'ranking', 'half')[1]).toEqual({ key: 'ranking', size: 'half' })
+    // One third is clamped to the nearest size it allows.
+    expect(resizeWidget(board, 'prompt-box', 'third')[0]).toEqual({ key: 'prompt-box', size: 'half' })
+    expect(normalizeLayout([{ key: 'prompt-box', size: 'third' }])).toEqual([{ key: 'prompt-box', size: 'full' }])
   })
 })

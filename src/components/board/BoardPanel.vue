@@ -231,13 +231,10 @@ function onKeydown(event) {
   line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* Focus lands here only from script (tabindex -1), so a screen reader
+     starts at the title. A ring around this full-width heading read as a
+     text field, so it draws none, like the onboarding titles. */
   outline: none;
-}
-
-.bd-panel-title:focus-visible {
-  border-radius: 4px;
-  outline: 2px solid var(--ag-ring);
-  outline-offset: 2px;
 }
 
 .bd-panel-actions {

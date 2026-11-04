@@ -18,9 +18,10 @@ const navGroups = [
     { id: 'engines', label: 'The AI engines' },
   ] },
   { title: 'The app', items: [
-    { id: 'overview', label: 'Overview' },
-    { id: 'prompt', label: 'Prompt page' },
-    { id: 'sources', label: 'Sources' },
+    // Section ids stay as they were, so older /docs#overview links still land.
+    { id: 'overview', label: 'Analytics' },
+    { id: 'prompt', label: 'Prompt detail' },
+    { id: 'sources', label: 'Citations' },
   ] },
   { title: 'Settings', items: [
     { id: 'project', label: 'Project' },
@@ -41,8 +42,8 @@ const faqs = [
   { q: 'Does my site need traffic?', a: 'No. Cansee checks Google rankings and AI answers for your prompts, not your site analytics.' },
   { q: 'Should a prompt include my brand name?', a: 'No. A prompt is a buyer question. Cansee measures whether Google and the AI engines bring you up on their own.' },
   { q: 'How often are prompts checked?', a: 'Whenever you choose Check now on a prompt, and on the daily, weekly or monthly schedule you set for it.' },
-  { q: 'Why does a prompt say Not checked?', a: 'Google has not been checked for it yet, or no engine has answered. Use Check Google on the Overview or Check now on the prompt.' },
-  { q: 'Who counts as a competitor?', a: 'The brands you list in Settings › Project. Who AI recommends on the Overview shows every brand the answers name.' },
+  { q: 'Why does a prompt say Not checked?', a: 'Google has not been checked for it yet, or no engine has answered. Use Check Google in Prompts on Analytics, or Check now on the prompt.' },
+  { q: 'Who counts as a competitor?', a: 'The brands you list in Settings › Project. The Who AI recommends widget on Analytics shows every brand the answers name.' },
   { q: 'Can Cansee change what an AI engine says about me?', a: 'No tool can retrain the public models from the outside. Cansee shows where the answers and Google disagree about you, and which pages to work on.' },
 ]
 
@@ -152,7 +153,7 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
             <span class="dx-sr-t">{{ r.title }}</span>
             <span class="dx-sr-s">{{ r.snip.slice(0, 78) }}</span>
           </button>
-          <p v-if="!results.length" class="dx-sr-empty">No matches. Try “gap”, “engines” or “Sources”.</p>
+          <p v-if="!results.length" class="dx-sr-empty">No matches. Try “gap”, “engines” or “Citations”.</p>
         </div>
       </div>
       <div class="dx-spacer"></div>
@@ -200,8 +201,8 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
             <p class="kicker">From your website to your first comparison.</p>
             <ol class="steps">
               <li><strong>Add your project.</strong> Enter your website. Cansee reads your homepage to draft a description of the business, starter prompts and competitors to compare you with. Check them and change anything that is off.</li>
-              <li><strong>Add prompts.</strong> On the Overview, choose <em>Add prompts</em> and enter the questions your buyers ask, one per line, without your brand name. Pick the country to search from. The AI engines are asked right away.</li>
-              <li><strong>Check Google.</strong> Choose <em>Check Google</em> on the Overview to look up where your site ranks for each prompt.</li>
+              <li><strong>Add prompts.</strong> On Analytics, choose <em>Add prompts</em> in Prompts and enter the questions your buyers ask, one per line, without your brand name. Pick the country to search from. The AI engines are asked right away.</li>
+              <li><strong>Check Google.</strong> Choose <em>Check Google</em> in Prompts to look up where your site ranks for each prompt.</li>
               <li><strong>Open a prompt.</strong> See Google next to each engine, the brands recommended instead of you, the pages the engines cite, and a ranked list of what to change.</li>
             </ol>
           </section>
@@ -218,25 +219,26 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
                 </tbody>
               </table>
             </div>
-            <p>If an engine isn't available, the prompt page says so instead of leaving it out. The Google check also shows whether Google displayed an AI Overview for the prompt, and whether it mentions or cites you.</p>
+            <p>If an engine isn't available, a prompt's detail says so instead of leaving it out. The Google check also shows whether Google displayed an AI Overview for the prompt, and whether it mentions or cites you.</p>
           </section>
 
           <section id="overview">
-            <h2>Overview</h2>
-            <p class="kicker">The home screen.</p>
-            <p>Every prompt in the active project, with Google's view next to the AI engines'.</p>
+            <h2>Analytics</h2>
+            <p class="kicker">One board of widgets for the active project.</p>
+            <p>The board starts with Ask AI and Prompt ranking. <em>Add widget</em> puts more on it, such as Summary, Prompts, Countries, Traffic, Sentiment or Citations; each card's menu moves, resizes or removes it, and your board is saved for you. Open a card's title, or <em>Expand</em> in its menu, to see its detail in a side panel.</p>
             <ul>
-              <li><strong>Key numbers.</strong> AI visibility (the share of recent AI answers that name you), your average Google position, and how many prompts are AI ahead, Google ahead, or invisible in both.</li>
-              <li><strong>The gap, prompt by prompt.</strong> A map of every prompt: further left is better on Google, higher up is better in AI answers.</li>
+              <li><strong>Ask AI.</strong> Type a question your buyers ask. Cansee asks each AI engine several times, after showing what it will cost, and shows how often you are named, at what rank, and the answers. Track it to keep checking it.</li>
+              <li><strong>Prompt ranking.</strong> Your tracked prompts, ranked by how often the AI engines name you, with each prompt's Google result.</li>
+              <li><strong>Summary.</strong> AI visibility (the share of recent AI answers that name you), your average Google position, and how many prompts are AI ahead or Google ahead. Expanded, it adds the gap, prompt by prompt: a map where further left is better on Google and higher up is better in AI answers.</li>
+              <li><strong>Prompts.</strong> The biggest gaps between Google and the AI engines. Expanded, a table with your Google position, each engine's result, the gap and the top fix, biggest gaps first. Filter by gap, then open a prompt.</li>
               <li><strong>Who AI recommends.</strong> The share of the latest answers that name each brand, you included.</li>
-              <li><strong>Every prompt.</strong> A table with your Google position, each engine's result, the gap and the top fix, biggest gaps first. Filter by gap, then open a prompt.</li>
             </ul>
             <p class="need"><span class="need-l">You need</span> a project and at least one prompt. Google positions appear once Google has been checked.</p>
           </section>
 
           <section id="prompt">
-            <h2>Prompt page</h2>
-            <p class="kicker">Open any prompt from the Overview.</p>
+            <h2>Prompt detail</h2>
+            <p class="kicker">Open any prompt from Prompts on Analytics. It opens in the side panel.</p>
             <p>Everything Cansee knows about one prompt, from top to bottom:</p>
             <ul>
               <li><strong>The verdict.</strong> One line on how your AI score compares with your Google score.</li>
@@ -244,13 +246,13 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
               <li><strong>Google next to every engine.</strong> Your Google position and the page-one results you are up against, then each engine's latest answer: whether it named you and at what rank, the brands it listed above you, and the pages it cited. Open an answer to read it in full, with its brand alignment score.</li>
               <li><strong>What AI gets wrong.</strong> Claims in these answers that conflict with your brand facts.</li>
             </ul>
-            <p><em>Check now</em> looks Google up again and asks any engine that hasn't answered yet. <em>Schedule</em> runs the prompt daily, weekly or monthly. <em>Archive</em> stops it running and removes it from the Overview.</p>
+            <p><em>Check now</em> looks Google up again and asks any engine that hasn't answered yet. <em>Schedule</em> runs the prompt daily, weekly or monthly. <em>Archive</em> stops it running and removes it from Prompts.</p>
             <p class="need"><span class="need-l">You need</span> answers from at least one engine. With Search Console connected, the Google column also shows real clicks, impressions and average position for the exact query.</p>
           </section>
 
           <section id="sources">
-            <h2>Sources</h2>
-            <p class="kicker">Sources in the top bar.</p>
+            <h2>Citations</h2>
+            <p class="kicker">The Citations widget on Analytics.</p>
             <p>Every web page the AI engines pulled up while answering your prompts.</p>
             <ul>
               <li><strong>At the top.</strong> How many pages were retrieved, and how many came from your site, from competitors and from third parties.</li>
@@ -263,7 +265,7 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
 
           <section id="settings">
             <h2>Settings</h2>
-            <p class="kicker">Settings in the top bar. Project pages apply to the project picked in the header.</p>
+            <p class="kicker">Settings at the foot of the sidebar. Project pages apply to the project picked at the top of the sidebar.</p>
 
             <div class="service" id="project">
               <div class="svc-head"><h3>Project</h3><span class="svc-where">Settings › Project</span></div>
@@ -272,7 +274,7 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
 
             <div class="service" id="connections">
               <div class="svc-head"><h3>Connections</h3><span class="svc-where">Settings › Connections</span></div>
-              <p><strong>Google Search Console</strong> adds your real Google clicks, impressions and average position to each prompt and to your own pages in Sources. You sign in with Google and pick the property for the project.</p>
+              <p><strong>Google Search Console</strong> adds your real Google clicks, impressions and average position to each prompt and to your own pages in Citations. You sign in with Google and pick the property for the project.</p>
               <p><strong>Where reports go</strong> connects a Slack, Discord or Microsoft Teams channel through a webhook, so Cansee can post the daily report there.</p>
             </div>
 
@@ -405,7 +407,9 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
 .dx-spacer { flex: 1; }
 .dx-link { font-size: 12.5px; color: var(--muted-foreground); padding: 6px 10px; border-radius: 7px; }
 .dx-link:hover { color: var(--foreground); background: var(--muted); }
-.dx-cta { font-size: 12.5px; font-weight: 600; color: var(--primary-foreground); background: var(--primary); padding: 6px 13px; border-radius: 8px; flex-shrink: 0; }
+/* Two classes: `.docs a` outranks one, and painted the label in
+   --foreground on the dark button. */
+.docs .dx-cta { font-size: 12.5px; font-weight: 600; color: var(--primary-foreground); background: var(--primary); padding: 6px 13px; border-radius: 8px; flex-shrink: 0; }
 .dx-cta:hover { opacity: .9; }
 
 .dx-search { position: relative; width: min(400px, 40vw); flex-shrink: 1; }

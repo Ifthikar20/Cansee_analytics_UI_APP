@@ -58,9 +58,18 @@ export const STALE_NOTE = "Couldn't refresh."
 
 /** The overview's headline sentence. */
 export function summaryHeadline(kpis) {
-    const { ai_ahead: ai = 0, google_ahead: google = 0, prompts = 0, google_checked: checked = 0 } = kpis || {}
+    const k = kpis || {}
+    const { ai_ahead: ai = 0, google_ahead: google = 0, prompts = 0, google_checked: checked = 0 } = k
     if (!checked) return `Tracking ${plural(prompts ?? 0, 'prompt', 'prompts')}. Check Google to see the gap.`
-    if (!ai && !google) return 'Google and the AI engines agree on every checked prompt.'
+    if (!ai && !google) {
+        // They agree only when every checked prompt is in a class that says
+        // so. A prompt whose Google side is a range (not definite), or with
+        // no AI answer yet, agrees on nothing.
+        const agreeing = (k.strong_both || 0) + (k.invisible_both || 0) + (k.even || 0)
+        return agreeing >= checked
+            ? 'Google and the AI engines agree on every checked prompt.'
+            : 'Neither Google nor the AI engines rank you clearly higher on any checked prompt.'
+    }
     return `AI ranks you higher than Google on ${plural(ai, 'prompt', 'prompts')}. Google ranks you higher on ${google}.`
 }
 

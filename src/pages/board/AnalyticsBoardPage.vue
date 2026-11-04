@@ -130,17 +130,30 @@ const covered = computed(() => Boolean(panelKey.value) && (!docked.value || wide
 let opener = null
 let restoreOnClose = true
 
+// What has focus on the board itself (a card's title, a row, a map mark),
+// or null: focus inside the panel, or nowhere.
+function boardFocus() {
+  const active = document.activeElement
+  const main = rootEl.value?.querySelector('.bd-main')
+  return active instanceof Element && typeof active.focus === 'function' && main?.contains(active) ? active : null
+}
+
 /**
  * Open `key`'s panel with the panel's own query keys. From the board this
  * adds one history entry (state bdPanel); from an open panel it replaces
- * the entry, keeping that state. The layout never changes.
+ * the entry, keeping that state. The layout never changes. Close gives
+ * focus back to what opened the panel shown last from the board: a docked
+ * panel leaves the board in reach, so another card can switch it.
  */
 function open(key, query = {}) {
   if (!widgetMeta(key)) return Promise.resolve()
   const location = { query: { ...(query || {}), widget: key } }
-  if (panelKey.value) return router.replace(location).catch(() => {})
-  const active = document.activeElement
-  opener = active instanceof HTMLElement && active !== document.body ? active : null
+  const from = boardFocus()
+  if (panelKey.value) {
+    if (from) opener = from
+    return router.replace(location).catch(() => {})
+  }
+  opener = from
   return router.push({ ...location, state: { bdPanel: true } }).catch(() => {})
 }
 
@@ -302,7 +315,7 @@ watch(
     <AgConfirmDialog
       v-model:open="resetOpen"
       title="Reset this board?"
-      description="Your board goes back to Summary, Prompts, Countries and Traffic. Widgets you added are removed; their data is not touched."
+      description="Your board goes back to Ask AI and Prompt ranking. Widgets you added are removed; their data is not touched."
       confirm-label="Reset board"
       destructive
       @confirm="confirmReset"
