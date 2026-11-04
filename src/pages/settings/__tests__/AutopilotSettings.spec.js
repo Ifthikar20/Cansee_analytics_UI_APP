@@ -365,6 +365,23 @@ describe('AutopilotSettings: the daily text', () => {
         expect(wrapper.find('.dt-quote').text()).toBe(body)
         expect(wrapper.find('.dt-last .dt-help').text()).toBe('Sent at 08:00')
     })
+
+    it("previews the latest run's text when texts are off on the server", async () => {
+        const latest = runSummary({ id: 'run-2', text: { status: 'not_requested', due_at: null, sent_at: null } })
+        const body = 'Cansee daily, Notion, first run: 9 prompts, 2 engines. Named in 13/18 answers (72%). Reply STOP to end'
+        autopilot.run.mockResolvedValue({ data: { ...latest, text_body: body, prompts: [] } })
+        const { wrapper } = await render({ payload: settingsPayload({ sms: { available: false }, runs: [latest] }) })
+        expect(autopilot.run).toHaveBeenCalledWith('w1', 'run-2')
+        expect(wrapper.find('.dt-last .dt-label').text()).toBe("The last run's text (not sent)")
+        expect(wrapper.find('.dt-quote').text()).toBe(body)
+    })
+
+    it('reads no text for a run that did not ask for one while texts are set up', async () => {
+        const latest = runSummary({ text: { status: 'not_requested', due_at: null, sent_at: null } })
+        const { wrapper } = await render({ payload: settingsPayload({ runs: [latest] }) })
+        expect(autopilot.run).not.toHaveBeenCalled()
+        expect(wrapper.find('.dt-quote').exists()).toBe(false)
+    })
 })
 
 describe('AutopilotSettings: runs', () => {

@@ -7,7 +7,14 @@
     title="Daily text"
     description="One text after each run with what ran and which prompts keep you visible."
   >
-    <p v-if="state === 'unavailable'" class="dt-muted">Text messages aren't set up on this server yet.</p>
+    <template v-if="state === 'unavailable'">
+      <p class="dt-muted">Text messages aren't set up on this server yet.</p>
+      <!-- The run still writes its text, so the owner sees what would arrive. -->
+      <figure v-if="lastText?.body" class="dt-last">
+        <figcaption class="dt-label">The last run's text (not sent)</figcaption>
+        <blockquote class="dt-quote">{{ lastText.body }}</blockquote>
+      </figure>
+    </template>
 
     <div v-else-if="state === 'no-number'" class="dt-stack">
       <p class="dt-muted">Add and verify your mobile number in Connections to get the daily text.</p>
@@ -437,6 +444,10 @@ async function sendTest() {
   flex-direction: column;
   gap: 6px;
   margin: 0;
+}
+
+.dt-muted + .dt-last {
+  margin-top: 12px;
 }
 
 .dt-quote {

@@ -343,8 +343,10 @@ async function refresh() {
 /* ── The last text ── */
 
 // The latest run whose text was asked for: its body comes from the run detail.
+// Without texting on this server, the latest run's text is shown as a preview.
 async function refreshLastText() {
-  const run = runs.value.find((r) => r?.text?.status && r.text.status !== 'not_requested')
+  const preview = !payload.value?.sms?.available
+  const run = runs.value.find((r) => r?.text?.status && (r.text.status !== 'not_requested' || (preview && ['done', 'partial'].includes(r.status))))
   if (!run) {
     lastText.value = null
     lastTextKey = ''

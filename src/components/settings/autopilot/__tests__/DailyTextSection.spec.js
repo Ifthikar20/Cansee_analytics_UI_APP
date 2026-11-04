@@ -81,6 +81,13 @@ describe('DailyTextSection: states', () => {
         expect(wrapper.find('.sc-foot').exists()).toBe(false)
     })
 
+    it("shows the last run's text as a preview when texts are off on the server", async () => {
+        const body = 'Cansee daily, Notion: named in 13/18 answers (72%). Reply STOP to end'
+        const { wrapper } = await render({ sms: { available: false }, lastText: { text: { status: 'not_requested' }, body } })
+        expect(wrapper.find('.dt-quote').text()).toBe(body)
+        expect(wrapper.find('.dt-last .dt-label').text()).toBe("The last run's text (not sent)")
+    })
+
     it('sends a caller without a verified number to Connections', async () => {
         const { wrapper } = await render({ sms: { numbers: [] } })
         expect(wrapper.find('.dt-muted').text()).toBe('Add and verify your mobile number in Connections to get the daily text.')
