@@ -168,7 +168,7 @@ const routes = [
         meta: { layout: 'auth', public: true }
     },
 
-    /* ── App (signed in; every page renders inside the workspace shell) ──
+    /* ── App (signed in; every page renders in AppShell, under the header) ──
        Analytics (the board, its /dashboard entry and the redirects of the
        old analytics tabs) and Settings, in analyticsRoutes.js. */
     ...analyticsRoutes,
@@ -188,7 +188,7 @@ const routes = [
         meta: { requiresAuth: true }
     },
 
-    /* ── Agent workspace (the same shell; see agentRoutes.js) ── */
+    /* ── Agent workspace (the same AppShell; see agentRoutes.js) ── */
     ...agentRoutes,
 
     /* ── Old addresses (bookmarks, emails, OAuth returns) ──

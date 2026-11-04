@@ -3,19 +3,22 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { setLastChat } from '@/lib/agent/storage'
+import { useAgentUiStore } from '@/stores/agentUi'
 import { useAppStore } from '@/stores/app'
-import { useAuthStore } from '@/stores/auth'
 
-// The switcher, inbox, agent sections and recents belong to other files;
-// these stand-ins say where each one renders.
+// The inbox, agent sections and recents belong to other files; these
+// stand-ins say where each one renders.
 const { stub } = vi.hoisted(() => ({
   stub: (cls) => async () => {
     const vue = await import('vue')
-    return { default: vue.defineComponent({ props: ['websiteId', 'website'], setup: () => () => vue.h('div', { class: cls }) }) }
+    return {
+      default: vue.defineComponent({
+        props: ['websiteId'],
+        setup: (props) => () => vue.h('div', { class: cls, 'data-website-id': props.websiteId ?? '' }),
+      }),
+    }
   },
 }))
-vi.mock('../WorkspaceSwitcher.vue', stub('stub-switcher'))
 vi.mock('../ActivityButton.vue', stub('stub-activity'))
 vi.mock('../SidebarNav.vue', stub('stub-agent-nav'))
 vi.mock('../SidebarRecents.vue', stub('stub-recents'))
@@ -23,45 +26,42 @@ vi.mock('../SidebarRecents.vue', stub('stub-recents'))
 const { default: AgentSidebar } = await import('../AgentSidebar.vue')
 
 const Blank = defineComponent({ render: () => h('div') })
-
-function makeRouter() {
-  return createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/docs', name: 'docs', component: Blank },
-      { path: '/agent', name: 'agent', component: Blank },
-      { path: '/dashboard', name: 'dashboard', component: Blank, meta: { page: true, title: 'Analytics' } },
-      { path: '/settings', name: 'settings', component: Blank, meta: { settings: true, title: 'Settings' } },
-      { path: '/billing', name: 'billing', component: Blank, meta: { settings: true, title: 'Billing' } },
-      { path: '/projects/:websiteId/agent', name: 'agent-home', component: Blank },
-      { path: '/projects/:websiteId/agent/c/:chatId', name: 'agent-chat', component: Blank },
-      { path: '/projects/:websiteId/agent/context', name: 'agent-context', component: Blank },
-      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank, meta: { board: true } },
-    ],
-  })
-}
-
 const mounted = []
 
-async function setup(path) {
+async function setup(path = '/projects/w1/agent/context', props = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
-  useAppStore().setWebsites([{ id: 'w1', name: 'Wrenfield' }])
-  useAuthStore().user = { id: 7 }
-  const router = makeRouter()
+  useAppStore().setWebsites([
+    { id: 'w1', name: 'Wrenfield' },
+    { id: 'w2', name: 'Acme' },
+  ])
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      {
+        path: '/agent/projects',
+        meta: { section: 'agent' },
+        children: [{ path: '', name: 'agent-projects', component: Blank, meta: { title: 'Projects' } }],
+      },
+      {
+        path: '/projects/:websiteId/agent',
+        meta: { section: 'agent' },
+        children: [
+          { path: '', name: 'agent-home', component: Blank },
+          { path: 'context', name: 'agent-context', component: Blank, meta: { title: 'Context' } },
+        ],
+      },
+    ],
+  })
   await router.push(path)
   await router.isReady()
-  const wrapper = mount(AgentSidebar, { global: { plugins: [pinia, router] }, attachTo: document.body })
+  const wrapper = mount(AgentSidebar, { props, global: { plugins: [pinia, router] }, attachTo: document.body })
   mounted.push(wrapper)
   await flushPromises()
-  return { wrapper, router }
+  return { wrapper, router, ui: useAgentUiStore() }
 }
 
-const switchItems = (wrapper) => wrapper.findAll('.ag-ps-item')
-const current = (wrapper) => wrapper.findAll('.ag-ps-item.is-active').map((a) => a.text())
-
 beforeEach(() => {
-  sessionStorage.clear()
   localStorage.clear()
 })
 
@@ -71,44 +71,55 @@ afterEach(() => {
 })
 
 describe('AgentSidebar', () => {
-  it('shows the same sidebar on the Agent and Analytics tabs', async () => {
-    const { wrapper, router } = await setup('/projects/w1/agent/context')
-    expect(current(wrapper)).toEqual(['Agent'])
-    const parts = () => ['.stub-switcher', '.stub-activity', '.stub-agent-nav', '.stub-recents', '.ag-sb-footer'].map((s) => wrapper.find(s).exists())
-    expect(parts()).toEqual([true, true, true, true, true])
+  it('holds the sections, recent chats and a footer with the inbox and the collapse button', async () => {
+    const { wrapper } = await setup()
+    const nav = wrapper.find('nav.ag-sb[aria-label="Workspace"]')
+    expect(nav.classes()).toContain('is-docked')
+    const parts = nav.element.children
+    expect([...parts].map((el) => el.className)).toEqual(['stub-agent-nav', 'stub-recents', 'ag-sb-footer'])
 
-    await router.push('/projects/w1/analytics?widget=countries')
-    await flushPromises()
-    expect(current(wrapper)).toEqual(['Analytics'])
-    expect(parts()).toEqual([true, true, true, true, true])
-    // No list of analytics tabs on either side.
-    expect(wrapper.find('[aria-label="Analytics"][role="group"]').exists()).toBe(false)
+    const footer = wrapper.find('.ag-sb-footer')
+    expect(footer.find('.stub-activity').exists()).toBe(true)
+    const collapse = footer.find('button[aria-label="Collapse sidebar"]')
+    expect(collapse.exists()).toBe(true)
+    expect(collapse.attributes('aria-keyshortcuts')).toBe('Control+B')
+    // Inbox bottom left, collapse bottom right.
+    const [first, last] = footer.element.children
+    expect(first.classList.contains('stub-activity')).toBe(true)
+    expect(last).toBe(collapse.element)
+
+    // What moved to the header is gone.
+    expect(wrapper.find('.ag-ps-item').exists()).toBe(false)
+    expect(wrapper.find('.ag-ws').exists()).toBe(false)
+    expect(wrapper.find('a[aria-label="Settings"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Help"]').exists()).toBe(false)
   })
 
-  it('marks neither tab on Settings and Billing, and the footer Settings as current', async () => {
-    const { wrapper, router } = await setup('/settings')
-    expect(current(wrapper)).toEqual([])
-    const settings = wrapper.find('.ag-sb-footer a[aria-label="Settings"]')
-    expect(settings.attributes('href')).toBe('/settings')
-    expect(settings.attributes('aria-current')).toBe('page')
+  it('scopes its parts to the project in view', async () => {
+    let ctx = await setup('/projects/w2/agent')
+    expect(ctx.wrapper.find('.stub-agent-nav').attributes('data-website-id')).toBe('w2')
+    expect(ctx.wrapper.find('.stub-activity').attributes('data-website-id')).toBe('w2')
 
-    await router.push('/billing')
-    await flushPromises()
-    expect(current(wrapper)).toEqual([])
-
-    await router.push('/dashboard')
-    await flushPromises()
-    expect(current(wrapper)).toEqual(['Analytics'])
+    ctx = await setup('/agent/projects')
+    expect(ctx.wrapper.find('.stub-recents').attributes('data-website-id')).toBe('w1')
   })
 
-  it("links Agent to the project's last chat and Analytics to its board", async () => {
-    const { wrapper, router } = await setup('/projects/w1/analytics?widget=traffic')
-    const [agent, analytics] = switchItems(wrapper)
-    expect(agent.attributes('href')).toBe('/projects/w1/agent')
-    expect(analytics.attributes('href')).toBe('/projects/w1/analytics')
-    setLastChat(7, 'w1', 'c42')
-    await router.push('/projects/w1/analytics')
-    await flushPromises()
-    expect(switchItems(wrapper)[0].attributes('href')).toBe('/projects/w1/agent/c/c42')
+  it('collapses when docked, and closes the drawer as a drawer', async () => {
+    let ctx = await setup()
+    ctx.ui.setDocked(true)
+    await ctx.wrapper.find('button[aria-label="Collapse sidebar"]').trigger('click')
+    expect(ctx.ui.sidebarCollapsed).toBe(true)
+
+    localStorage.clear()
+    ctx = await setup('/projects/w1/agent', { variant: 'drawer' })
+    ctx.ui.setDocked(false)
+    ctx.ui.openDrawer()
+    expect(ctx.wrapper.find('nav.ag-sb').classes()).toContain('is-drawer')
+    const close = ctx.wrapper.find('button[aria-label="Close sidebar"]')
+    expect(close.exists()).toBe(true)
+    await close.trigger('click')
+    expect(ctx.ui.drawerOpen).toBe(false)
+    // The docked preference is not the drawer's.
+    expect(ctx.ui.sidebarCollapsed).toBe(false)
   })
 })

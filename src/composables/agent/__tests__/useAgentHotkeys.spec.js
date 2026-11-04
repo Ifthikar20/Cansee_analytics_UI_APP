@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, reactive } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -16,23 +16,40 @@ const { matchShortcut, useAgentHotkeys } = await import('../useAgentHotkeys')
 
 const Blank = defineComponent({ render: () => h('div') })
 
+// As in the app: AppShell's parents carry the section, children their title.
 function makeRouter() {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
       { path: '/', name: 'root', component: Blank },
-      { path: '/projects/:websiteId/agent', name: 'agent-home', component: Blank },
-      { path: '/projects/:websiteId/agent/c/:chatId', name: 'agent-chat', component: Blank },
-      { path: '/projects/:websiteId/agent/context', name: 'agent-context', component: Blank },
-      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank, meta: { board: true } },
-      { path: '/settings', name: 'settings', component: Blank, meta: { settings: true } },
+      { path: '/agent', name: 'agent', component: Blank, meta: { section: 'agent' } },
+      {
+        path: '/projects/:websiteId/agent',
+        meta: { section: 'agent' },
+        children: [
+          { path: '', name: 'agent-home', component: Blank },
+          { path: 'c/:chatId', name: 'agent-chat', component: Blank },
+          { path: 'context', name: 'agent-context', component: Blank, meta: { title: 'Context' } },
+        ],
+      },
+      {
+        path: '/projects/:websiteId',
+        meta: { section: 'analytics' },
+        children: [{ path: 'analytics', name: 'analytics', component: Blank }],
+      },
+      {
+        path: '/settings',
+        meta: { section: 'settings' },
+        children: [{ path: '', name: 'settings', component: Blank, meta: { title: 'Settings' } }],
+      },
     ],
   })
 }
 
-async function setup(path) {
+async function setup(path, { sites = [] } = {}) {
   const pinia = createPinia()
   setActivePinia(pinia)
+  useAppStore().setWebsites(sites)
   const router = makeRouter()
   await router.push(path)
   await router.isReady()
@@ -106,27 +123,69 @@ describe('useAgentHotkeys', () => {
     expect(ctx.ui.sidebarCollapsed).toBe(false)
   })
 
-  it('opens chat search in place on the board and in Settings, whose sidebar shows Recents too', async () => {
+  it('opens the agent with chat search from the board and Settings', async () => {
     const ctx = await setup('/projects/w1/analytics?widget=countries')
     wrapper = ctx.wrapper
     expect(press(ctrl('k', { code: 'KeyK' })).defaultPrevented).toBe(true)
+    // Not before the agent is open: the board has no sidebar to search in.
+    expect(ctx.ui.filterOpen).toBe(false)
+    await flushPromises()
+    // Where the header's Agent link goes: no last chat yet, so a new chat.
+    expect(ctx.router.currentRoute.value.fullPath).toBe('/projects/w1/agent')
     expect(ctx.ui.filterOpen).toBe(true)
-    await Promise.resolve()
-    expect(ctx.router.currentRoute.value.fullPath).toBe('/projects/w1/analytics?widget=countries')
 
-    ctx.ui.setFilterOpen(false)
-    await ctx.router.push('/settings')
-    press(ctrl('k', { code: 'KeyK' }))
-    expect(ctx.ui.filterOpen).toBe(true)
-    expect(ctx.router.currentRoute.value.name).toBe('settings')
+    wrapper.unmount()
+    const settings = await setup('/settings', { sites: [{ id: 'w2', name: 'Acme' }] })
+    wrapper = settings.wrapper
+    expect(press(ctrl('k', { code: 'KeyK' })).defaultPrevented).toBe(true)
+    await flushPromises()
+    expect(settings.router.currentRoute.value.fullPath).toBe('/projects/w2/agent')
+    expect(settings.ui.filterOpen).toBe(true)
   })
 
-  it('toggles the sidebar and opens the shortcuts on the board too', async () => {
+  it('leaves Ctrl+K alone without a project', async () => {
+    const ctx = await setup('/settings')
+    wrapper = ctx.wrapper
+    expect(press(ctrl('k', { code: 'KeyK' })).defaultPrevented).toBe(false)
+    await flushPromises()
+    expect(ctx.router.currentRoute.value.name).toBe('settings')
+    expect(ctx.ui.filterOpen).toBe(false)
+  })
+
+  it('leaves Ctrl+K to a field outside the agent, so typed text is not lost', async () => {
+    const ctx = await setup('/settings', { sites: [{ id: 'w2', name: 'Acme' }] })
+    wrapper = ctx.wrapper
+    const input = document.createElement('input')
+    const box = document.createElement('textarea')
+    const editor = document.createElement('div')
+    editor.setAttribute('contenteditable', 'true')
+    editor.append(document.createElement('span'))
+    document.body.append(input, box, editor)
+    for (const field of [input, editor.firstChild]) {
+      expect(press(ctrl('k', { code: 'KeyK' }), field).defaultPrevented).toBe(false)
+    }
+    await flushPromises()
+    expect(ctx.router.currentRoute.value.name).toBe('settings')
+
+    // The board's Ask AI box keeps its question too.
+    await ctx.router.push('/projects/w2/analytics')
+    expect(press(ctrl('k', { code: 'KeyK' }), box).defaultPrevented).toBe(false)
+    await flushPromises()
+    expect(ctx.router.currentRoute.value.name).toBe('analytics')
+    expect(ctx.ui.filterOpen).toBe(false)
+
+    // On the agent the search opens from any field, the composer included.
+    await ctx.router.push('/projects/w2/agent')
+    expect(press(ctrl('k', { code: 'KeyK' }), box).defaultPrevented).toBe(true)
+    expect(ctx.ui.filterOpen).toBe(true)
+  })
+
+  it('leaves Ctrl+B to the browser on the board, and still opens the shortcuts', async () => {
     const ctx = await setup('/projects/w1/analytics')
     wrapper = ctx.wrapper
-    press(ctrl('b', { code: 'KeyB' }))
-    expect(ctx.ui.sidebarCollapsed).toBe(true)
-    press(ctrl('/', { code: 'Slash' }))
+    expect(press(ctrl('b', { code: 'KeyB' })).defaultPrevented).toBe(false)
+    expect(ctx.ui.sidebarCollapsed).toBe(false)
+    expect(press(ctrl('/', { code: 'Slash' })).defaultPrevented).toBe(true)
     expect(ctx.ui.shortcutsOpen).toBe(true)
     // The browser pane exists only beside a chat.
     expect(press(ctrl('\\', { code: 'Backslash' })).defaultPrevented).toBe(false)

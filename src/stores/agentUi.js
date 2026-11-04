@@ -23,6 +23,9 @@ export const useAgentUiStore = defineStore('agentUi', () => {
     // Docked means the sidebar sits in the layout (>= 1024px); below that it
     // is a drawer. The shell keeps this in sync with the viewport.
     const docked = ref(true)
+    // False on pages without the workspace sidebar (Analytics, Settings); the
+    // shell keeps it in step with the route.
+    const sidebarAvailable = ref(true)
     const sidebarCollapsed = ref(prefs.sidebarCollapsed === true)
     const drawerOpen = ref(false)
     const recentsCollapsed = ref(prefs.recentsCollapsed === true)
@@ -38,16 +41,23 @@ export const useAgentUiStore = defineStore('agentUi', () => {
     const politeAnnouncement = ref({ id: 0, text: '' })
     const assertiveAnnouncement = ref({ id: 0, text: '' })
 
-    const sidebarVisible = computed(() => (docked.value ? !sidebarCollapsed.value : drawerOpen.value))
+    const sidebarVisible = computed(
+        () => sidebarAvailable.value && (docked.value ? !sidebarCollapsed.value : drawerOpen.value)
+    )
     // A page header shows its own sidebar button when the docked sidebar is
-    // collapsed or the layout is narrow.
-    const showSidebarToggle = computed(() => !docked.value || sidebarCollapsed.value)
+    // collapsed or the layout is narrow, and only where there is a sidebar.
+    const showSidebarToggle = computed(() => sidebarAvailable.value && (!docked.value || sidebarCollapsed.value))
 
     /* ── Sidebar and drawer ── */
 
     function setDocked(value) {
         docked.value = Boolean(value)
         if (docked.value) drawerOpen.value = false
+    }
+
+    function setSidebarAvailable(value) {
+        sidebarAvailable.value = Boolean(value)
+        if (!sidebarAvailable.value) drawerOpen.value = false
     }
 
     function setSidebarCollapsed(value) {
@@ -68,11 +78,13 @@ export const useAgentUiStore = defineStore('agentUi', () => {
     }
 
     function toggleSidebar() {
+        if (!sidebarAvailable.value) return
         if (docked.value) setSidebarCollapsed(!sidebarCollapsed.value)
         else drawerOpen.value = !drawerOpen.value
     }
 
     function openSidebar() {
+        if (!sidebarAvailable.value) return
         if (docked.value) {
             if (sidebarCollapsed.value) setSidebarCollapsed(false)
         } else {
@@ -101,6 +113,7 @@ export const useAgentUiStore = defineStore('agentUi', () => {
 
     /** Ctrl/Cmd+K: reveal the sidebar and focus the chat search field. */
     function openSearch() {
+        if (!sidebarAvailable.value) return
         openSidebar()
         if (recentsCollapsed.value) setRecentsCollapsed(false)
         filterOpen.value = true
@@ -272,8 +285,8 @@ export const useAgentUiStore = defineStore('agentUi', () => {
     }
 
     // Sign-out from anywhere in the app (clearAuth drops the token), not
-    // only from the workspace menu. Synchronous, so nothing of the old user
-    // renders after it.
+    // only from the header's account menu. Synchronous, so nothing of the old
+    // user renders after it.
     watch(
         () => auth.accessToken,
         (token, before) => {
@@ -294,6 +307,7 @@ export const useAgentUiStore = defineStore('agentUi', () => {
 
     return {
         docked,
+        sidebarAvailable,
         sidebarCollapsed,
         drawerOpen,
         recentsCollapsed,
@@ -309,6 +323,7 @@ export const useAgentUiStore = defineStore('agentUi', () => {
         sidebarVisible,
         showSidebarToggle,
         setDocked,
+        setSidebarAvailable,
         setSidebarCollapsed,
         setDrawerOpen,
         openDrawer,

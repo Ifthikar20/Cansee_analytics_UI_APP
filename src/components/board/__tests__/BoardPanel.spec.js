@@ -30,6 +30,8 @@ vi.mock('@/components/board/widgetComponents', async () => {
           vue.h('button', { type: 'button', class: 'stub-view-button' }, 'Inside'),
           // A view opening a record of its own (a prompt's detail, say).
           vue.h('button', { type: 'button', class: 'stub-view-open', onClick: () => board.open('traffic', { period: '7d' }) }, 'Record'),
+          // A view opening another widget (Who AI recommends -> Competitors, say).
+          vue.h('button', { type: 'button', class: 'stub-view-switch', onClick: () => board.open('countries') }, 'Other'),
         ])
     },
   })
@@ -61,12 +63,10 @@ const DEFAULT = [
 const mounted = []
 // Cleared after each test, so its debounced saves never land in the next one's mocks.
 const stores = []
-let observers = []
-const RealResizeObserver = window.ResizeObserver
 const realMatchMedia = window.matchMedia
 let phone = false
 
-async function setup(path, { width = 1400 } = {}) {
+async function setup(path) {
   const pinia = createPinia()
   setActivePinia(pinia)
   useAppStore().setWebsites([{ id: 'w1', name: 'Wrenfield' }])
@@ -75,23 +75,21 @@ async function setup(path, { width = 1400 } = {}) {
   const router = createRouter({
     history: createWebHistory(),
     routes: [
-      { path: '/projects/:websiteId/analytics', name: 'analytics', component: AnalyticsBoardPage, props: true, meta: { board: true } },
+      { path: '/projects/:websiteId/analytics', name: 'analytics', component: AnalyticsBoardPage, props: true, meta: { section: 'analytics' } },
       { path: '/elsewhere', name: 'elsewhere', component: { render: () => null } },
     ],
   })
   await router.push(path)
   await router.isReady()
-  const wrapper = mount(RouterView, { global: { plugins: [pinia, router] }, attachTo: document.body })
+  // The grid's TransitionGroup renders for real (test-utils stubs it by default).
+  const wrapper = mount(RouterView, {
+    global: { plugins: [pinia, router], stubs: { 'transition-group': false } },
+    attachTo: document.body,
+  })
   mounted.push(wrapper)
-  await flushPromises()
-  resize(width)
   await flushPromises()
   stores.push(useBoardStore())
   return { wrapper, router, store: useBoardStore(), ui: useAgentUiStore() }
-}
-
-function resize(width) {
-  for (const o of observers) o.callback([{ contentRect: { width } }])
 }
 
 async function settle() {
@@ -103,24 +101,15 @@ async function settle() {
 
 const panel = (wrapper) => wrapper.find('aside.bd-panel')
 const query = (router) => router.currentRoute.value.query
+const escape = (target) => target.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
 const main = (wrapper) => wrapper.find('section.bd-main').element
 const inert = (el) => el.inert === true || el.hasAttribute('inert')
 
 beforeEach(() => {
   localStorage.clear()
-  observers = []
   phone = false
   Object.values(api).forEach((fn) => fn.mockReset())
   Object.values(sources).forEach((fn) => fn.mockReset())
-  window.ResizeObserver = class {
-    constructor(callback) {
-      this.callback = callback
-      observers.push(this)
-    }
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  }
   window.matchMedia = (q) => ({
     matches: q === '(max-width: 767px)' ? phone : false,
     media: q,
@@ -136,7 +125,6 @@ beforeEach(() => {
 afterEach(() => {
   while (mounted.length) mounted.pop().unmount()
   while (stores.length) stores.pop().clear()
-  window.ResizeObserver = RealResizeObserver
   window.matchMedia = realMatchMedia
   document.body.innerHTML = ''
 })
@@ -159,45 +147,50 @@ describe('BoardPanel', () => {
     expect(document.body.querySelector('[role="dialog"]')).toBeNull()
   })
 
-  it('docks beside a wide board, and Widen lets it cover the board', async () => {
-    const { wrapper } = await setup('/projects/w1/analytics?widget=countries', { width: 1400 })
-    const root = wrapper.find('.bd')
-    expect(root.classes()).toContain('has-docked')
-    expect(panel(wrapper).classes()).toContain('is-docked')
-    expect(wrapper.find('.bd-scrim').exists()).toBe(false)
-    expect(inert(main(wrapper))).toBe(false)
-
+  it('Widen makes the sheet cover the board, is remembered, and shows at every width but phones', async () => {
+    const { wrapper } = await setup('/projects/w1/analytics?widget=countries')
+    expect(panel(wrapper).classes()).not.toContain('is-wide')
     const widen = panel(wrapper).find('button[aria-label="Widen"]')
     expect(widen.attributes('aria-pressed')).toBe('false')
     await widen.trigger('click')
     await flushPromises()
     const narrow = panel(wrapper).find('button[aria-label="Narrow"]')
     expect(narrow.attributes('aria-pressed')).toBe('true')
-    expect(root.classes()).toContain('is-wide')
-    expect(inert(main(wrapper))).toBe(true)
+    expect(panel(wrapper).classes()).toContain('is-wide')
     expect(localStorage.getItem('cs-board-panel-wide')).toBe('1')
-    await narrow.trigger('click')
+
+    // The next panel opens wide.
+    mounted.pop().unmount()
+    const again = await setup('/projects/w1/analytics?widget=traffic')
+    expect(panel(again.wrapper).classes()).toContain('is-wide')
+    await panel(again.wrapper).find('button[aria-label="Narrow"]').trigger('click')
     await flushPromises()
-    expect(root.classes()).not.toContain('is-wide')
+    expect(panel(again.wrapper).classes()).not.toContain('is-wide')
     expect(localStorage.getItem('cs-board-panel-wide')).toBe('0')
   })
 
-  it('lies over a board under 1100px on a scrim, with the board inert, and fills a phone', async () => {
-    const { wrapper, router } = await setup('/projects/w1/analytics?widget=countries', { width: 1099 })
-    expect(wrapper.find('.bd').classes()).not.toContain('has-docked')
-    expect(panel(wrapper).classes()).toContain('is-sheet')
-    expect(panel(wrapper).find('button[aria-label="Widen"]').exists()).toBe(false)
+  it('lies over the board at every width on a scrim, with the board inert, and fills a phone without Widen', async () => {
+    const { wrapper, router } = await setup('/projects/w1/analytics?widget=countries')
+    // The layer comes first in the board root and holds the scrim and the sheet.
+    const layer = wrapper.find('.bd > .bd-layer')
+    expect(wrapper.find('.bd').element.firstElementChild).toBe(layer.element)
+    expect(layer.find('.bd-scrim').exists()).toBe(true)
+    expect(layer.find('aside.bd-panel').exists()).toBe(true)
+    expect(panel(wrapper).classes()).not.toContain('is-full')
     expect(inert(main(wrapper))).toBe(true)
     expect(document.body.querySelector('[role="dialog"]')).toBeNull()
     await wrapper.find('.bd-scrim').trigger('click')
     await settle()
     expect(query(router).widget).toBeUndefined()
+    expect(wrapper.find('.bd-layer').exists()).toBe(false)
     expect(inert(main(wrapper))).toBe(false)
 
     mounted.pop().unmount()
     phone = true
-    const small = await setup('/projects/w1/analytics?widget=countries', { width: 1400 })
-    expect(panel(small.wrapper).classes()).toEqual(expect.arrayContaining(['is-sheet', 'is-full']))
+    const small = await setup('/projects/w1/analytics?widget=countries')
+    expect(panel(small.wrapper).classes()).toContain('is-full')
+    expect(panel(small.wrapper).find('button[aria-label="Widen"]').exists()).toBe(false)
+    expect(inert(main(small.wrapper))).toBe(true)
   })
 
   it('closes on Escape and gives focus back to the card that opened it', async () => {
@@ -220,11 +213,54 @@ describe('BoardPanel', () => {
     expect(sources.revalidate).toHaveBeenCalledWith('w1')
   })
 
-  it('leaves Escape to whoever took it, and to an open menu', async () => {
+  it('closes on Escape from the header above it, and from nowhere', async () => {
+    const { wrapper, router } = await setup('/projects/w1/analytics?widget=countries')
+    // The header's Help button, in the app's root beside the board, once its
+    // menu has closed and given it focus back, which shows its tooltip: a
+    // reka layer, but only a hint.
+    const help = document.createElement('button')
+    wrapper.element.parentElement.prepend(help)
+    const tooltip = document.createElement('div')
+    tooltip.setAttribute('data-dismissable-layer', '')
+    tooltip.innerHTML = 'Help<span role="tooltip">Help</span>'
+    document.body.append(tooltip)
+    escape(help)
+    await vi.waitFor(() => expect(query(router).widget).toBeUndefined())
+    await settle()
+    expect(panel(wrapper).exists()).toBe(false)
+
+    await router.push('/projects/w1/analytics?widget=traffic')
+    await settle()
+    escape(document.body)
+    await vi.waitFor(() => expect(query(router).widget).toBeUndefined())
+  })
+
+  it('leaves Escape to whoever took it, and to a menu, a dialog or a layer over the page', async () => {
     const { wrapper, router } = await setup('/projects/w1/analytics?widget=countries')
     const button = panel(wrapper).find('.stub-view-button').element
     button.addEventListener('keydown', (e) => e.preventDefault())
-    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    escape(button)
+    await settle()
+    expect(query(router).widget).toBe('countries')
+
+    // A reka menu that is still open closes itself; so does a page's modal.
+    const help = document.createElement('button')
+    wrapper.element.parentElement.prepend(help)
+    for (const attrs of [{ 'data-dismissable-layer': '' }, { role: 'dialog', 'aria-modal': 'true' }]) {
+      const layer = document.createElement('div')
+      Object.entries(attrs).forEach(([name, value]) => layer.setAttribute(name, value))
+      document.body.append(layer)
+      escape(help)
+      await settle()
+      expect(query(router).widget).toBe('countries')
+      layer.remove()
+    }
+
+    // A card teleported over the page keeps the key, even one that ignores it.
+    const card = document.createElement('div')
+    card.append(document.createElement('button'))
+    document.body.append(card)
+    escape(card.firstElementChild)
     await settle()
     expect(query(router).widget).toBe('countries')
   })
@@ -248,8 +284,7 @@ describe('BoardPanel', () => {
     await wrapper.find('.bd-cell[data-widget="summary"] button.bd-card-open').trigger('click')
     await settle()
     const length = window.history.length
-    // A view opening another widget (Who AI recommends -> Competitors, say).
-    await wrapper.find('.bd-cell[data-widget="countries"] button.bd-card-open').trigger('click')
+    await panel(wrapper).find('.stub-view-switch').trigger('click')
     await settle()
     expect(query(router).widget).toBe('countries')
     expect(window.history.length).toBe(length)
@@ -258,18 +293,13 @@ describe('BoardPanel', () => {
     expect(document.activeElement).toBe(panel(wrapper).find('h2').element)
   })
 
-  it('gives focus back to the card that switched a docked panel, and keeps the board where it was', async () => {
-    const { wrapper, router } = await setup('/projects/w1/analytics', { width: 1400 })
+  it('a record opened from inside the panel keeps the card that opened it', async () => {
+    const { wrapper, router } = await setup('/projects/w1/analytics')
     const title = (key) => wrapper.find(`.bd-cell[data-widget="${key}"] button.bd-card-open`)
-    title('summary').element.focus()
-    await title('summary').trigger('click')
-    await settle()
-    // The board stays in reach beside a docked panel: another card switches it.
     title('traffic').element.focus()
     await title('traffic').trigger('click')
     await settle()
     expect(query(router).widget).toBe('traffic')
-    // A record opened from inside the panel keeps the card that opened it.
     const record = panel(wrapper).find('.stub-view-open')
     record.element.focus()
     await record.trigger('click')

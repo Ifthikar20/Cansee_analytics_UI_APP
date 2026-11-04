@@ -85,7 +85,11 @@ async function setup(widgets = LAYOUT, { path = '/projects/w1/analytics', pendin
         ])
     },
   })
-  const wrapper = mount(Host, { global: { plugins: [pinia, router] }, attachTo: document.body })
+  // The grid's TransitionGroup renders for real (test-utils stubs it by default).
+  const wrapper = mount(Host, {
+    global: { plugins: [pinia, router], stubs: { 'transition-group': false } },
+    attachTo: document.body,
+  })
   mounted.push(wrapper)
   await flushPromises()
   return { wrapper, store, router, ui: useAgentUiStore() }
@@ -147,6 +151,17 @@ describe('BoardWidget', () => {
       'Where you rank and where your traffic comes from, country by country.',
     )
     expect(countries.find('button.bd-card-menu').attributes('aria-label')).toBe('Options for Countries')
+    // The grip sits between the title and the options.
+    const grip = countries.find('button.bd-card-grip')
+    expect(grip.attributes('aria-label')).toBe('Move Countries')
+    expect(grip.attributes('aria-describedby')).toBe('bd-move-help')
+    const parts = [...countries.find('.bd-card-head').element.children]
+    expect(parts.map((el) => ['bd-card-heading', 'bd-card-grip', 'bd-card-menu'].find((c) => el.classList.contains(c)))).toEqual([
+      'bd-card-heading',
+      'bd-card-grip',
+      'bd-card-menu',
+    ])
+    expect(wrapper.find('p#bd-move-help').attributes('hidden')).toBeDefined()
     expect(countries.find('.stub-card').text()).toBe('w1 half')
     expect(cell(wrapper, 'summary').find('.stub-card').text()).toBe('w1 full')
   })
@@ -195,6 +210,20 @@ describe('BoardWidget', () => {
     await settle()
     expect(order(wrapper)).toEqual(['countries', 'traffic', 'summary'])
     expect(ui.politeAnnouncement.text).toBe('Moved Traffic up. Now 2 of 3.')
+  })
+
+  it("keeps every card mounted when a save's answer replaces the layout", async () => {
+    const { wrapper } = await setup()
+    const loads = cards.loaders.card.mock.calls.length
+    const traffic = cell(wrapper, 'traffic').find('.stub-card').element
+    await openMenu(wrapper, 'summary')
+    menuItem('Move down').click()
+    await settle()
+    // The answer comes back as new {key, size} objects in the same order.
+    await vi.waitFor(() => expect(api.save).toHaveBeenCalledTimes(1))
+    await settle()
+    expect(cards.loaders.card.mock.calls.length).toBe(loads)
+    expect(cell(wrapper, 'traffic').find('.stub-card').element).toBe(traffic)
   })
 
   it('offers only the sizes a widget allows, checks the current one and resizes', async () => {
@@ -279,6 +308,9 @@ describe('BoardWidget', () => {
     expect(wrapper.findAll('.bd-skel')).toHaveLength(3)
     expect(wrapper.find('.stub-card').exists()).toBe(false)
     expect(wrapper.find('button.bd-card-menu').exists()).toBe(false)
+    // Nothing moves while the layout is unknown.
+    expect(wrapper.find('button.bd-card-grip').exists()).toBe(false)
+    expect(wrapper.find('.bd-card-head.is-movable').exists()).toBe(false)
     expect(cards.loaders.card).not.toHaveBeenCalled()
     expect(cell(wrapper, 'summary').find('section').attributes('aria-busy')).toBe('true')
   })

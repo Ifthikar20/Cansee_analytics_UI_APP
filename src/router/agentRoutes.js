@@ -1,10 +1,10 @@
-// Agent workspace routes, rendered inside AgentShell. The new-chat and
+// Agent workspace routes, rendered in AppShell's agent area. The new-chat and
 // chat URLs share one component reference, so moving from
 // /projects/:id/agent to /projects/:id/agent/c/:chatId after the first
 // turn reuses the page instance (streams live in the store either way).
 import { resolveAgentEntry, resolveChatLink } from './agentGuards'
 
-const AgentShell = () => import('@/layouts/AgentShell.vue')
+const AppShell = () => import('@/layouts/AppShell.vue')
 const AgentChatPage = () => import('@/pages/agent/AgentChatPage.vue')
 const AgentProjectsPage = () => import('@/pages/agent/AgentProjectsPage.vue')
 const AgentContextPage = () => import('@/pages/agent/AgentContextPage.vue')
@@ -14,8 +14,8 @@ const AgentArtifactPage = () => import('@/pages/agent/AgentArtifactPage.vue')
 const AgentFindingsPage = () => import('@/pages/agent/AgentFindingsPage.vue')
 const AgentReviewsPage = () => import('@/pages/agent/AgentReviewsPage.vue')
 
-const meta = { requiresAuth: true, workspace: true }
-// Tab titles for pages that do not set their own (AgentShell applies them);
+const meta = { requiresAuth: true, section: 'agent' }
+// Tab titles for pages that do not set their own (AppShell applies them);
 // the chat and artifact pages title themselves.
 const titled = (title) => ({ title })
 
@@ -27,18 +27,18 @@ const withKinds = (kinds) => (route) => ({ ...route.params, kinds })
 
 export const agentRoutes = [
     // Redirect-only entries: their guards always return a location.
-    { path: '/agent', name: 'agent', component: AgentShell, meta, beforeEnter: resolveAgentEntry },
-    { path: '/agent/c/:chatId', name: 'agent-chat-link', component: AgentShell, meta, beforeEnter: resolveChatLink },
+    { path: '/agent', name: 'agent', component: AppShell, meta, beforeEnter: resolveAgentEntry },
+    { path: '/agent/c/:chatId', name: 'agent-chat-link', component: AppShell, meta, beforeEnter: resolveChatLink },
     {
         path: '/agent/projects',
-        component: AgentShell,
+        component: AppShell,
         meta,
         children: [{ path: '', name: 'agent-projects', component: AgentProjectsPage, meta: titled('Projects') }],
     },
     {
         // The :websiteId guard in index.js makes this the active website.
         path: '/projects/:websiteId/agent',
-        component: AgentShell,
+        component: AppShell,
         meta,
         children: [
             { path: '', name: 'agent-home', component: AgentChatPage, props: true },

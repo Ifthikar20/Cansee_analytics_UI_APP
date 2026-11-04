@@ -1,40 +1,48 @@
 <template>
   <TooltipProvider :delay-duration="400" :skip-delay-duration="200">
-    <div class="ag-root" :class="{ 'is-docked': ui.docked, 'is-collapsed': ui.docked && ui.sidebarCollapsed }">
-      <a href="#ag-main" class="ag-skip" @click.prevent="focusMain">Skip to content</a>
+    <div class="ag-root app-frame">
+      <a :href="`#${mainId}`" class="app-skip" @click.prevent="focusMain">Skip to content</a>
+
+      <AppHeader :website-id="websiteId" />
 
       <div
-        v-if="ui.docked"
-        class="ag-shell-rail"
-        :inert="ui.sidebarCollapsed ? true : undefined"
-        :aria-hidden="ui.sidebarCollapsed ? 'true' : undefined"
+        v-if="isAgent"
+        class="ag-shell"
+        :class="{ 'is-docked': ui.docked, 'is-collapsed': ui.docked && ui.sidebarCollapsed }"
       >
-        <AgentSidebar variant="docked" />
-      </div>
-      <AgDrawer
-        v-else
-        :open="ui.drawerOpen"
-        title="Workspace"
-        description="Projects, sections and recent chats."
-        @update:open="ui.setDrawerOpen($event)"
-      >
-        <AgentSidebar variant="drawer" />
-      </AgDrawer>
-
-      <main id="ag-main" ref="mainEl" class="ag-shell-main" :class="{ 'is-page': isPage }" tabindex="-1">
-        <!-- Settings and the Analytics entry: the main app's look, one
-             scrolling column, and a page bar while the sidebar is out of view.
-             Keyed by path like the old app shell, so another page mounts fresh.
-             The Analytics board renders unwrapped below, like the chat. -->
-        <div v-if="isPage" class="ws-page">
-          <WorkspacePageBar v-if="ui.showSidebarToggle" :title="pageBarTitle" />
-          <div class="ws-page-body">
-            <router-view v-slot="{ Component, route: viewRoute }">
-              <component :is="Component" :key="viewRoute.path" />
-            </router-view>
-          </div>
+        <div
+          v-if="ui.docked"
+          class="ag-shell-rail"
+          :inert="ui.sidebarCollapsed ? true : undefined"
+          :aria-hidden="ui.sidebarCollapsed ? 'true' : undefined"
+        >
+          <AgentSidebar variant="docked" />
         </div>
-        <router-view v-else />
+        <AgDrawer
+          v-else
+          :open="ui.drawerOpen"
+          title="Workspace"
+          description="Agent sections, recent chats and activity."
+          @update:open="ui.setDrawerOpen($event)"
+        >
+          <AgentSidebar variant="drawer" />
+        </AgDrawer>
+        <main id="ag-main" ref="mainEl" class="ag-shell-main" tabindex="-1">
+          <router-view />
+        </main>
+      </div>
+
+      <main
+        v-else
+        id="app-main"
+        ref="mainEl"
+        class="app-main"
+        :class="{ 'is-settings': section === 'settings' }"
+        tabindex="-1"
+      >
+        <router-view v-slot="{ Component, route: viewRoute }">
+          <component :is="Component" :key="viewRoute.path" />
+        </router-view>
       </main>
 
       <AgentAnnouncer />
@@ -46,13 +54,13 @@
 </template>
 
 <script setup>
-// The frame of every signed-in page: a fixed, full-viewport grid with the
-// sidebar (docked or a drawer) and the routed page. Agent pages and the
-// Analytics board (route meta.board) render as they are, on the agent
-// surface: that router-view is neither keyed nor wrapped in a transition,
-// so a chat page survives /agent -> /agent/c/:id and its stream keeps
-// running; streams live in the store either way. Settings and the
-// Analytics entry (route meta.settings / meta.page) render in the page area.
+// The frame of every signed-in page: the header (logo, project, Analytics /
+// Agent / Settings, help, theme, account) over the body. Agent routes get
+// the workspace: the sidebar, docked or a drawer, beside the routed page.
+// That router-view is neither keyed nor wrapped in a transition, so a chat page
+// survives /agent -> /agent/c/:id and its stream keeps running. Every other
+// route renders full width in <main id="app-main">, which scrolls; those pages
+// are keyed by path. The document itself never scrolls.
 import '@/assets/agent/tokens.css'
 import '@/assets/agent/base.css'
 import '@/assets/agent/portal.css'
@@ -62,11 +70,11 @@ import { useMediaQuery } from '@vueuse/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import ToastContainer from '@/components/ToastContainer.vue'
 import AddProjectDialog from '@/components/projects/AddProjectDialog.vue'
+import AppHeader from '@/components/shell/AppHeader.vue'
 import AgentSidebar from '@/components/agent/sidebar/AgentSidebar.vue'
 import AgDrawer from '@/components/agent/common/AgDrawer.vue'
 import AgentAnnouncer from '@/components/agent/common/AgentAnnouncer.vue'
 import ShortcutsDialog from '@/components/agent/common/ShortcutsDialog.vue'
-import WorkspacePageBar from '@/components/agent/workspace/WorkspacePageBar.vue'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentUiStore } from '@/stores/agentUi'
 import { useAppStore } from '@/stores/app'
@@ -75,6 +83,7 @@ import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
 import { useAgentHotkeys } from '@/composables/agent/useAgentHotkeys'
 import { useVisualViewportInset } from '@/composables/agent/useVisualViewportInset'
 import { ensureAgentFont } from '@/lib/agent/font'
+import { sectionOf } from '@/lib/shell/nav'
 
 const route = useRoute()
 const app = useAppStore()
@@ -93,6 +102,14 @@ useBodyScrollLock(() => true)
 
 const wide = useMediaQuery('(min-width: 1024px)')
 watch(wide, (value) => ui.setDocked(value), { immediate: true })
+
+const section = computed(() => sectionOf(route))
+const isAgent = computed(() => section.value === 'agent')
+const mainId = computed(() => (isAgent.value ? 'ag-main' : 'app-main'))
+
+// Only the agent routes have the workspace sidebar; elsewhere every sidebar
+// toggle hides and does nothing.
+watch(isAgent, (value) => ui.setSidebarAvailable(value), { immediate: true })
 
 // The project in view: the URL when it names one, else the active project.
 const websiteId = computed(() => {
@@ -136,11 +153,6 @@ watch(
   { immediate: true },
 )
 
-/* ── Settings and the Analytics entry ── */
-
-const isPage = computed(() => Boolean(route.meta?.settings || route.meta?.page))
-const pageBarTitle = computed(() => (route.meta?.settings ? 'Settings' : 'Analytics'))
-
 function scrollToHash(hash) {
   let target = null
   try {
@@ -151,22 +163,33 @@ function scrollToHash(hash) {
   if (target && mainEl.value?.contains(target)) target.scrollIntoView({ block: 'start' })
 }
 
-// The document no longer scrolls (the body is locked), so the router's
-// scrollBehavior does nothing here and the kept <main> would carry one
-// page's scroll into the next: a new page starts at the top, a hash
-// scrolls its target into view, a filter (query) change keeps the place.
+// The document never scrolls (the body is locked) and <main id="app-main"> is
+// kept across pages, so it would carry one page's scroll into the next: a new
+// page starts at the top and takes focus, a hash scrolls its target into view,
+// a filter (query) change keeps the place. Agent routes manage their own
+// scrolling and focus (the chat's composer).
 watch(
   () => [route.path, route.hash],
   ([path, hash], before) => {
-    if (!isPage.value) return
+    if (isAgent.value) return
     const [prevPath, prevHash] = before || []
     if (path === prevPath && hash === prevHash) return
     nextTick(() => {
+      const main = mainEl.value
+      if (!main) return
       if (hash) scrollToHash(hash)
-      else if (path !== prevPath && mainEl.value) mainEl.value.scrollTop = 0
+      else if (path !== prevPath) main.scrollTop = 0
+      if (path !== prevPath) focusNewPage(main)
     })
   },
 )
+
+// A page that put focus inside itself on mount keeps it.
+function focusNewPage(main) {
+  const active = document.activeElement
+  if (active && active !== document.body && main.contains(active)) return
+  main.focus({ preventScroll: true })
+}
 
 function focusMain() {
   mainEl.value?.focus({ preventScroll: true })
@@ -174,7 +197,10 @@ function focusMain() {
 </script>
 
 <style scoped>
-.ag-root {
+.app-frame {
+  --app-header-h: 64px;
+  --app-gutter: 24px;
+  --app-body-h: calc(var(--ag-vv-height, 100dvh) - var(--app-header-h) - 1px);
   position: fixed;
   top: var(--ag-vv-top, 0px);
   right: 0;
@@ -182,19 +208,42 @@ function focusMain() {
   z-index: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   height: var(--ag-vv-height, 100%);
   overflow: hidden;
-  background: var(--ag-pane-bg);
-  color: var(--ag-fg-1);
+  background: var(--background);
   overscroll-behavior: none;
 }
 
-.ag-root.is-docked {
+@media (max-width: 640px) {
+  .app-frame {
+    --app-header-h: 56px;
+    --app-gutter: 16px;
+  }
+}
+
+/* Agent routes: the sidebar (docked or a drawer) beside the chat area. Its
+   own stacking context: the browser pane's overlay (z 30, the bar's own
+   level) and every other agent layer stay under the header and its menu
+   sheet. What must cover the header (the drawer, dialogs, menus) is
+   teleported to <body>. */
+.ag-shell {
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--ag-pane-bg);
+  color: var(--ag-fg-1);
+}
+
+.ag-shell.is-docked {
   grid-template-columns: calc(var(--ag-sidebar-w) + 1px) minmax(0, 1fr);
   transition: grid-template-columns 240ms var(--ag-ease);
 }
 
-.ag-root.is-docked.is-collapsed {
+.ag-shell.is-docked.is-collapsed {
   grid-template-columns: 0px minmax(0, 1fr);
 }
 
@@ -206,7 +255,7 @@ function focusMain() {
   visibility: visible;
 }
 
-.ag-root.is-collapsed .ag-shell-rail {
+.ag-shell.is-collapsed .ag-shell-rail {
   visibility: hidden;
   transition: visibility 0s linear 240ms;
 }
@@ -227,10 +276,24 @@ function focusMain() {
   min-height: 0;
 }
 
-/* Settings and the Analytics entry scroll in <main>, on the main app's surface. */
-.ag-shell-main.is-page {
+/* Analytics, Settings and Billing: one full-width region that scrolls. While
+   a board panel is open the board hides its overflow and swaps the gutter
+   for as much right padding, inline, and puts both back on close
+   (AnalyticsBoardPage, lockScroll). */
+.app-main {
+  min-width: 0;
+  min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  background: var(--ag-pane-bg);
+  color: var(--ag-fg-1);
+  outline: none;
+}
+
+/* Settings and Billing: the main app's look, as the page area had. */
+.app-main.is-settings {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-family);
@@ -238,28 +301,7 @@ function focusMain() {
   line-height: 1.6;
 }
 
-.ag-shell-main.is-page > .ws-page {
-  display: flex;
-  flex: 1 0 auto;
-  flex-direction: column;
-  min-height: 100%;
-}
-
-.ws-page-body {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px 32px;
-}
-
-@media (max-width: 767px) {
-  .ws-page-body {
-    padding: 16px;
-  }
-}
-
-.ag-skip {
+.app-skip {
   position: absolute;
   top: 8px;
   left: 8px;
@@ -273,7 +315,7 @@ function focusMain() {
   transform: translateY(-200%);
 }
 
-.ag-skip:focus-visible {
+.app-skip:focus-visible {
   border-radius: 8px;
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
@@ -281,28 +323,28 @@ function focusMain() {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ag-root.is-docked {
+  .ag-shell.is-docked {
     transition: none;
   }
 }
 </style>
 
 <!-- Unscoped on purpose: the agent base layer (assets/agent/base.css) gives
-     every link and focus ring inside the shell the agent look; the pages of
-     the page area keep the main app's (assets/css/base.css). :where() keeps
-     these at the specificity of the rules they replace, so a page's own
-     classes still win. -->
+     every link and focus ring inside the frame the agent look; Settings and
+     Billing keep the main app's (assets/css/base.css). :where() keeps these
+     at the specificity of the rules they replace, so a page's own classes
+     still win. -->
 <style>
-:where(.ag-shell-main.is-page) a {
+:where(.app-main.is-settings) a {
   color: var(--text-primary);
   font-weight: 500;
 }
 
-:where(.ag-shell-main.is-page) a:hover {
+:where(.app-main.is-settings) a:hover {
   opacity: 0.7;
 }
 
-:where(.ag-shell-main.is-page) :focus-visible {
+:where(.app-main.is-settings) :focus-visible {
   outline-color: var(--brand-accent, #7232e0);
 }
 </style>

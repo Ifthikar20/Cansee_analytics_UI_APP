@@ -1,13 +1,14 @@
 import { isNavigationFailure, useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { sectionOf } from '@/lib/shell/nav'
 
-// Switching project from the workspace sidebar. Project-scoped list pages
-// keep their section; a chat, an artifact or the projects list land on the
-// new project's agent home, because chats and artifacts belong to one
-// project. The Analytics board stays the board of the new project, with
-// the same panel (`widget`) and filters; the query keys that name records
-// of one project (a prompt, a cited URL...) are dropped. The Analytics
-// entry and Settings stay where they are.
+// Switching project from the header (and the agent's Projects page).
+// Project-scoped list pages keep their section; a chat, an artifact or the
+// projects list land on the new project's agent home, because chats and
+// artifacts belong to one project. The Analytics board stays the board of
+// the new project, with the same panel (`widget`) and filters; the query
+// keys that name records of one project (a prompt, a cited URL...) are
+// dropped. The Analytics entry, Settings and Billing stay where they are.
 //
 // Navigation comes first: the router makes the project active once the
 // navigation is confirmed, and the shell's agent.init(newId) resets the old
@@ -15,13 +16,22 @@ import { useAppStore } from '@/stores/app'
 // that blocks the navigation (unsaved context edits) therefore leaves the old
 // project fully in place.
 
-const KEEP_SECTION = new Set(['agent-context', 'agent-agents', 'agent-reports', 'agent-documents', 'agent-sheets'])
+const KEEP_SECTION = new Set([
+  'agent-context',
+  'agent-agents',
+  'agent-findings',
+  'agent-reviews',
+  'agent-reports',
+  'agent-documents',
+  'agent-sheets',
+])
 
 // Routes without a project in the URL that stay as they are.
 const STAY = new Set([
   'dashboard',
   'settings',
   'settings-project',
+  'settings-autopilot',
   'settings-connections',
   'settings-brand-facts',
   'settings-command-center',
@@ -71,7 +81,7 @@ export function useProjectSwitch() {
     const website = app.websites.find((w) => String(w.id) === id)
     if (!website) return false
     if (route.params?.websiteId && currentProjectId() === id) return false
-    const target = route.meta?.settings ? null : projectTarget(route.name, id, route.query)
+    const target = sectionOf(route) === 'settings' ? null : projectTarget(route.name, id, route.query)
     if (!target) {
       // Nothing to navigate to: a push to the route already shown would be a
       // duplicated navigation, so the project changes in place.

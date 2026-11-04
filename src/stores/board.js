@@ -10,6 +10,7 @@ import {
     defaultLayout,
     moveWidget,
     normalizeLayout,
+    placeWidget,
     removeWidget,
     resizeWidget,
     sameLayout,
@@ -165,6 +166,8 @@ export const useBoardStore = defineStore('board', () => {
     const add = (wid, key) => edit(wid, (widgets) => addWidget(widgets, key))
     const remove = (wid, key) => edit(wid, (widgets) => removeWidget(widgets, key))
     const move = (wid, key, step) => edit(wid, (widgets) => moveWidget(widgets, key, step))
+    // A drop on the board: one edit, however far the widget went.
+    const place = (wid, key, index) => edit(wid, (widgets) => placeWidget(widgets, key, index))
     const resize = (wid, key, size) => edit(wid, (widgets) => resizeWidget(widgets, key, size))
 
     function conflict(err) {
@@ -303,5 +306,5 @@ export const useBoardStore = defineStore('board', () => {
         resetBoardSources()
     })
 
-    return { layouts, layoutOf, has, load, add, remove, move, resize, flush, retrySave, reset, clear }
+    return { layouts, layoutOf, has, load, add, remove, move, place, resize, flush, retrySave, reset, clear }
 })

@@ -18,7 +18,7 @@ async function withRouter(path = '/projects/w1/analytics?widget=sentiment') {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank, meta: { board: true } },
+      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank, meta: { section: 'analytics' } },
       { path: '/elsewhere', name: 'elsewhere', component: Blank },
     ],
   })

@@ -8,21 +8,53 @@ import { PROJECT_QUERY_KEYS, projectTarget, useProjectSwitch } from '../useProje
 
 const Blank = defineComponent({ render: () => h('div') })
 
+// As in the app: AppShell's parents carry the section, children their title.
 function makeRouter() {
   return createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/agent/projects', name: 'agent-projects', component: Blank },
-      { path: '/projects/:websiteId/agent', name: 'agent-home', component: Blank },
-      { path: '/projects/:websiteId/agent/c/:chatId', name: 'agent-chat', component: Blank },
-      { path: '/projects/:websiteId/agent/context', name: 'agent-context', component: Blank },
-      { path: '/projects/:websiteId/agent/reports', name: 'agent-reports', component: Blank },
-      { path: '/projects/:websiteId/agent/artifacts/:artifactId', name: 'agent-artifact', component: Blank },
-      { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank, meta: { board: true } },
-      { path: '/dashboard', name: 'dashboard', component: Blank, meta: { page: true } },
-      { path: '/settings', name: 'settings', component: Blank, meta: { settings: true } },
-      { path: '/settings/project', name: 'settings-project', component: Blank, meta: { settings: true } },
-      { path: '/billing', name: 'billing', component: Blank, meta: { settings: true } },
+      {
+        path: '/agent/projects',
+        meta: { section: 'agent' },
+        children: [{ path: '', name: 'agent-projects', component: Blank, meta: { title: 'Projects' } }],
+      },
+      {
+        path: '/projects/:websiteId/agent',
+        meta: { section: 'agent' },
+        children: [
+          { path: '', name: 'agent-home', component: Blank },
+          { path: 'c/:chatId', name: 'agent-chat', component: Blank },
+          { path: 'context', name: 'agent-context', component: Blank, meta: { title: 'Context' } },
+          { path: 'findings', name: 'agent-findings', component: Blank, meta: { title: 'Findings' } },
+          { path: 'reviews', name: 'agent-reviews', component: Blank, meta: { title: 'Reviews' } },
+          { path: 'reports', name: 'agent-reports', component: Blank, meta: { title: 'Reports' } },
+          { path: 'artifacts/:artifactId', name: 'agent-artifact', component: Blank },
+        ],
+      },
+      {
+        path: '/projects/:websiteId',
+        meta: { section: 'analytics' },
+        children: [{ path: 'analytics', name: 'analytics', component: Blank }],
+      },
+      {
+        path: '/dashboard',
+        meta: { section: 'analytics' },
+        children: [{ path: '', name: 'dashboard', component: Blank, meta: { title: 'Analytics' } }],
+      },
+      {
+        path: '/settings',
+        meta: { section: 'settings' },
+        children: [
+          { path: '', name: 'settings', component: Blank, meta: { title: 'Settings' } },
+          { path: 'project', name: 'settings-project', component: Blank, meta: { title: 'Project settings' } },
+          { path: 'autopilot', name: 'settings-autopilot', component: Blank, meta: { title: 'Autopilot' } },
+        ],
+      },
+      {
+        path: '/billing',
+        meta: { section: 'settings' },
+        children: [{ path: '', name: 'billing', component: Blank, meta: { title: 'Billing' } }],
+      },
     ],
   })
 }
@@ -55,6 +87,8 @@ describe('projectTarget', () => {
   it('keeps list sections and sends chats and artifacts home', () => {
     expect(projectTarget('agent-reports', 'w2')).toEqual({ name: 'agent-reports', params: { websiteId: 'w2' } })
     expect(projectTarget('agent-context', 'w2')).toEqual({ name: 'agent-context', params: { websiteId: 'w2' } })
+    expect(projectTarget('agent-findings', 'w2')).toEqual({ name: 'agent-findings', params: { websiteId: 'w2' } })
+    expect(projectTarget('agent-reviews', 'w2')).toEqual({ name: 'agent-reviews', params: { websiteId: 'w2' } })
     expect(projectTarget('agent-chat', 'w2')).toEqual({ name: 'agent-home', params: { websiteId: 'w2' } })
     expect(projectTarget('agent-artifact', 'w2')).toEqual({ name: 'agent-home', params: { websiteId: 'w2' } })
     expect(projectTarget('agent-projects', 'w2')).toEqual({ name: 'agent-home', params: { websiteId: 'w2' } })
@@ -105,6 +139,7 @@ describe('projectTarget', () => {
       'dashboard',
       'settings',
       'settings-project',
+      'settings-autopilot',
       'settings-connections',
       'settings-brand-facts',
       'settings-command-center',
@@ -120,6 +155,12 @@ describe('useProjectSwitch', () => {
     await expect(ctx.api.switchProject('w2')).resolves.toBe(true)
     expect(ctx.router.currentRoute.value.fullPath).toBe('/projects/w2/agent/reports')
     expect(ctx.app.activeWebsite.id).toBe('w2')
+
+    for (const section of ['findings', 'reviews']) {
+      const list = await setup(`/projects/w1/agent/${section}`)
+      await list.api.switchProject('w2')
+      expect(list.router.currentRoute.value.fullPath).toBe(`/projects/w2/agent/${section}`)
+    }
   })
 
   it('opens the project home from a chat or the projects list', async () => {
@@ -151,7 +192,7 @@ describe('useProjectSwitch', () => {
   })
 
   it('changes the project in place on the Analytics entry and Settings', async () => {
-    for (const path of ['/dashboard', '/settings', '/settings/project', '/billing']) {
+    for (const path of ['/dashboard', '/settings', '/settings/project', '/settings/autopilot', '/billing']) {
       const ctx = await setup(path)
       ctx.app.setActiveWebsite(ctx.app.websites[0])
       await expect(ctx.api.switchProject('w2')).resolves.toBe(true)

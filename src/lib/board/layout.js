@@ -49,6 +49,21 @@ export function moveWidget(widgets, key, step) {
 }
 
 /**
+ * Move `key` to `index`, clamped to the list (a drop on the board);
+ * unchanged when it is there already or not on the board.
+ */
+export function placeWidget(widgets, key, index) {
+    const from = widgets.findIndex((w) => w.key === key)
+    const wanted = Math.round(Number(index))
+    if (from < 0 || Number.isNaN(wanted)) return widgets
+    const to = Math.min(Math.max(wanted, 0), widgets.length - 1)
+    if (to === from) return widgets
+    const next = widgets.slice()
+    next.splice(to, 0, ...next.splice(from, 1))
+    return next
+}
+
+/**
  * Set the size of `key`. A size the widget does not allow is clamped to the
  * nearest one it does (Full width on a third-or-half widget is Half).
  */

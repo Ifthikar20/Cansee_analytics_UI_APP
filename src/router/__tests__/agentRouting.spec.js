@@ -43,8 +43,11 @@ describe('agent routes', () => {
         expect(child('agent-home').component).toBe(child('agent-chat').component)
     })
 
-    it('marks every workspace route as signed-in and workspace', () => {
-        for (const r of agentRoutes) expect(r.meta).toEqual({ requiresAuth: true, workspace: true })
+    it('marks every agent route as signed-in and in the agent section of AppShell', () => {
+        for (const r of agentRoutes) {
+            expect(r.meta).toEqual({ requiresAuth: true, section: 'agent' })
+            expect(String(r.component)).toContain('layouts/AppShell.vue')
+        }
     })
 
     it('passes the artifact kinds per list page', () => {
@@ -59,7 +62,7 @@ describe('agent routes', () => {
         const target = router.resolve({ name: 'agent-findings', params: { websiteId: '2' } })
         expect(target.path).toBe('/projects/2/agent/findings')
         expect(target.params).toEqual({ websiteId: '2' })
-        expect(target.meta).toEqual({ requiresAuth: true, workspace: true, title: 'Findings' })
+        expect(target.meta).toEqual({ requiresAuth: true, section: 'agent', title: 'Findings' })
         expect(router.resolve('/projects/2/agent/findings').name).toBe('agent-findings')
 
         const findings = child('agent-findings')
@@ -73,7 +76,7 @@ describe('agent routes', () => {
         const router = createRouter({ history: createMemoryHistory(), routes: agentRoutes })
         const target = router.resolve({ name: 'agent-reviews', params: { websiteId: '2' }, query: { box: 'mine' } })
         expect(target.fullPath).toBe('/projects/2/agent/reviews?box=mine')
-        expect(target.meta).toEqual({ requiresAuth: true, workspace: true, title: 'Reviews' })
+        expect(target.meta).toEqual({ requiresAuth: true, section: 'agent', title: 'Reviews' })
         expect(router.resolve('/projects/2/agent/reviews').name).toBe('agent-reviews')
 
         const reviews = child('agent-reviews')

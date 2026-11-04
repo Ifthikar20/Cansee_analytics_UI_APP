@@ -1901,7 +1901,7 @@ export const useAgentStore = defineStore('agent', () => {
         }
     )
     // The project follows the workspace URL, never app.activeWebsite on its
-    // own: AgentShell calls init() for the project in view. The active
+    // own: AppShell calls init() for the project in view. The active
     // website can change while a page that blocked the switch (an unsaved
     // context entry) still shows the old project.
 

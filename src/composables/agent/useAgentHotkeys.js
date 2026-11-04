@@ -1,15 +1,17 @@
-import { getCurrentScope, onScopeDispose } from 'vue'
+import { getCurrentScope, nextTick, onScopeDispose } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { useAgentUiStore } from '@/stores/agentUi'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
+import { agentLocation, sectionOf } from '@/lib/shell/nav'
 import { detectMac, isModEvent } from './usePlatform'
 
-// Workspace-wide shortcuts, installed once by AgentShell, so they work on
-// the Agent and Analytics tabs and in Settings. Composer keys (Enter,
-// Shift+Enter, Up in an empty composer) belong to the composer; they are
-// listed here only for the shortcuts dialog.
+// Workspace-wide shortcuts, installed once by AppShell, so they work on
+// every signed-in page. Composer keys (Enter, Shift+Enter, Up in an empty
+// composer) belong to the composer; they are listed here only for the
+// shortcuts dialog.
 
 export const AGENT_SHORTCUTS = Object.freeze([
   { id: 'new-chat', keys: 'mod+shift+o', label: 'New chat', group: 'General' },
@@ -25,6 +27,7 @@ export const AGENT_SHORTCUTS = Object.freeze([
 ])
 
 const CHAT_ROUTES = new Set(['agent-home', 'agent-chat'])
+const EDITABLE = 'input, textarea, select, [contenteditable]:not([contenteditable="false"])'
 
 function keyIs(event, letter) {
   return event.code === `Key${letter.toUpperCase()}` || String(event.key || '').toLowerCase() === letter
@@ -53,12 +56,20 @@ function layerOpen() {
   return Boolean(document.querySelector('[data-dismissable-layer]'))
 }
 
+function inField(event) {
+  const el = event.target
+  return Boolean(el && typeof el.closest === 'function' && el.closest(EDITABLE))
+}
+
 export function useAgentHotkeys({ target = typeof window !== 'undefined' ? window : null } = {}) {
   const route = useRoute()
   const router = useRouter()
   const ui = useAgentUiStore()
   const app = useAppStore()
+  const auth = useAuthStore()
   const mac = detectMac()
+
+  const onAgent = () => sectionOf(route) === 'agent'
 
   function websiteId() {
     const wid = route.params?.websiteId ?? app.activeWebsite?.id
@@ -77,9 +88,25 @@ export function useAgentHotkeys({ target = typeof window !== 'undefined' ? windo
       .catch(() => {})
   }
 
-  // Chat search lives in the sidebar's Recents, which every page shows.
-  function search() {
-    ui.openSearch()
+  // Chat search lives in the agent sidebar's Recents. Elsewhere the key opens
+  // the agent first (where the header's Agent link goes), then the search,
+  // but not from a field: leaving would throw away what is typed there (Ask
+  // AI on the board, an unsaved setting), so the key stays the browser's.
+  function search(event) {
+    if (onAgent()) {
+      ui.openSearch()
+      return true
+    }
+    if (inField(event)) return false
+    const wid = websiteId()
+    if (!wid) return false
+    Promise.resolve(router.push(agentLocation(wid, auth.user?.id)))
+      .then(() => nextTick())
+      .then(() => {
+        if (sectionOf(router.currentRoute.value) === 'agent') ui.openSearch()
+      })
+      .catch(() => {})
+    return true
   }
 
   function togglePane() {
@@ -119,10 +146,12 @@ export function useAgentHotkeys({ target = typeof window !== 'undefined' ? windo
         newChat()
         break
       case 'search':
-        search()
+        handled = search(event)
         break
       case 'sidebar':
-        ui.toggleSidebar()
+        // No sidebar outside the agent: the key stays the browser's.
+        if (onAgent()) ui.toggleSidebar()
+        else handled = false
         break
       case 'pane':
         handled = togglePane()

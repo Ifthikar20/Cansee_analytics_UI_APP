@@ -136,6 +136,7 @@ describe('loading a board', () => {
     store.load('w1')
     expect(store.add('w1', 'pages')).toBe(false)
     expect(store.remove('w1', 'ranking')).toBe(false)
+    expect(store.place('w1', 'ranking', 0)).toBe(false)
     expect(keys(store)).toEqual(DEFAULT_KEYS)
   })
 
@@ -293,6 +294,76 @@ describe('saving a board', () => {
     api.save.mockImplementationOnce((wid, body) => ok(SAVED(body.version + 1, body.widgets)))
     await store.retrySave('w1')
     expect(api.save.mock.calls[0][1]).toEqual({ version: 0, widgets: DEFAULT_PAYLOAD.widgets })
+  })
+})
+
+describe('placing a widget (a drop on the board)', () => {
+  const BOARD = [
+    { key: 'summary', size: 'full' },
+    { key: 'traffic', size: 'third' },
+    { key: 'sentiment', size: 'third' },
+    { key: 'citations', size: 'half' },
+  ]
+  const [summary, traffic, sentiment, citations] = BOARD
+
+  beforeEach(async () => {
+    api.get.mockReturnValue(ok(SAVED(3, BOARD)))
+    await store.load('w1')
+  })
+
+  it('applies at once, writes the cache and saves once 400ms later with the new order', async () => {
+    api.save.mockImplementation((wid, body) => ok(SAVED(body.version + 1, body.widgets)))
+    expect(store.place('w1', 'citations', 0)).toBe(true)
+    expect(keys(store)).toEqual(['citations', 'summary', 'traffic', 'sentiment'])
+    expect(JSON.parse(localStorage.getItem(CACHE_KEY)).widgets).toEqual([citations, summary, traffic, sentiment])
+
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS - 1)
+    expect(api.save).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(api.save).toHaveBeenCalledTimes(1)
+    expect(api.save).toHaveBeenCalledWith('w1', { version: 3, widgets: [citations, summary, traffic, sentiment] })
+    await vi.runAllTimersAsync()
+    expect(store.layoutOf('w1')).toMatchObject({ version: 4, saved: true, save: 'idle' })
+  })
+
+  it('saves nothing for the place a widget already has, or for a widget off the board', async () => {
+    expect(store.place('w1', 'traffic', 1)).toBe(false)
+    expect(store.place('w1', 'pages', 0)).toBe(false)
+    await vi.runAllTimersAsync()
+    expect(api.save).not.toHaveBeenCalled()
+    expect(keys(store)).toEqual(['summary', 'traffic', 'sentiment', 'citations'])
+  })
+
+  it('sends a place made during a save after it, with the version that save returned', async () => {
+    const first = deferred()
+    api.save.mockReturnValueOnce(first.promise)
+    store.place('w1', 'summary', 3)
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS)
+    expect(store.layoutOf('w1').save).toBe('saving')
+
+    store.place('w1', 'citations', 0)
+    await vi.advanceTimersByTimeAsync(SAVE_DEBOUNCE_MS * 2)
+    expect(api.save).toHaveBeenCalledTimes(1)
+
+    api.save.mockImplementationOnce((wid, body) => ok(SAVED(body.version + 1, body.widgets)))
+    first.resolve(SAVED(4, [traffic, sentiment, citations, summary]))
+    await vi.runAllTimersAsync()
+    expect(api.save).toHaveBeenCalledTimes(2)
+    expect(api.save.mock.calls[1][1]).toEqual({ version: 4, widgets: [citations, traffic, sentiment, summary] })
+    expect(store.layoutOf('w1')).toMatchObject({ version: 5, save: 'idle' })
+  })
+
+  it('adopts the newer board and says so when a place meets a 409', async () => {
+    const latest = SAVED(7, [{ key: 'products', size: 'full' }])
+    api.save.mockImplementationOnce(() =>
+      fail(409, { code: 'layout_conflict', message: 'Your board changed in another window.', details: { layout: latest } }),
+    )
+    store.place('w1', 'citations', 0)
+    await vi.runAllTimersAsync()
+    expect(keys(store)).toEqual(['products'])
+    expect(store.layoutOf('w1')).toMatchObject({ version: 7, save: 'idle' })
+    expect(toast.info).toHaveBeenCalledWith(CONFLICT_TOAST)
+    expect(api.save).toHaveBeenCalledTimes(1)
   })
 })
 

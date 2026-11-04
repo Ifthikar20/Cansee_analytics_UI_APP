@@ -105,10 +105,21 @@ watch(
 </script>
 
 <style scoped>
+/* The frame renders this page straight into its main: it sets its own box. */
 .an-entry {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 24px;
+  box-sizing: border-box;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 32px;
+}
+
+@media (max-width: 767px) {
+  .an-entry {
+    padding: 16px;
+  }
 }
 
 .an-entry-state {

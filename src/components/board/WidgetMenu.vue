@@ -1,9 +1,11 @@
 <script setup>
 // A board card's options (board_contract.md 9): Expand, Move up, Move
-// down, Size (the sizes the widget allows) and Remove from board. Moving is
-// menu only, so the board can be arranged by keyboard. After an action the
-// card decides where focus goes, so the menu's own return to the trigger is
-// skipped then; Escape and a click outside return to the trigger as usual.
+// down, Size (the sizes the widget allows) and Remove from board. Move up
+// and Move down are the single-pointer and screen-reader way to arrange the
+// board; cards also move by drag and drop and by the grip's keys
+// (frame_board.md B3 and B4). After an action the card decides where focus
+// goes, so the menu's own return to the trigger is skipped then; Escape and
+// a click outside return to the trigger as usual.
 import { computed } from 'vue'
 import {
   DropdownMenuItemIndicator,

@@ -46,7 +46,7 @@ async function setup(path = '/dashboard', { onboarding = false } = {}) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/dashboard', name: 'dashboard', component: AnalyticsEntryPage, meta: { page: true, title: 'Analytics' } },
+      { path: '/dashboard', name: 'dashboard', component: AnalyticsEntryPage, meta: { section: 'analytics', title: 'Analytics' } },
       { path: '/projects/:websiteId/analytics', name: 'analytics', component: Blank },
       { path: '/projects/:websiteId/agent', name: 'agent-home', component: Blank },
     ],

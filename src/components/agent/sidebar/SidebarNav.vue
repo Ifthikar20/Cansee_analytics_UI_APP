@@ -91,7 +91,7 @@ const items = computed(() =>
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin: 16px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }

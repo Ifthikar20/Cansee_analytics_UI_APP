@@ -3,6 +3,7 @@ import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, reactive } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import replySource from '../AssistantMessage.vue?raw'
 
 const fakeAgent = reactive({})
 const fakePane = reactive({})
@@ -152,5 +153,16 @@ describe('AssistantMessage research agents', () => {
 
     const plain = mountReply({ message: reply({ parts: [{ id: 'p1', type: 'text', text: 'Hi' }] }) }, stubs)
     expect(plain.find('.ag-assistant-swarms').exists()).toBe(false)
+  })
+})
+
+describe('AssistantMessage layout', () => {
+  // jsdom lays nothing out, so the rule is read from the source. Without it
+  // the body's implicit grid column took a wide table's width, and on a
+  // phone every paragraph of the reply ran past the screen's edge.
+  it('keeps the reply body to one column no wider than the reply', () => {
+    const rule = replySource.match(/\.ag-assistant-body \{[^}]*\}/)?.[0] || ''
+    expect(rule).toContain('display: grid;')
+    expect(rule).toContain('grid-template-columns: minmax(0, 1fr);')
   })
 })

@@ -17,7 +17,7 @@ vi.mock('@/api/websites', () => ({ default: { list: vi.fn() } }))
 // The shell and every page are stand-ins: these tests check which module
 // each route loads and where every old address lands, not the pages.
 const stub = (name) => ({ default: { name, render: () => null } })
-vi.mock('@/layouts/AgentShell.vue', () => stub('AgentShell'))
+vi.mock('@/layouts/AppShell.vue', () => stub('AppShell'))
 vi.mock('@/pages/board/AnalyticsBoardPage.vue', () => stub('AnalyticsBoardPage'))
 vi.mock('@/pages/board/AnalyticsEntryPage.vue', () => stub('AnalyticsEntryPage'))
 vi.mock('@/pages/SettingsPage.vue', () => stub('SettingsPage'))
@@ -32,6 +32,7 @@ const { default: websitesApi } = await import('@/api/websites')
 const { default: router } = await import('@/router')
 const { analyticsRoutes, settingsRoutes } = await import('../analyticsRoutes')
 const { resolveAnalyticsEntry } = await import('../analyticsEntry')
+const { SECTIONS } = await import('@/lib/shell/nav')
 const { useAppStore } = await import('@/stores/app')
 const { useAuthStore } = await import('@/stores/auth')
 const { setLastProject } = await import('@/lib/agent/storage')
@@ -100,6 +101,11 @@ const SETTINGS_PAGES = [
     ['billing', '/billing', 'BillingPage', 'Billing'],
 ]
 
+// A record's component is AppShell's loader, or the stub it resolved to once
+// a navigation loaded it.
+const isAppShell = (component) =>
+    component?.name === 'AppShell' || String(component || '').includes('layouts/AppShell.vue')
+
 async function loaded(record) {
     const component = record.components.default
     expect(component).toBeTypeOf('function')
@@ -124,25 +130,25 @@ afterEach(() => {
 })
 
 describe('the board route', () => {
-    it('renders the board of a project inside the workspace shell, untitled', async () => {
+    it('renders the board of a project in AppShell, in the analytics section, untitled', async () => {
         const target = router.resolve({ name: 'analytics', params: { websiteId: 'w1' } })
         expect(target.path).toBe('/projects/w1/analytics')
         expect(router.resolve('/projects/w1/analytics').name).toBe('analytics')
-        expect(target.meta).toEqual({ requiresAuth: true, workspace: true, board: true })
+        expect(target.meta).toEqual({ requiresAuth: true, section: 'analytics' })
         const record = target.matched.at(-1)
         expect(record.props.default).toBe(true)
         expect(await loaded(record)).toBe('AnalyticsBoardPage')
-        expect(await loaded(target.matched[0])).toBe('AgentShell')
+        expect(await loaded(target.matched[0])).toBe('AppShell')
     })
 
-    it('renders the entry page in the page area at /dashboard, behind its guard', async () => {
+    it('renders the entry page at /dashboard in the analytics section, behind its guard', async () => {
         const target = router.resolve({ name: 'dashboard' })
         expect(target.path).toBe('/dashboard')
-        expect(target.meta).toMatchObject({ requiresAuth: true, workspace: true, page: true, title: 'Analytics' })
+        expect(target.meta).toEqual({ requiresAuth: true, section: 'analytics', title: 'Analytics' })
         const record = target.matched.at(-1)
         expect(record.beforeEnter).toBe(resolveAnalyticsEntry)
         expect(await loaded(record)).toBe('AnalyticsEntryPage')
-        expect(await loaded(target.matched[0])).toBe('AgentShell')
+        expect(await loaded(target.matched[0])).toBe('AppShell')
     })
 })
 
@@ -230,22 +236,40 @@ describe('resolveAnalyticsEntry', () => {
 })
 
 describe('settings routes', () => {
-    it.each(SETTINGS_PAGES)('%s is a settings page inside the workspace shell', async (name, path, page, title) => {
+    it.each(SETTINGS_PAGES)('%s is a page of the settings section in AppShell', async (name, path, page, title) => {
         const target = router.resolve({ name })
         expect(target.path).toBe(path)
         expect(router.resolve(path).name).toBe(name)
-        expect(target.meta).toMatchObject({ requiresAuth: true, settings: true, title })
-        expect(target.meta.board).toBeUndefined()
+        expect(target.meta).toEqual({ requiresAuth: true, section: 'settings', title })
         expect(await loaded(target.matched.at(-1))).toBe(page)
-        expect(await loaded(target.matched[0])).toBe('AgentShell')
+        expect(await loaded(target.matched[0])).toBe('AppShell')
     })
 
-    it('has no route left in the old app shell', async () => {
+    it('renders every analytics and settings page in AppShell, the only signed-in layout', async () => {
         const parents = [...analyticsRoutes, ...settingsRoutes]
-        for (const record of parents) expect(await loaded({ components: { default: record.component } })).toBe('AgentShell')
+        for (const record of parents) expect(await loaded({ components: { default: record.component } })).toBe('AppShell')
         for (const route of router.getRoutes()) {
             const source = String(route.components?.default || '')
-            expect(source).not.toContain('AppShell')
+            if (source.includes('/layouts/')) expect(source).toContain('/layouts/AppShell.vue')
+        }
+    })
+
+    it('gives every AppShell record a section, which picks its layout and current link', () => {
+        const shells = router.getRoutes().filter((r) => isAppShell(r.components?.default))
+        expect(shells.map((r) => r.path).sort()).toEqual([
+            '/agent',
+            '/agent/c/:chatId',
+            '/agent/projects',
+            '/billing',
+            '/dashboard',
+            '/projects/:websiteId',
+            '/projects/:websiteId/agent',
+            '/settings',
+        ])
+        for (const record of shells) expect(SECTIONS).toContain(record.meta.section)
+        // The pages outside the frame have no section.
+        for (const name of ['paywall', 'run-link', 'docs', 'login', 'not-found']) {
+            expect(router.getRoutes().find((r) => r.name === name).meta.section).toBeUndefined()
         }
     })
 

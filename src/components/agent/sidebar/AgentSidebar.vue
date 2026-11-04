@@ -1,25 +1,26 @@
 <script setup>
-// The workspace sidebar: project switcher and inbox, the Agent | Analytics
-// switch, the workspace sections, recent chats and the footer. It is the
-// same on both tabs: the switch changes the main area, never the
-// navigation. Docked at >= 1024px, otherwise rendered inside the shell's
-// drawer (variant="drawer").
+// The agent workspace sidebar: sections, recent chats, and a footer with the
+// inbox and the collapse button. Docked at 1024px and wider, otherwise
+// inside the shell's drawer (variant="drawer"). The project switcher,
+// Settings and Help are in the header.
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { useAgentUiStore } from '@/stores/agentUi'
+import { IconPanelLeft } from '@/components/agent/icons'
+import AgIconButton from '@/components/agent/common/AgIconButton.vue'
 import ActivityButton from './ActivityButton.vue'
-import ProductSwitch from './ProductSwitch.vue'
-import SidebarFooter from './SidebarFooter.vue'
 import SidebarNav from './SidebarNav.vue'
 import SidebarRecents from './SidebarRecents.vue'
-import WorkspaceSwitcher from './WorkspaceSwitcher.vue'
 
-defineProps({
+const props = defineProps({
+  // 'docked' collapses the sidebar; 'drawer' closes the drawer.
   variant: { type: String, default: 'docked' },
 })
 
 const route = useRoute()
 const app = useAppStore()
+const ui = useAgentUiStore()
 
 const websiteId = computed(() => {
   const fromRoute = route.params?.websiteId
@@ -28,23 +29,24 @@ const websiteId = computed(() => {
   return active === undefined || active === null ? null : String(active)
 })
 
-const website = computed(
-  () => app.websites.find((w) => String(w.id) === websiteId.value) || (websiteId.value ? app.activeWebsite : null) || null,
-)
+const toggleLabel = computed(() => (props.variant === 'drawer' ? 'Close sidebar' : 'Collapse sidebar'))
+
+function toggle() {
+  if (props.variant === 'drawer') ui.closeDrawer()
+  else ui.toggleSidebar()
+}
 </script>
 
 <template>
   <nav class="ag-sb" :class="`is-${variant}`" aria-label="Workspace">
-    <div class="ag-sb-workspace">
-      <WorkspaceSwitcher :website="website" />
-      <ActivityButton :website-id="websiteId" />
-    </div>
-    <ProductSwitch :website-id="websiteId" />
-    <!-- The same sidebar on both tabs: the switch changes the main area,
-         never the navigation. Analytics has no list of tabs. -->
     <SidebarNav :website-id="websiteId" />
     <SidebarRecents :website-id="websiteId" />
-    <SidebarFooter :variant="variant" />
+    <div class="ag-sb-footer">
+      <ActivityButton :website-id="websiteId" />
+      <AgIconButton :label="toggleLabel" shortcut="mod+b" tooltip-side="top" @click="toggle">
+        <IconPanelLeft />
+      </AgIconButton>
+    </div>
   </nav>
 </template>
 
@@ -72,12 +74,12 @@ const website = computed(
   padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
-.ag-sb-workspace {
+.ag-sb-footer {
   display: flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
   height: 36px;
+  margin-top: 8px;
 }
 </style>

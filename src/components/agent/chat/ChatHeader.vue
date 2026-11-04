@@ -3,7 +3,7 @@
     <div class="ag-chat-head-start">
       <AgIconButton
         v-if="ui.showSidebarToggle"
-        :label="ui.docked ? 'Show sidebar' : 'Open menu'"
+        :label="ui.docked ? 'Show sidebar' : 'Open sidebar'"
         shortcut="mod+b"
         :size="28"
         class="ag-chat-head-sidebar"

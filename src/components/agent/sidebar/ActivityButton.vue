@@ -98,7 +98,7 @@ onBeforeUnmount(() => clearTimeout(prefetchTimer))
   <PopoverRoot v-model:open="open">
     <span class="ag-act-anchor">
       <PopoverTrigger as-child>
-        <AgIconButton :label="label" :tooltip="open ? false : 'Activity'" :disabled="!websiteId">
+        <AgIconButton :label="label" :tooltip="open ? false : 'Activity'" tooltip-side="top" :disabled="!websiteId">
           <Inbox />
         </AgIconButton>
       </PopoverTrigger>
@@ -107,7 +107,7 @@ onBeforeUnmount(() => clearTimeout(prefetchTimer))
     <PopoverPortal>
       <PopoverContent
         class="ag-portal ag-popover"
-        side="bottom"
+        side="top"
         align="start"
         :side-offset="6"
         :collision-padding="8"

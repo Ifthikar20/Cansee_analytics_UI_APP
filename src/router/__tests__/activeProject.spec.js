@@ -120,7 +120,7 @@ describe('the active project follows confirmed navigations', () => {
         const app = useAppStore()
         const agent = useAgentStore()
         await router.push('/test-context/1')
-        // AgentShell scopes the store to the project in the URL.
+        // AppShell scopes the store to the project in the URL.
         await agent.init('1')
         const wrapper = await open('/test-context/1')
         await wrapper.findAll('button').find((b) => b.text() === 'Add an entry').trigger('click')

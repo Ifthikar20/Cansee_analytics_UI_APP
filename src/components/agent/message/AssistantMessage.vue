@@ -266,8 +266,12 @@ function switchBranch(dir) {
   margin-top: 0;
 }
 
+/* One column as wide as the reply. An implicit column takes its widest
+   content's width, so a wide table pushed every paragraph past a phone's
+   edge; with minmax(0, 1fr) the table scrolls in its own box instead. */
 .ag-assistant-body {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   margin-top: 20px;
 }

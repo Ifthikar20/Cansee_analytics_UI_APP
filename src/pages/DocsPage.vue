@@ -225,7 +225,7 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
           <section id="overview">
             <h2>Analytics</h2>
             <p class="kicker">One board of widgets for the active project.</p>
-            <p>The board starts with Ask AI and Prompt ranking. <em>Add widget</em> puts more on it, such as Summary, Prompts, Countries, Traffic, Sentiment or Citations; each card's menu moves, resizes or removes it, and your board is saved for you. Open a card's title, or <em>Expand</em> in its menu, to see its detail in a side panel.</p>
+            <p>The board starts with Ask AI and Prompt ranking. <em>Add widget</em> puts more on it, such as Summary, Prompts, Countries, Traffic, Sentiment or Citations; drag a card by its top to move it, or use its menu to move, resize or remove it. Your board is saved for you. Open a card's title, or <em>Expand</em> in its menu, to see its detail in a side panel.</p>
             <ul>
               <li><strong>Ask AI.</strong> Type a question your buyers ask. Cansee asks each AI engine several times, after showing what it will cost, and shows how often you are named, at what rank, and the answers. Track it to keep checking it.</li>
               <li><strong>Prompt ranking.</strong> Your tracked prompts, ranked by how often the AI engines name you, with each prompt's Google result.</li>
@@ -265,7 +265,7 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
 
           <section id="settings">
             <h2>Settings</h2>
-            <p class="kicker">Settings at the foot of the sidebar. Project pages apply to the project picked at the top of the sidebar.</p>
+            <p class="kicker">Settings in the header. Project pages apply to the project picked next to the logo.</p>
 
             <div class="service" id="project">
               <div class="svc-head"><h3>Project</h3><span class="svc-where">Settings › Project</span></div>

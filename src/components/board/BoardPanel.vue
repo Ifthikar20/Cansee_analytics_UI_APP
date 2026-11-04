@@ -1,14 +1,17 @@
 <script setup>
 // A widget's expanded view, in a side panel on the board (board_frontend.md
-// 6b). Docked (a column beside the board, which Widen lets cover it) on a
-// board of 1100px or more; below that the same aside lies over the board on
-// a scrim, and on a phone it fills the screen. It is never a modal dialog:
-// the reused pages open BaseModal dialogs (Add prompts, Schedule) that a
-// focus trap would block. It renders inside .bd in every mode, so the
-// board's surface tokens reach the page it shows.
+// 6b, frame_board.md B7): a sheet that slides over the board from the
+// right at every width, on a scrim, inside the board root and below the
+// header. Widen lets it cover the board; on a phone it fills it. The layer
+// is sticky at the top of the board's scroll container with no height, so
+// the sheet covers what the container shows (--bd-view-h, set by the page)
+// whatever the scroll. It is never a modal dialog: the reused pages open
+// BaseModal dialogs (Add prompts, Schedule) that a focus trap would block.
+// It renders inside .bd, so the board's surface tokens reach the page it
+// shows.
 import { computed, defineAsyncComponent, nextTick, onErrorCaptured, provide, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useMediaQuery } from '@vueuse/core'
+import { useEventListener, useMediaQuery } from '@vueuse/core'
 import { Maximize2, Minimize2, Plus, X } from '@lucide/vue'
 import AgButton from '@/components/agent/common/AgButton.vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
@@ -25,8 +28,6 @@ const wide = defineModel('wide', { type: Boolean, default: false })
 const props = defineProps({
   widgetKey: { type: String, required: true },
   websiteId: { type: String, required: true },
-  // 'docked' | 'sheet'
-  mode: { type: String, default: 'sheet' },
 })
 
 provide(IN_PANEL, true)
@@ -36,10 +37,10 @@ const board = useBoard()
 const store = useBoardStore()
 const ui = useAgentUiStore()
 const phone = useMediaQuery('(max-width: 767px)')
+const layerEl = ref(null)
 const titleEl = ref(null)
 const bodyEl = ref(null)
 
-const docked = computed(() => props.mode === 'docked' && !phone.value)
 const title = computed(() => panelTitle(props.widgetKey, route.query))
 const entry = computed(() => WIDGET_COMPONENTS[props.widgetKey] || null)
 const panelProps = computed(() => entry.value?.panelProps || {})
@@ -117,96 +118,149 @@ function toggleWide() {
   wide.value = !wide.value
 }
 
-// Reka menus and popovers close themselves on Escape.
+// Escape closes the panel from anywhere on the page: the sheet, the header
+// above it (once its menu has closed), or nowhere. What lies over the page
+// takes the key first: reka menus, popovers and dialogs close themselves, a
+// page's own modal too, the header's phone sheet prevents it, and anything
+// else teleported out of the app keeps it. A tooltip is a reka layer too,
+// but only a hint: the one a menu's button shows when the menu gives focus
+// back must not cost a second Escape.
 function layerOpen() {
-  return Boolean(document.querySelector('[data-dismissable-layer]'))
+  if (document.querySelector('[aria-modal="true"]')) return true
+  return [...document.querySelectorAll('[data-dismissable-layer]')].some((layer) => !layer.querySelector('[role="tooltip"]'))
+}
+
+// The app's root holds the frame, the board and this panel; layers are
+// teleported beside it, to <body>.
+function onPage(target) {
+  if (!(target instanceof Node) || target === document.body || target === document.documentElement) return true
+  let app = layerEl.value
+  while (app?.parentElement && app.parentElement !== document.body) app = app.parentElement
+  return !app || app.contains(target)
 }
 
 function onKeydown(event) {
   if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
-  if (layerOpen()) return
+  if (layerOpen() || !onPage(event.target)) return
   event.preventDefault()
   board.close()
 }
+// On the window, after the document's listeners (the phone sheet's).
+useEventListener(window, 'keydown', onKeydown)
 </script>
 
 <template>
-  <div v-if="!docked" class="bd-scrim" aria-hidden="true" @click="board.close()" />
-  <aside
-    class="bd-panel"
-    :class="[docked ? 'is-docked' : 'is-sheet', { 'is-full': phone }]"
-    aria-labelledby="bd-panel-title"
-    @keydown="onKeydown"
-  >
-    <header class="bd-panel-head">
-      <h2 id="bd-panel-title" ref="titleEl" class="bd-panel-title" tabindex="-1">{{ title }}</h2>
-      <div class="bd-panel-actions">
-        <AgButton v-if="canAdd" size="sm" :icon="Plus" @click="addToBoard">Add to board</AgButton>
-        <AgIconButton
-          v-if="docked"
-          :label="wide ? 'Narrow' : 'Widen'"
-          :pressed="wide"
-          :size="30"
-          @click="toggleWide"
-        >
-          <Minimize2 v-if="wide" :size="16" aria-hidden="true" />
-          <Maximize2 v-else :size="16" aria-hidden="true" />
-        </AgIconButton>
-        <AgIconButton :label="`Close ${title}`" :size="30" @click="board.close()">
-          <X :size="16" aria-hidden="true" />
-        </AgIconButton>
+  <div ref="layerEl" class="bd-layer">
+    <div class="bd-scrim" aria-hidden="true" @click="board.close()" />
+    <aside
+      class="bd-panel"
+      :class="{ 'is-wide': wide && !phone, 'is-full': phone }"
+      aria-labelledby="bd-panel-title"
+    >
+      <header class="bd-panel-head">
+        <h2 id="bd-panel-title" ref="titleEl" class="bd-panel-title" tabindex="-1">{{ title }}</h2>
+        <div class="bd-panel-actions">
+          <AgButton v-if="canAdd" size="sm" :icon="Plus" @click="addToBoard">Add to board</AgButton>
+          <AgIconButton
+            v-if="!phone"
+            :label="wide ? 'Narrow' : 'Widen'"
+            :pressed="wide"
+            :size="30"
+            @click="toggleWide"
+          >
+            <Minimize2 v-if="wide" :size="16" aria-hidden="true" />
+            <Maximize2 v-else :size="16" aria-hidden="true" />
+          </AgIconButton>
+          <AgIconButton :label="`Close ${title}`" :size="30" @click="board.close()">
+            <X :size="16" aria-hidden="true" />
+          </AgIconButton>
+        </div>
+      </header>
+      <div ref="bodyEl" class="bd-panel-body">
+        <CardLoadError v-if="failed || !view" :on-retry="retry" />
+        <component
+          :is="view"
+          v-else
+          v-bind="panelProps"
+          :key="`${websiteId}|${widgetKey}|${attempt}`"
+          :website-id="websiteId"
+        />
       </div>
-    </header>
-    <div ref="bodyEl" class="bd-panel-body">
-      <CardLoadError v-if="failed || !view" :on-retry="retry" />
-      <component
-        :is="view"
-        v-else
-        v-bind="panelProps"
-        :key="`${websiteId}|${widgetKey}|${attempt}`"
-        :website-id="websiteId"
-      />
-    </div>
-  </aside>
+    </aside>
+  </div>
 </template>
 
 <style scoped>
+/* Sticky at the top of the scroll container with no height: the scrim and
+   the sheet below it cover what the container shows. While the board is
+   locked, main pads its right side where its scrollbar gutter was
+   (--bd-lock-gutter, set by the page), and the layer reaches over that too,
+   so the sheet meets the window's edge. Under the header bar (z 30), whose
+   phone menu hangs over the board. */
+.bd-layer {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  height: 0;
+  margin-right: calc(-1 * var(--bd-lock-gutter, 0px));
+}
+
 .bd-scrim {
   position: absolute;
-  inset: 0;
-  z-index: 20;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--bd-view-h, 100dvh);
   background: var(--ag-scrim);
+  animation: bd-scrim-in 160ms var(--ag-ease);
 }
 
 .bd-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  width: min(var(--bd-sheet-w, 760px), 100%);
   min-width: 0;
-  height: 100%;
-  min-height: 0;
+  height: var(--bd-view-h, 100dvh);
+  border-left: 1px solid var(--ag-divider);
   background: var(--ag-pane-bg);
   color: var(--ag-fg-1);
-  outline: none;
-}
-
-.bd-panel.is-docked {
-  border-left: 1px solid var(--ag-divider);
-}
-
-.bd-panel.is-sheet {
-  position: absolute;
-  inset: 0 0 0 auto;
-  z-index: 21;
-  width: min(760px, 100%);
-  border-left: 1px solid var(--ag-divider);
   box-shadow: var(--ag-shadow-pop);
+  outline: none;
+  animation: bd-panel-in 220ms var(--ag-ease);
 }
 
-.bd-panel.is-sheet.is-full {
+.bd-panel.is-wide {
+  width: 100%;
+}
+
+.bd-panel.is-full {
   width: 100%;
   border-left: 0;
   box-shadow: none;
+}
+
+@keyframes bd-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+
+@keyframes bd-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-scrim,
+  .bd-panel {
+    animation: none;
+  }
 }
 
 .bd-panel-head {
@@ -268,7 +322,7 @@ function onKeydown(event) {
 </style>
 
 <!-- Unscoped on purpose: the pages shown here were built for the page
-     area, whose links wear the app's ink (AgentShell); the agent base layer
+     area, whose links wear the app's ink (AppShell); the agent base layer
      would make them inherit. :where() keeps a page's own classes winning. -->
 <style>
 :where(.bd-panel-body) a {

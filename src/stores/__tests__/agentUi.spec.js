@@ -107,6 +107,49 @@ describe('agentUi sidebar', () => {
     expect(ui.filterOpen).toBe(true)
     expect(ui.searchRequest).toBe(before + 1)
   })
+
+  it('has no sidebar where the page has none', () => {
+    const ui = freshStore()
+    expect(ui.sidebarAvailable).toBe(true)
+    ui.setDocked(false)
+    ui.openDrawer()
+    ui.setSidebarAvailable(false)
+    // An open drawer closes with it.
+    expect(ui.drawerOpen).toBe(false)
+    expect(ui.showSidebarToggle).toBe(false)
+    expect(ui.sidebarVisible).toBe(false)
+
+    ui.setDocked(true)
+    ui.setSidebarCollapsed(true)
+    expect(ui.showSidebarToggle).toBe(false)
+    expect(ui.sidebarVisible).toBe(false)
+
+    // The toggles change nothing, the saved preference included.
+    const request = ui.searchRequest
+    ui.toggleSidebar()
+    ui.openSidebar()
+    ui.openSearch()
+    expect(ui.sidebarCollapsed).toBe(true)
+    expect(JSON.parse(localStorage.getItem(PREFS_KEY))).toMatchObject({ sidebarCollapsed: true })
+    expect(ui.filterOpen).toBe(false)
+    expect(ui.searchRequest).toBe(request)
+    ui.setDocked(false)
+    ui.toggleSidebar()
+    ui.openSidebar()
+    expect(ui.drawerOpen).toBe(false)
+
+    // Back on a page with the sidebar, everything works as before.
+    ui.setSidebarAvailable(true)
+    expect(ui.showSidebarToggle).toBe(true)
+    ui.toggleSidebar()
+    expect(ui.drawerOpen).toBe(true)
+    expect(ui.sidebarVisible).toBe(true)
+    ui.setDocked(true)
+    expect(ui.showSidebarToggle).toBe(true)
+    ui.openSearch()
+    expect(ui.sidebarCollapsed).toBe(false)
+    expect(ui.filterOpen).toBe(true)
+  })
 })
 
 describe('agentUi unseen chats and activity', () => {
@@ -243,7 +286,7 @@ describe('agentUi.reset', () => {
     ui.openShortcuts()
     ui.markUnseen('c1')
     ui.announce('Reply finished')
-    // An expired session or the main app's sign-out, not WorkspaceSwitcher.
+    // An expired session or the main app's sign-out, not the header's account menu.
     auth.clearAuth()
     expect(ui.isUnseen('c1')).toBe(false)
     expect(ui.shortcutsOpen).toBe(false)

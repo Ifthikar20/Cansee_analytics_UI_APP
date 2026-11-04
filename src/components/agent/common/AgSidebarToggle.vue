@@ -6,20 +6,17 @@ import { useAgentUiStore } from '@/stores/agentUi'
 import { IconPanelLeft } from '@/components/agent/icons'
 import AgIconButton from './AgIconButton.vue'
 
-const props = defineProps({
-  // Render even when the sidebar is visible (the sidebar's own footer).
-  always: { type: Boolean, default: false },
+defineProps({
   size: { type: [Number, String], default: 32 },
 })
 
 const ui = useAgentUiStore()
-const visible = computed(() => props.always || ui.showSidebarToggle)
 const label = computed(() => (ui.sidebarVisible ? 'Close sidebar' : 'Open sidebar'))
 </script>
 
 <template>
   <AgIconButton
-    v-if="visible"
+    v-if="ui.showSidebarToggle"
     :label="label"
     :size="size"
     shortcut="mod+b"

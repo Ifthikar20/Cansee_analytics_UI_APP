@@ -7,7 +7,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 const fakeAgent = reactive({ artifacts: {}, reviewsWaiting: null, artifact: (id) => fakeAgent.artifacts[id] || null })
 vi.mock('@/stores/agent', () => ({ useAgentStore: () => fakeAgent }))
 
-// ProductSwitch has its own spec (ProductSwitch.spec.js).
+// The Analytics / Agent / Settings links are the header's (components/shell).
 const { default: SidebarNav } = await import('../SidebarNav.vue')
 
 enableAutoUnmount(afterEach)

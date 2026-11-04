@@ -4,6 +4,7 @@ import {
   defaultLayout,
   moveWidget,
   normalizeLayout,
+  placeWidget,
   removeWidget,
   resizeWidget,
   sameLayout,
@@ -66,6 +67,25 @@ describe('layout edits', () => {
     expect(moveWidget(BOARD, 'pages', 1)).toBe(BOARD)
     // The original is untouched.
     expect(BOARD.map((w) => w.key)).toEqual(['summary', 'countries', 'traffic'])
+  })
+
+  it('places a widget at an index, forward or backward, clamped to the list', () => {
+    const four = [...BOARD, { key: 'pages', size: 'half' }]
+    const keysOf = (list) => list.map((w) => w.key)
+    expect(keysOf(placeWidget(four, 'summary', 2))).toEqual(['countries', 'traffic', 'summary', 'pages'])
+    expect(keysOf(placeWidget(four, 'pages', 1))).toEqual(['summary', 'pages', 'countries', 'traffic'])
+    expect(keysOf(placeWidget(four, 'countries', 99))).toEqual(['summary', 'traffic', 'pages', 'countries'])
+    expect(keysOf(placeWidget(four, 'traffic', -3))).toEqual(['traffic', 'summary', 'countries', 'pages'])
+    // Sizes travel with their widgets; the original is untouched.
+    expect(placeWidget(four, 'pages', 0)[0]).toEqual({ key: 'pages', size: 'half' })
+    expect(keysOf(four)).toEqual(['summary', 'countries', 'traffic', 'pages'])
+  })
+
+  it('keeps the same list when a place changes nothing or the widget is not on the board', () => {
+    expect(placeWidget(BOARD, 'countries', 1)).toBe(BOARD)
+    expect(placeWidget(BOARD, 'traffic', 7)).toBe(BOARD)
+    expect(placeWidget(BOARD, 'pages', 0)).toBe(BOARD)
+    expect(placeWidget(BOARD, 'summary', Number.NaN)).toBe(BOARD)
   })
 
   it('resizes within the sizes a widget allows, clamping to the nearest one', () => {
