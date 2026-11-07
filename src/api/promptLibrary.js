@@ -13,8 +13,9 @@ export default {
     deletePromptSchedule: (websiteId, promptId) =>
         api.delete(`/prompt-library/websites/${websiteId}/prompts/${promptId}/schedule/`),
 
+    // Silent: a logo is decoration; the caller falls back to a badge.
     brandLogo: (domain) =>
-        api.get('/prompt-library/logo/', { params: { domain } }),
+        api.get('/prompt-library/logo/', { params: { domain }, _silentError: true }),
 
     // Per-website archive of a saved prompt (tenant-scoped on the
     // BrandPrompt row). Replaces the old enable/disable, which flipped

@@ -71,6 +71,7 @@ const COPY = Object.freeze({
 })
 
 const clip = (value, max) => String(value ?? '').trim().slice(0, max).trim()
+const clipText = (value, max) => (typeof value === 'string' ? clip(value, max) : '')
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`
 
 /** https URL for what the user typed, or '' when it is not a web address. */
@@ -135,8 +136,20 @@ function uniqueCompetitors(values) {
   return out
 }
 
+/** The address as given when it is an http(s) URL, else ''. */
+export function webUrl(raw) {
+  const value = typeof raw === 'string' ? raw.trim() : ''
+  if (!value) return ''
+  try {
+    return /^https?:$/.test(new URL(value).protocol) ? value : ''
+  } catch {
+    return ''
+  }
+}
+
 function emptyScan() {
-  return { products: 0, topics: 0, competitors: 0, topics_source: '', missing_keys: [] }
+  // audience: whether the homepage itself said who the brand sells to.
+  return { products: 0, topics: 0, competitors: 0, audience: false, topics_source: '', missing_keys: [] }
 }
 
 function blankForm({ url = '', location = DEFAULT_COUNTRY } = {}) {
@@ -148,6 +161,9 @@ function blankForm({ url = '', location = DEFAULT_COUNTRY } = {}) {
     offerings: [],
     audience: '',
     voice: '',
+    // The logo the scan found on the site, shown on the brand step only:
+    // the save endpoint takes no logo.
+    logo_url: '',
     competitors: [],
     prompts: [],
     location,
@@ -297,18 +313,25 @@ export function provideOnboardingFlow({ onComplete } = {}) {
     const offerings = uniqueTexts(payload.products, LIMITS.offering).slice(0, LIMITS.offerings)
     const prompts = uniqueTexts(payload.topics, LIMITS.prompt).filter((t) => t.length >= LIMITS.promptMin)
     const competitors = uniqueCompetitors(payload.competitors)
+    // Audience and voice come only from the page's own words; the scan
+    // leaves them empty when the page does not say, and so does the form.
+    const audience = clipText(payload.audience, LIMITS.audience)
     form.value = {
       ...blankForm({ url: typeof payload.url === 'string' && payload.url ? payload.url : url, location: form.value.location }),
       business_name: clip(payload.business_name, LIMITS.name),
       industry: clip(payload.industry, LIMITS.industry),
       description: clip(payload.description_short || payload.description_raw, LIMITS.description),
       offerings,
+      audience,
+      voice: clipText(payload.voice, LIMITS.voice),
+      logo_url: webUrl(payload.logo_url),
       competitors: competitors.map((c, i) => ({ ...c, selected: i < MAX_COMPETITORS, custom: false })),
       prompts: prompts.map((text, i) => ({ text, selected: i < DEFAULT_PROMPTS, custom: false })),
       scan: {
         products: offerings.length,
         topics: prompts.length,
         competitors: competitors.length,
+        audience: Boolean(audience),
         topics_source: typeof payload.topics_source === 'string' ? payload.topics_source : '',
         missing_keys: Array.isArray(payload.missing_keys) ? payload.missing_keys.map(String) : [],
       },

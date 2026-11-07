@@ -9,15 +9,25 @@ const props = defineProps({
   // Domain matched to this brand from cited sources. When present we ask
   // the backend logo crawler for the site's real logo.
   domain: { type: String, default: '' },
+  // A logo URL already found for this brand (the onboarding scan's),
+  // tried before the domain crawl.
+  src: { type: String, default: '' },
+  // Whether to guess by name (steps 2 and 3 below) when the domain gives
+  // no logo. Off where another company's logo would mislead, such as the
+  // user's own brand during onboarding.
+  guess: { type: Boolean, default: true },
 })
 
 // Logo resolution order:
+//   0. the given src, when there is one
 //   1. crawl the brand's domain (backend /logo/) for the real site logo
 //   2. Clearbit autocomplete by name (known companies)
 //   3. Google favicon for a guessed domain (squashed brand name + .com)
 //   4. deterministic colored initial badge
 // Every resolved URL is cached in-memory + localStorage so each
-// domain/name hits the network at most once.
+// domain/name hits the network at most once. A URL that failed to load is
+// never shown again in the same resolution, so a crawl that returns the
+// same broken URL moves on instead of leaving a broken image.
 
 const MEM = new Map()
 const LS_KEY = 'brandLogoCache.v2'
@@ -40,33 +50,61 @@ function cacheSet(key, val) {
 
 const logoUrl = ref('')
 const failed = ref(false)
+const triedDomain = ref(false) // have we asked the domain crawl?
 const triedName = ref(false)   // have we already fallen back to the name lookup?
 const triedGuess = ref(false)  // have we tried the squashed-name domain guess?
+const brokenUrls = new Set()
+// Bumped by every resolve(), so an answer for old props is dropped.
+let run = 0
 
-async function resolve() {
+function show(url) {
+  if (!url || brokenUrls.has(url)) return false
+  logoUrl.value = url
+  failed.value = false
+  return true
+}
+
+function resolve() {
+  run += 1
   logoUrl.value = ''
   failed.value = false
+  triedDomain.value = false
   triedName.value = false
   triedGuess.value = false
+  brokenUrls.clear()
+  if (show(props.src)) return
+  resolveByDomain(run)
+}
 
+async function resolveByDomain(token) {
+  triedDomain.value = true
   if (props.domain) {
     const key = `d:${props.domain.toLowerCase()}`
     const cached = cacheGet(key)
     if (cached !== undefined) {
-      if (cached) { logoUrl.value = cached; return }
+      if (show(cached)) return
     } else {
       try {
         const { data } = await promptLibrary.brandLogo(props.domain)
         const url = data?.logo || ''
         cacheSet(key, url)
-        if (url) { logoUrl.value = url; return }
-      } catch { /* fall through to name lookup */ }
+        if (token !== run) return
+        if (show(url)) return
+      } catch {
+        if (token !== run) return
+        /* fall through to name lookup */
+      }
     }
   }
-  resolveByName(props.name)
+  afterDomain(token)
 }
 
-async function resolveByName(name) {
+function afterDomain(token) {
+  if (!props.guess) { failed.value = true; return }
+  resolveByName(props.name, token)
+}
+
+async function resolveByName(name, token) {
   triedName.value = true
   const key = `n:${String(name || '').trim().toLowerCase()}`
   if (key === 'n:') { failed.value = true; return }
@@ -80,15 +118,15 @@ async function resolveByName(name) {
     const best = Array.isArray(list) && list.length ? list[0] : null
     const url = best?.logo || (best?.domain ? `https://logo.clearbit.com/${best.domain}` : '')
     cacheSet(key, url)
-    applyResolved(url)
+    if (token === run) applyResolved(url)
   } catch {
     cacheSet(key, '')
-    applyResolved('')
+    if (token === run) applyResolved('')
   }
 }
 
 function applyResolved(url) {
-  if (url) { logoUrl.value = url; failed.value = false; return }
+  if (show(url)) return
   logoUrl.value = ''
   if (!triedGuess.value) { tryGuessedDomain(); return }
   failed.value = true
@@ -97,18 +135,24 @@ function applyResolved(url) {
 function tryGuessedDomain() {
   triedGuess.value = true
   const guess = brandDomainGuess(props.name)
-  if (!guess) { failed.value = true; return }
-  logoUrl.value = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(guess)}&sz=64`
+  if (!show(guess ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(guess)}&sz=64` : '')) {
+    failed.value = true
+  }
 }
 
 function onImgError() {
+  if (logoUrl.value) brokenUrls.add(logoUrl.value)
   logoUrl.value = ''
-  if (!triedName.value) { resolveByName(props.name); return }
+  if (!triedDomain.value) { resolveByDomain(run); return }
+  if (!props.guess) { failed.value = true; return }
+  if (!triedName.value) { resolveByName(props.name, run); return }
   if (!triedGuess.value) { tryGuessedDomain(); return }
   failed.value = true
 }
 
-watch(() => [props.name, props.domain], resolve, { immediate: true })
+// Without guessing, the name only picks the badge's initial and colour, so
+// editing it (as onboarding does) does not look the logo up again.
+watch(() => [props.src, props.domain, props.guess, props.guess ? props.name : ''], resolve, { immediate: true })
 </script>
 
 <template>

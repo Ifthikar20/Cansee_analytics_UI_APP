@@ -13,17 +13,22 @@
           <div class="ob-label-row">
             <label class="ob-label" for="ob-brand-name">Brand name</label>
           </div>
-          <input
-            id="ob-brand-name"
-            v-model="form.business_name"
-            class="ob-text-input"
-            type="text"
-            autocomplete="organization"
-            required
-            :maxlength="LIMITS.name"
-            :aria-invalid="nameMissing ? 'true' : undefined"
-            :aria-describedby="nameMissing ? 'ob-brand-name-error' : undefined"
-          />
+          <div class="ob-name-row">
+            <span class="ob-brand-logo">
+              <BrandLogo :name="logoName" :domain="host" :src="form.logo_url" :guess="false" :size="28" />
+            </span>
+            <input
+              id="ob-brand-name"
+              v-model="form.business_name"
+              class="ob-text-input ob-name-input"
+              type="text"
+              autocomplete="organization"
+              required
+              :maxlength="LIMITS.name"
+              :aria-invalid="nameMissing ? 'true' : undefined"
+              :aria-describedby="nameMissing ? 'ob-brand-name-error' : undefined"
+            />
+          </div>
           <p v-if="nameMissing" id="ob-brand-name-error" class="ob-field-error">Add your brand name to continue.</p>
         </div>
 
@@ -103,7 +108,7 @@
             <label class="ob-label" for="ob-brand-audience">Who you sell to</label>
             <span v-if="!form.audience.trim()" class="ob-missing">Missing</span>
           </div>
-          <p id="ob-brand-audience-hint" class="ob-label-hint">
+          <p v-if="!form.scan.audience" id="ob-brand-audience-hint" class="ob-label-hint">
             We can't tell this from your homepage. Describe your buyers so the agents write for them.
           </p>
           <textarea
@@ -112,7 +117,7 @@
             rows="3"
             class="ob-text-input ob-textarea"
             :maxlength="LIMITS.audience"
-            aria-describedby="ob-brand-audience-hint"
+            :aria-describedby="form.scan.audience ? undefined : 'ob-brand-audience-hint'"
           ></textarea>
         </div>
 
@@ -156,9 +161,15 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 
+import BrandLogo from '@/components/BrandLogo.vue'
 import { LIMITS, useOnboardingFlow } from '../useOnboardingFlow'
 
-const { form, newOffering, addOffering, removeOffering, canContinue, next, back, goTo } = useOnboardingFlow()
+const { form, host, newOffering, addOffering, removeOffering, canContinue, next, back, goTo } = useOnboardingFlow()
+
+// The logo is the scan's, else the site's own (crawled from its domain),
+// else the brand's initial: never a guess by name, which could be another
+// company's logo.
+const logoName = computed(() => form.value.business_name.trim() || host.value)
 
 const offeringsFull = computed(() => form.value.offerings.length >= LIMITS.offerings)
 // The address the project is saved with, as typed (path included), minus the scheme.

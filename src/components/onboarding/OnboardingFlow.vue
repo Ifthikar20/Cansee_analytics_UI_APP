@@ -559,6 +559,23 @@ onBeforeUnmount(() => {
   font-size: 15px;
 }
 .ob-readonly-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Brand name with the site's logo beside it (brand step). */
+.ob-name-row { display: flex; align-items: center; gap: 10px; }
+.ob-name-input { flex: 1; min-width: 0; }
+.ob-brand-logo {
+  /* BrandLogo paints a loaded image on --muted; keep it on the tile. */
+  --muted: var(--ob-bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--ob-border);
+  border-radius: 10px;
+  background: var(--ob-bg);
+  overflow: hidden;
+}
 
 .ob-select { position: relative; display: inline-flex; }
 .ob-select-input {
