@@ -43,7 +43,12 @@ function compactText(n) {
 
 function usdText(n, compact) {
   if (compact && Math.abs(n) >= 1000) {
-    return numberFormat({ style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 }).format(n)
+    // Currency style defaults minimumFractionDigits to 2; without an explicit
+    // 0 some ICU versions pad compact values ("$12.0K" instead of "$12K").
+    return numberFormat({
+      style: 'currency', currency: 'USD', notation: 'compact',
+      minimumFractionDigits: 0, maximumFractionDigits: 1,
+    }).format(n)
   }
   const digits = n !== 0 && Math.abs(n) < 0.01 ? 4 : 2
   return numberFormat({ style: 'currency', currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n)
