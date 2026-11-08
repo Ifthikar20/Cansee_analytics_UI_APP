@@ -284,23 +284,40 @@ export function promptSource(p) {
  * What step 3 says about where its competitors came from when Google or
  * Claude could not help: {text, settings} (settings: what to set, shown to
  * staff and DEBUG only), or null when both worked or the scan did not say.
+ *
+ * The list's own source (scan competitors_source) decides what the rows
+ * are: with Google's brand searches missing or failed, the server may still
+ * fill the list from the older Google Custom Search (source "search"), so
+ * the note only calls the rows AI suggestions when the source says "ai" and
+ * the AI service is set up.
  */
 export function competitorNote(scan) {
   const g = googleState(scan)
   const noClaude = claudeMissing(scan)
   const found = Number(scan?.competitors) > 0
+  const source = scan?.competitors_source
   const settings = []
   if (g.missing) settings.push('google')
   if (noClaude) settings.push('ANTHROPIC_API_KEY')
   const googleWhy = g.missing ? "Google search isn't set up on this workspace" : g.reason
+  const straightFromGoogle = noClaude
+    ? "The AI service isn't set up on this workspace, so these come straight from Google results, without an AI check."
+    : 'These come straight from Google results, without an AI check.'
   if (g.known && !g.ok) {
-    if (found) return { text: `${googleWhy}, so these are AI suggestions, not Google results.`, settings }
+    if (found) {
+      if (source === SOURCE.search) return { text: straightFromGoogle, settings }
+      if (source === SOURCE.ai && !noClaude) {
+        return { text: `${googleWhy}, so these are AI suggestions, not Google results.`, settings }
+      }
+      // The scan did not say where the rows came from: no claim about them.
+      return { text: noClaude ? `${googleWhy}, and the AI service isn't set up.` : `${googleWhy}.`, settings }
+    }
     if (noClaude) return { text: `${googleWhy} and the AI service isn't set up, so we couldn't suggest competitors.`, settings }
     return { text: `${googleWhy}, and the AI service suggested none.`, settings }
   }
   if (noClaude) {
     return found
-      ? { text: "The AI service isn't set up on this workspace, so these come straight from Google results, without an AI check.", settings }
+      ? { text: straightFromGoogle, settings }
       : { text: "The AI service isn't set up on this workspace, and Google results named no competitors.", settings }
   }
   return null
