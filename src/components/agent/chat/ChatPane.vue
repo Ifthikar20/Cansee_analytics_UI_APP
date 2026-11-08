@@ -37,11 +37,13 @@
       :chat-id="chatId"
       :website-id="websiteId"
       :agent="agent"
+      :template="template"
       :busy="busy"
       :stopping="stopping"
       :can-edit-last="canEditLast"
       :show-jump="Boolean(messages.length) && !atBottom"
       @update:agent="setAgent"
+      @update:template="template = $event || null"
       @sent="onSent"
       @edit-last="editLast"
       @jump="thread?.scrollToBottom({ behavior: 'smooth' })"
@@ -70,6 +72,8 @@ const props = defineProps({
   projectName: { type: String, default: '' },
   // Agent to preselect (from ?agent= on a new chat).
   initialAgent: { type: String, default: null },
+  // Report template for the first reply (from ?template= on a new chat).
+  initialTemplate: { type: String, default: null },
   paneDomId: { type: String, default: '' },
 })
 
@@ -82,6 +86,7 @@ const toast = useToast()
 const thread = ref(null)
 const dock = ref(null)
 const agent = ref(props.initialAgent || null)
+const template = ref(props.initialTemplate || null)
 const editingId = ref(null)
 const editSaving = ref(false)
 
@@ -125,8 +130,18 @@ watch(
   }
 )
 
+watch(
+  () => props.initialTemplate,
+  (key) => {
+    if (key) template.value = key
+  }
+)
+
+// A template picked for one chat's next reply does not follow to another
+// chat (sending already cleared it when the new chat gets its id).
 watch(chatKey, () => {
   editingId.value = null
+  template.value = null
 })
 
 function setAgent(key) {

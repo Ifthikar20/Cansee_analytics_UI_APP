@@ -88,6 +88,10 @@ th,td{border:1px solid #e6e6e1;padding:6px 10px;text-align:left;vertical-align:t
 th{background:#f7f7f5;font-weight:600}
 hr{border:0;border-top:1px solid #e6e6e1;margin:24px 0}
 button{display:none}
+.ag-rh{border:1px solid #e6e6e1;border-radius:8px;padding:12px 16px;margin:0 0 24px;font-size:14px;line-height:1.5}
+.ag-rh-top{margin:0 0 8px;font-weight:600}.ag-rh-sample{margin-left:8px;font-size:12px;text-transform:uppercase}
+.ag-rh-list{margin:0}.ag-rh-row{display:flex;gap:12px}.ag-rh-row dt{flex:0 0 96px;color:#5c5c57}.ag-rh-row dd{margin:0}
+.ag-rh-items,.ag-rh-engines{margin:0;padding:0;list-style:none}.ag-rh-engines li{display:inline;margin-right:14px}.ag-rh-muted{color:#5c5c57}
 @media print{main{padding:0}a{color:inherit}pre,table,blockquote{break-inside:avoid}}
 `
 

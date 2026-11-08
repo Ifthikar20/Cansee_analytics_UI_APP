@@ -1,14 +1,16 @@
 <template>
   <form
     class="ag-composer"
-    :class="{ 'is-disabled': blocked, 'has-agent': Boolean(agent) }"
+    :class="{ 'is-disabled': blocked, 'has-agent': Boolean(agent || template) }"
     :aria-label="label"
     @submit.prevent="submit"
     @click="focusFromChrome"
   >
-    <div v-if="agent" class="ag-composer-agent">
-      <AgentChip :agent="agent" :catalog="catalog" @remove="emit('update:agent', null)" />
+    <div v-if="agent || template" class="ag-composer-agent">
+      <AgentChip v-if="agent" :agent="agent" :catalog="catalog" @remove="emit('update:agent', null)" />
       <span v-if="agentUnavailable" class="ag-composer-agent-why">{{ agentUnavailable }}</span>
+      <TemplateChip v-if="template" :template="template" :templates="templates" @remove="removeTemplate" />
+      <span v-if="templateUnavailable" class="ag-composer-agent-why">{{ templateUnavailable }}</span>
     </div>
     <label :for="fieldId" class="ag-sr-only">{{ label }}</label>
     <textarea
@@ -33,8 +35,11 @@
       <PlusMenu
         :agents="agents"
         :agent="agent || ''"
+        :templates="templates"
+        :template="template || ''"
         :disabled="blocked"
         @select-agent="emit('update:agent', $event)"
+        @select-template="pickTemplate"
         @open-page="emit('open-page')"
       />
       <span v-if="dictationText" class="ag-composer-interim" aria-hidden="true">{{ dictationText }}</span>
@@ -58,10 +63,12 @@ import AgentChip from './AgentChip.vue'
 import DictationButton from './DictationButton.vue'
 import PlusMenu from './PlusMenu.vue'
 import SendStopButton from './SendStopButton.vue'
+import TemplateChip from './TemplateChip.vue'
 import { lengthCopy, messageLength } from './messageLimit'
 import { useImeSafeEnter } from '@/composables/agent/useImeSafeEnter'
 import { usePlatform } from '@/composables/agent/usePlatform'
 import { agentMeta } from '@/lib/agent/agentsMeta'
+import { findTemplate } from '@/lib/agent/reportTemplates'
 import { useAgentUiStore } from '@/stores/agentUi'
 
 const props = defineProps({
@@ -70,6 +77,10 @@ const props = defineProps({
   // [{key, name, icon, starter, unavailable}] from agentList(catalog, status)
   agents: { type: Array, default: () => [] },
   catalog: { type: Array, default: null },
+  // The report template the next reply follows (a catalog key), and the
+  // loaded templates (lib/agent/reportTemplates) for names and the "+" menu.
+  template: { type: String, default: null },
+  templates: { type: Array, default: () => [] },
   // The agent is working on this chat (Send becomes Stop).
   busy: { type: Boolean, default: false },
   stopping: { type: Boolean, default: false },
@@ -81,7 +92,15 @@ const props = defineProps({
   canEditLast: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['update:modelValue', 'update:agent', 'submit', 'stop', 'open-page', 'edit-last'])
+const emit = defineEmits([
+  'update:modelValue',
+  'update:agent',
+  'update:template',
+  'submit',
+  'stop',
+  'open-page',
+  'edit-last',
+])
 
 const MAX_HEIGHT = 280
 
@@ -103,13 +122,26 @@ const agentUnavailable = computed(() =>
   props.agent ? props.agents.find((a) => a && a.key === props.agent)?.unavailable || '' : ''
 )
 
+// A template the workspace cannot run would come back refused, so Send
+// waits until it is removed (the catalog says why).
+const templateUnavailable = computed(() => {
+  if (!props.template) return ''
+  const t = findTemplate(props.template, props.templates)
+  return t && !t.available ? t.unavailable?.message || `${t.name} isn't available on this workspace.` : ''
+})
+
 const canSubmit = computed(
-  () => !props.blocked && !agentUnavailable.value && !length.value.over && props.modelValue.trim().length > 0
+  () =>
+    !props.blocked &&
+    !agentUnavailable.value &&
+    !templateUnavailable.value &&
+    !length.value.over &&
+    props.modelValue.trim().length > 0
 )
 
 const hint = computed(() => {
   const keys = coarse.value ? 'Use the Send button to send.' : 'Enter sends, Shift+Enter adds a new line.'
-  const notes = [agentUnavailable.value, lengthText.value?.long].filter(Boolean)
+  const notes = [agentUnavailable.value, templateUnavailable.value, lengthText.value?.long].filter(Boolean)
   return [...notes, keys].join(' ')
 })
 
@@ -132,12 +164,29 @@ function submit() {
     ui.announce(agentUnavailable.value, 'assertive')
     return
   }
+  if (templateUnavailable.value && !props.blocked) {
+    ui.announce(templateUnavailable.value, 'assertive')
+    return
+  }
   if (length.value.over && !props.blocked) {
     ui.announce(lengthText.value.long, 'assertive')
     return
   }
   if (!canSubmit.value) return
   emit('submit', props.modelValue.trim())
+}
+
+function pickTemplate(key) {
+  emit('update:template', key || null)
+  const t = findTemplate(key, props.templates)
+  if (t) ui.announce(`The next reply follows the ${t.name} template.`)
+  nextTick(focus)
+}
+
+function removeTemplate() {
+  emit('update:template', null)
+  ui.announce('Report template removed.')
+  nextTick(focus)
 }
 
 function grow() {

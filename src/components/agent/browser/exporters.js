@@ -4,6 +4,8 @@ import { renderMarkdown } from '@/lib/agent/markdown/renderer'
 import { UNSETTLED_HTML, sanitizePageHtml } from '@/lib/agent/srcdoc'
 import { adCampaignRows, serpRows, toCsv, toTsv } from '@/lib/agent/csv'
 import { copyText, downloadText, printHtml, safeFilename, standaloneHtml } from '@/lib/agent/download'
+import { headerMarkdown } from '@/lib/agent/reportHeader'
+import ReportHeader from './views/ReportHeader.vue'
 import ResearchAppendix from './views/ResearchAppendix.vue'
 
 // Export actions per pane content kind, and the files they produce.
@@ -56,15 +58,32 @@ export function componentHtml(Component, props) {
   return html.replace(/<!--[\s\S]*?-->/g, '').replace(/\sdata-v-[a-z0-9]+=""/g, '')
 }
 
-// A standalone HTML file for a Markdown document, with the research appendix
-// for reports. Copy buttons from code blocks are left out.
+// data.header of a report version, or null (reports saved before headers).
+function reportHeaderOf(data) {
+  const header = data?.header
+  return header && typeof header === 'object' && !Array.isArray(header) ? header : null
+}
+
+const templateOf = (data) => (typeof data?.template === 'string' ? data.template : null)
+
+// A standalone HTML file for a Markdown document; a report gets its header
+// first and the research appendix last. Copy buttons from code blocks are
+// left out.
 export function documentHtml({ title, markdown, data = null, report = false }) {
   const tpl = document.createElement('template')
   tpl.innerHTML = renderMarkdown(markdown || '')
   tpl.content.querySelectorAll('button').forEach((el) => el.remove())
   let body = tpl.innerHTML
+  const header = report ? reportHeaderOf(data) : null
+  if (header) body = componentHtml(ReportHeader, { header, template: templateOf(data) }) + body
   if (report) body += componentHtml(ResearchAppendix, { data, expanded: true })
   return standaloneHtml({ title, bodyHtml: body })
+}
+
+// The Markdown file: a report's header as a short list ahead of its text.
+export function documentMarkdown({ markdown, data = null, report = false }) {
+  const header = report ? reportHeaderOf(data) : null
+  return (header ? headerMarkdown(header, templateOf(data)) : '') + (markdown || '')
 }
 
 // ctx: {title, content, data, sheet, capture, kind}. Resolves to a short
@@ -80,7 +99,11 @@ export async function runExport(key, ctx) {
       if (!(await copyText(sanitizePageHtml(ctx.content || '')))) throw new Error('copy_failed')
       return 'HTML copied'
     case 'md':
-      downloadText(ctx.content || '', safeFilename(title, 'md'), 'text/markdown;charset=utf-8')
+      downloadText(
+        documentMarkdown({ markdown: ctx.content, data: ctx.data, report: ctx.kind === 'report' }),
+        safeFilename(title, 'md'),
+        'text/markdown;charset=utf-8'
+      )
       return ''
     case 'llms-txt':
       // The file name the llms.txt convention expects at the site root.

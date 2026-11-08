@@ -17,12 +17,15 @@
         v-model="text"
         :agent="agent"
         :agents="agents"
+        :template="template"
+        :templates="templates"
         :catalog="store.catalog"
         :busy="busy"
         :stopping="stopping"
         :blocked="blocked"
         :can-edit-last="canEditLast"
         @update:agent="emit('update:agent', $event)"
+        @update:template="emit('update:template', $event)"
         @submit="submit"
         @stop="stop"
         @open-page="openPage"
@@ -34,9 +37,10 @@
 
 <script setup>
 // The composer and the banner above it, wired to the store: drafts per chat,
-// send (creating the chat on the first message), stop, and the honest
-// reason when the agent cannot answer.
-import { computed, ref, watch } from 'vue'
+// send (creating the chat on the first message, with the agent and the
+// report template picked for it), stop, and the honest reason when the
+// agent cannot answer.
+import { computed, onMounted, ref, watch } from 'vue'
 import Composer from './Composer.vue'
 import StatusBanner from './StatusBanner.vue'
 import JumpToLatest from '@/components/agent/chat/JumpToLatest.vue'
@@ -53,13 +57,15 @@ const props = defineProps({
   chatId: { type: String, default: null },
   websiteId: { type: [String, Number], required: true },
   agent: { type: String, default: null },
+  // The report template key the next reply follows (lib/agent/reportTemplates).
+  template: { type: String, default: null },
   busy: { type: Boolean, default: false },
   stopping: { type: Boolean, default: false },
   canEditLast: { type: Boolean, default: false },
   showJump: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['update:agent', 'sent', 'edit-last', 'jump'])
+const emit = defineEmits(['update:agent', 'update:template', 'sent', 'edit-last', 'jump'])
 
 const BLOCKING = new Set(['agent_disabled', 'agent_not_configured', 'allowance_exceeded'])
 const KNOWN = new Set([...BLOCKING, 'agent_unavailable', 'maintenance'])
@@ -81,6 +87,15 @@ const draft = useComposerDraft(
 )
 
 const agents = computed(() => agentList(store.catalog, store.status))
+const templates = computed(() => {
+  const items = store.reportTemplates?.items
+  return Array.isArray(items) ? items : []
+})
+
+// The "+" menu lists the templates; the catalog is loaded once per session.
+onMounted(() => {
+  if (typeof store.loadReportTemplates === 'function') Promise.resolve(store.loadReportTemplates()).catch(() => {})
+})
 
 const bannerCode = computed(() => {
   const s = store.status
@@ -134,16 +149,20 @@ async function submit(value) {
   const body = String(value || '').trim()
   if (!body || props.busy || blocked.value) return
   const agent = props.agent || null
+  const template = props.template || null
   text.value = ''
   draft.clear()
   emit('update:agent', null)
+  // A template applies to this reply only.
+  if (template) emit('update:template', null)
   try {
-    const chatId = await store.send({ chatId: props.chatId || null, text: body, agent })
+    const chatId = await store.send({ chatId: props.chatId || null, text: body, agent, template })
     emit('sent', { chatId, created: !props.chatId })
   } catch (error) {
     const info = errorInfo(error)
     if (!text.value) text.value = body
     if (agent) emit('update:agent', agent)
+    if (template) emit('update:template', template)
     if (KNOWN.has(info.code)) {
       sendError.value = info.code
       store.loadStatus()

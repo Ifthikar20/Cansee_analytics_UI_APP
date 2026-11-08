@@ -1,5 +1,6 @@
 <template>
   <div class="ag-docv">
+    <slot name="before" />
     <article
       ref="root"
       class="ag-prose ag-doc ag-docv-body"

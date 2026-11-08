@@ -2,11 +2,12 @@
 // Reports, Documents and Sheets: the project's artifacts of the given kinds,
 // searchable and filtered by review state. A row opens the artifact; "Open
 // in chat" returns to the chat that made it with the artifact open in the
-// browser pane.
+// browser pane. Reports also show the report template gallery first.
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { ChevronDown, MessageSquare } from '@lucide/vue'
 import { useAgentStore } from '@/stores/agent'
+import { useAppStore } from '@/stores/app'
 import { kindMeta } from '@/lib/agent/agentsMeta'
 import AgPage from '@/components/agent/common/AgPage.vue'
 import AgButton from '@/components/agent/common/AgButton.vue'
@@ -15,6 +16,7 @@ import AgSearchField from '@/components/agent/common/AgSearchField.vue'
 import { IconDocuments, IconReports, IconSheets } from '@/components/agent/icons'
 import { errorMessage, relativeTime } from '@/components/agent/common/agentText'
 import ReviewChip from '@/components/agent/review/ReviewChip.vue'
+import ReportTemplateGallery from '@/components/agent/reports/ReportTemplateGallery.vue'
 import { REVIEW_FILTERS, effectiveState } from '@/lib/agent/review'
 
 const ROUTE_KINDS = {
@@ -65,6 +67,7 @@ const props = defineProps({
 
 const route = useRoute()
 const agent = useAgentStore()
+const app = useAppStore()
 
 const kindList = computed(() => {
   if (Array.isArray(props.kinds) && props.kinds.length) return [...props.kinds]
@@ -77,6 +80,15 @@ const section = computed(() => {
   return SECTIONS.document
 })
 const wid = computed(() => props.websiteId || (route.params?.websiteId ? String(route.params.websiteId) : null))
+const isReports = computed(() => kindList.value.includes('report'))
+// The project, for the template gallery's drafted request.
+const website = computed(() => {
+  const id = wid.value
+  if (!id) return null
+  const active = app.activeWebsite
+  if (active && String(active.id) === id) return active
+  return (app.websites || []).find((w) => String(w.id) === id) || null
+})
 
 const items = ref([])
 const loading = ref(true)
@@ -156,6 +168,8 @@ const ctaTo = computed(() =>
 
 <template>
   <AgPage :title="section.title" :intro="section.intro" :busy="loading">
+    <ReportTemplateGallery v-if="isReports" :website-id="wid" :website="website" />
+
     <div class="ag-arts-search">
       <AgSearchField v-model="query" :label="`Search ${section.noun}`" @search="onSearch" />
       <label class="ag-arts-filter">
