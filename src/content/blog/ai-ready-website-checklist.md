@@ -44,29 +44,29 @@ Each AI provider documents its own crawlers, and most respect robots.txt. Some a
 
 Agent names and purposes change, so confirm the current list on each provider's documentation pages before you edit your rules. xAI and other providers may use their own agents; check their documentation too.
 
-A reasonable starting point for many businesses that want to be visible in AI answers is to allow search and user-initiated agents on public marketing pages, then decide on training agents according to your own policy. For example, a robots.txt might look like this:
+A reasonable starting point for many businesses that want to be visible in AI answers is to allow search and user-initiated agents on public marketing pages, then decide on training agents according to your own policy. For example, a site that welcomes search and user-initiated agents but opts out of training might use a robots.txt like this:
 
 ```
 User-agent: OAI-SearchBot
-Allow: /
-
 User-agent: ChatGPT-User
-Allow: /
-
 User-agent: PerplexityBot
 Allow: /
+Disallow: /admin/
+Disallow: /checkout/
+Disallow: /account/
 
 User-agent: GPTBot
-Disallow: /account/
+Disallow: /
 
 User-agent: *
 Disallow: /admin/
 Disallow: /checkout/
+Disallow: /account/
 
 Sitemap: https://www.example.com/sitemap.xml
 ```
 
-This is an example, not a recommendation for every site. Keep private areas, account pages and checkout flows blocked for all agents.
+This is an example, not a recommendation for every site. Note how the private paths appear in every group. Under the robots.txt standard, a crawler follows only the most specific group that names it and ignores the `User-agent: *` group, so rules you put under `*` do not carry over to agents with their own group. Whatever you allow, keep private areas, account pages and checkout flows blocked in each group.
 
 ## Step 2: Check your security and CDN settings
 
