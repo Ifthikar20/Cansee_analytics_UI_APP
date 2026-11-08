@@ -9,8 +9,8 @@
 // through the streaming renderer so only the growing last block is parsed
 // again; finished blocks keep their DOM. Links open in the browser pane
 // (a modified click keeps the browser's own behaviour). The project's brand
-// and its competitors are highlighted in finished replies (brandMarks.js),
-// so a reply shows at a glance where the brand stands.
+// and its competitors are highlighted (brandMarks.js), so a reply shows at
+// a glance where the brand stands.
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { createStreamingRenderer, isSafeUrl, onHighlighterReady } from '@/lib/agent/markdown/renderer'
 import { brandMatcher, markBrands } from '@/lib/agent/markdown/brandMarks'
@@ -52,10 +52,26 @@ const matcher = computed(() => {
   return brandMatcher({ own: site.name, competitors: site.competitors || [] })
 })
 
+// Finished blocks keep the same markup while a reply streams, so their
+// marked markup is cached instead of re-parsed on every tick.
+const markCache = new Map()
+const MARK_CACHE_MAX = 200
+
+function markedHtml(html, m) {
+  const key = `${m.pattern.source}\u0000${html}`
+  let out = markCache.get(key)
+  if (out === undefined) {
+    out = markBrands(html, m)
+    if (markCache.size >= MARK_CACHE_MAX) markCache.delete(markCache.keys().next().value)
+    markCache.set(key, out)
+  }
+  return out
+}
+
 const marked = computed(() => {
   const m = matcher.value
   if (!m) return blocks.value
-  return blocks.value.map((block) => ({ ...block, html: markBrands(block.html, m) }))
+  return blocks.value.map((block) => ({ ...block, html: markedHtml(block.html, m) }))
 })
 
 const copyTimers = new Set()
