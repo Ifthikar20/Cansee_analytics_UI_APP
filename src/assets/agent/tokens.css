@@ -74,6 +74,23 @@
   --ag-ring: #5c5c57;
   --ag-scroll-thumb: #d6d6d1;
 
+  /* Highlighted terms in the browser pane (find, keyword, brand, competitor).
+     Text on every background meets WCAG AA. */
+  --ag-hl-fg: #1a1a18;
+  --ag-hl-find-bg: #fde68a;
+  --ag-hl-current-bg: #f59e0b;
+  --ag-hl-current-ring: #92400e;
+  --ag-hl-keyword-bg: #dbeafe;
+  --ag-hl-keyword-line: #1d4ed8;
+  --ag-hl-brand-bg: #dcfce7;
+  --ag-hl-brand-line: #15803d;
+  --ag-hl-competitor-bg: #fee2e2;
+  --ag-hl-competitor-line: #b91c1c;
+  /* A research results row that changed since the previous version: a hue no
+     highlight kind uses. The tint is opaque (sticky cells paint over it). */
+  --ag-changed-line: #6d28d9;
+  --ag-changed-bg: color-mix(in srgb, #6d28d9 6%, var(--ag-pane-bg));
+
   /* Shell additions: tooltips stay dark in both themes; menu-hover is the
      highlighted row on a menu or popover surface. */
   --ag-tooltip-bg: #1a1a18;
@@ -144,6 +161,19 @@
   --ag-scrim: rgba(0, 0, 0, 0.6);
   --ag-ring: #a8a8aa;
   --ag-scroll-thumb: #2a2a2c;
+
+  --ag-hl-fg: #fafafa;
+  --ag-hl-find-bg: #713f12;
+  --ag-hl-current-bg: #b45309;
+  --ag-hl-current-ring: #fcd34d;
+  --ag-hl-keyword-bg: #1e3a8a;
+  --ag-hl-keyword-line: #93c5fd;
+  --ag-hl-brand-bg: #14532d;
+  --ag-hl-brand-line: #86efac;
+  --ag-hl-competitor-bg: #7f1d1d;
+  --ag-hl-competitor-line: #fca5a5;
+  --ag-changed-line: #c4b5fd;
+  --ag-changed-bg: color-mix(in srgb, #a78bfa 10%, var(--ag-pane-bg));
 
   --ag-tooltip-bg: #2a2a2c;
   --ag-tooltip-fg: #fafafa;

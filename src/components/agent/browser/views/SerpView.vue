@@ -102,7 +102,7 @@
 
       <ol v-if="results.length" class="ag-serp-results" aria-label="Google results">
         <li
-          v-for="r in results"
+          v-for="(r, i) in results"
           :key="`${r.position}-${r.url}`"
           class="ag-serp-row"
           :class="{ 'is-you': r.is_yours, 'is-competitor': !r.is_yours && r.is_competitor }"
@@ -128,10 +128,13 @@
                 rel="noopener noreferrer nofollow"
                 @click="openInPane($event, r.url)"
               >
-                <span class="ag-sr-only">Position {{ r.position }}: </span>{{ r.title || r.url }}
+                <span class="ag-sr-only">Position {{ r.position }}: </span
+                ><HighlightedText :text="r.title || r.url" :segments="marked?.titles[i]" />
               </a>
             </h3>
-            <p v-if="r.snippet" class="ag-serp-snippet">{{ r.snippet }}</p>
+            <p v-if="r.snippet" class="ag-serp-snippet">
+              <HighlightedText :text="r.snippet" :segments="marked?.snippets[i]" />
+            </p>
           </div>
         </li>
       </ol>
@@ -140,7 +143,9 @@
       <section v-if="peopleAlsoAsk.length" class="ag-serp-paa" aria-labelledby="ag-serp-paa-title">
         <h3 id="ag-serp-paa-title" class="ag-serp-section-title">People also ask</h3>
         <ul class="ag-serp-paa-list">
-          <li v-for="(q, i) in peopleAlsoAsk" :key="`${i}-${q}`">{{ q }}</li>
+          <li v-for="(q, i) in peopleAlsoAsk" :key="`${i}-${q}`">
+            <HighlightedText :text="q" :segments="marked?.paa[i]" />
+          </li>
         </ul>
       </section>
 
@@ -153,10 +158,12 @@
 import { computed } from 'vue'
 import { CircleAlert, Info, MapPin, Search, Sparkles } from '@lucide/vue'
 import { useAgentPaneStore } from '@/stores/agentPane'
+import { compileTerms, createMarker } from '@/lib/agent/highlight'
 import { firstLetter, hostOf } from '@/lib/agent/url'
 import { aiOverviewUnread } from '@/lib/gap'
 import { safeHref } from '@/utils/safeHref'
 import { formatCapturedAt, regionName } from '../format'
+import HighlightedText from '../HighlightedText.js'
 
 const props = defineProps({
   tab: { type: Object, required: true },
@@ -179,6 +186,19 @@ const peopleAlsoAsk = computed(() =>
 const brandPositions = computed(() =>
   Array.isArray(capture.value.brand_positions) ? capture.value.brand_positions.filter(Number.isFinite) : []
 )
+
+// The pane's keyword highlight marks result titles, snippets and People also
+// ask. The query sits in a read-only input, which cannot hold marks.
+const terms = computed(() => compileTerms(pane.highlightGroups(props.tab.id)))
+const marked = computed(() => {
+  if (!terms.value.length) return null
+  const marker = createMarker(terms.value)
+  return {
+    titles: results.value.map((r) => marker.mark(String(r.title || r.url || ''))),
+    snippets: results.value.map((r) => (r.snippet ? marker.mark(String(r.snippet)) : null)),
+    paa: peopleAlsoAsk.value.map((q) => marker.mark(q)),
+  }
+})
 
 const loading = computed(
   () =>

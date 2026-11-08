@@ -109,8 +109,13 @@ export default {
 
     /* ── other apps' lists the agent task dialog and the context picker read ── */
 
-    // GET search-gap overview; callers read prompts[] {prompt_id, text}
+    // GET search-gap overview: {website, engines, kpis, prompts[], leaderboard};
+    // prompts[] rows carry {prompt_id, brand_prompt_id, text, google, engines, gap, top_action}
     trackedPrompts: (wid, config) => api.get(`/search-gap/websites/${enc(wid)}/overview/`, quiet(config)),
+    // What changed per tracked prompt and engine in the last `days` (1-90):
+    // {window_days, counts, latest_check_at, previous_check_at, changes[], changes_total}
+    keywordChanges: (wid, { days } = {}, config) =>
+        api.get(`/llm-ranking/${enc(wid)}/highlight-changes/`, { ...quiet(config), params: clean({ days }) }),
     // current brand facts; the envelope turns the paginated list into the data array
     brandFacts: (wid, { status, q } = {}, config) =>
         api.get(`/brand-vault/websites/${enc(wid)}/facts/`, {

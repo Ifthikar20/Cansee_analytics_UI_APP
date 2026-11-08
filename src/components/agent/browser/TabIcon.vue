@@ -6,7 +6,17 @@
 
 <script setup>
 import { computed } from 'vue'
-import { CircleAlert, FileChartColumn, FileText, Globe, Search, SquareTerminal, Table, Table2 } from '@lucide/vue'
+import {
+  CircleAlert,
+  FileChartColumn,
+  FileText,
+  Globe,
+  ListOrdered,
+  Search,
+  SquareTerminal,
+  Table,
+  Table2,
+} from '@lucide/vue'
 import AgSpinner from '@/components/agent/common/AgSpinner.vue'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { draftStatusOf } from './useArtifactSource'
@@ -46,6 +56,8 @@ const glyph = computed(() => {
       return { icon: SquareTerminal, tone: 'is-accent' }
     case 'table':
       return { icon: Table2, tone: 'is-sheet' }
+    case 'keywords':
+      return { icon: ListOrdered, tone: 'is-accent' }
     case 'newtab':
       return { icon: Globe, tone: 'is-muted' }
     default:
