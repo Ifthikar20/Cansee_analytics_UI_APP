@@ -2,6 +2,15 @@
   <div class="ag-page">
     <div class="ag-page-body">
       <div class="ag-page-main">
+        <FindBar
+          v-if="find && find.open"
+          :tab="tab"
+          :mode="mode"
+          :count="matches.count"
+          :total="matches.total"
+          :capped="matches.capped"
+          @reader="showReader"
+        />
         <div v-if="tab.status === 'gone'" class="ag-page-state" role="status">
           This page capture is not part of this conversation anymore.
         </div>
@@ -36,7 +45,11 @@
               :reader="reader"
               :base-url="url"
               :source-label="sourceLabel"
+              :terms="terms"
+              :current="find && find.open ? find.index : -1"
+              :nav-token="find ? find.nav : 0"
               @navigate="navigate"
+              @matches="onMatches"
             />
             <div v-else-if="readerState === 'loading'" class="ag-page-state" role="status">
               <span class="ag-page-spinner" aria-hidden="true" />
@@ -72,7 +85,9 @@ import { computed, ref, watch } from 'vue'
 import { Info } from '@lucide/vue'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { useBrowse } from '@/composables/agent/useBrowse'
+import { compileTerms } from '@/lib/agent/highlight'
 import { hostOf } from '@/lib/agent/url'
+import FindBar from '../FindBar.vue'
 import PaneError from '../PaneError.vue'
 import LiveFrame from './LiveFrame.vue'
 import ReaderView from './ReaderView.vue'
@@ -102,6 +117,30 @@ const showLoading = computed(() => {
   return (status === 'idle' || status === 'loading' || status === 'missing') && !seo.value && !reader.value
 })
 
+// Highlighting: this tab's find bar and the terms its reader view marks.
+const find = computed(() => pane.findOf(props.tab.id))
+const terms = computed(() => compileTerms(pane.highlightGroups(props.tab.id)))
+const NO_MATCHES = { count: 0, total: 0, capped: false }
+const matches = ref(NO_MATCHES)
+
+function onMatches(info) {
+  matches.value = info
+  pane.setFindCount(props.tab.id, info.count)
+}
+
+// A find bar opened over marks already on screen (a keyword highlight)
+// starts from their count: the reader only reports counts when they change.
+watch(
+  () => Boolean(find.value),
+  (open) => {
+    if (open) pane.setFindCount(props.tab.id, matches.value.count)
+  }
+)
+
+function showReader() {
+  pane.updateTab(props.tab.id, { mode: 'reader' })
+}
+
 const errorInfo = computed(() => pageErrorInfo(data.value.error))
 const canRetry = computed(() => props.tab.kind === 'url' || Boolean(data.value.transport))
 
@@ -123,6 +162,14 @@ watch(
   () => props.tab.url,
   () => {
     blockedNotice.value = false
+  }
+)
+
+// Without a reader view on screen there is nothing marked to step through.
+watch(
+  () => mode.value === 'reader' && Boolean(reader.value),
+  (shown) => {
+    if (!shown) onMatches(NO_MATCHES)
   }
 )
 

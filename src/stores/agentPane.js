@@ -3,6 +3,7 @@ import { computed, markRaw, ref, watch } from 'vue'
 import { useAgentStore } from '@/stores/agent'
 import { useAuthStore } from '@/stores/auth'
 import { hostOf, isHttpUrl, normalizeAddress } from '@/lib/agent/url'
+import { captureTerms, keywordTerms, uniqueNames } from '@/lib/agent/highlight'
 import { taskError } from '@/lib/agent/normalize'
 import { swarmTabOrder } from '@/lib/agent/reducer'
 import { loadPaneState, loadUiPrefs, movePaneState, savePaneState, saveUiPrefs } from '@/lib/agent/storage'
@@ -33,6 +34,9 @@ import { loadPaneState, loadUiPrefs, movePaneState, savePaneState, saveUiPrefs }
 export const MAX_TABS = 12
 const MAX_CLOSED = 100
 const MAX_STASH = 30
+// Keywords offered by the find bar's keyword picker.
+const MAX_CHAT_KEYWORDS = 50
+const MAX_FIND_TEXT = 200
 const RESEARCH_KINDS = new Set(['serp', 'page'])
 const TAB_FIELDS = new Set([
     'title',
@@ -389,6 +393,13 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
     const layout = ref(null)
     // The agent had tabs to show while the pane stayed closed.
     const attention = ref(false)
+    // Highlighting: each page tab's find bar, by tab id ({open, text, index,
+    // count, nav}: nav changes on every jump so the view knows to scroll),
+    // and the keyword whose terms every reader and Google results view
+    // marks ({keyword, brand, competitors, sourceTabId}). Memory only:
+    // snapshot() leaves both out, so nothing here is ever stored.
+    const finds = ref({})
+    const keywordHighlight = ref(null)
 
     let openedByAgent = false
     let closed = new Set()
@@ -1171,7 +1182,123 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         if (specs.length || chatLoaded(key)) restored = true
     }
 
+    // ── Highlighting ──
+
+    function findOf(id) {
+        return (id && finds.value[id]) || null
+    }
+
+    function openFind(id) {
+        if (!byId(id)) return
+        const entry = finds.value[id]
+        if (entry) entry.open = true
+        else finds.value[id] = { open: true, text: '', index: 0, count: 0, nav: 0 }
+    }
+
+    // Closing drops the find text; the keyword highlight stays.
+    function closeFind(id) {
+        if (id && finds.value[id]) delete finds.value[id]
+    }
+
+    function toggleFind(id) {
+        if (findOf(id)?.open) closeFind(id)
+        else openFind(id)
+    }
+
+    function setFindText(id, text) {
+        const entry = findOf(id)
+        if (!entry) return
+        const next = typeof text === 'string' ? text.slice(0, MAX_FIND_TEXT) : ''
+        if (entry.text === next) return
+        entry.text = next
+        entry.index = 0
+        entry.nav += 1
+    }
+
+    // The view reports how many marks next/previous can step through.
+    function setFindCount(id, count) {
+        const entry = findOf(id)
+        if (!entry) return
+        const n = Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
+        entry.count = n
+        if (entry.index >= n) entry.index = 0
+    }
+
+    function stepFind(id, delta) {
+        const entry = findOf(id)
+        if (!entry || !entry.count) return
+        const step = delta < 0 ? -1 : 1
+        entry.index = (entry.index + step + entry.count) % entry.count
+        entry.nav += 1
+    }
+
+    function setKeywordHighlight(value) {
+        const keyword =
+            value && typeof value.keyword === 'string' ? value.keyword.replace(/\s+/g, ' ').trim() : ''
+        if (!keyword) {
+            keywordHighlight.value = null
+            return
+        }
+        keywordHighlight.value = {
+            keyword,
+            brand: uniqueNames(value.brand),
+            competitors: uniqueNames(value.competitors),
+            sourceTabId: value.sourceTabId ?? null,
+        }
+    }
+
+    function clearKeywordHighlight() {
+        keywordHighlight.value = null
+    }
+
+    // The terms a tab marks: its own find text (while its bar is open), then
+    // the pane's keyword with its brand and competitor names.
+    function highlightGroups(id) {
+        const entry = findOf(id)
+        const k = keywordHighlight.value
+        return {
+            find: entry && entry.open && entry.text.trim() ? [entry.text] : [],
+            keyword: k ? keywordTerms(k.keyword) : [],
+            brand: k ? k.brand : [],
+            competitor: k ? k.competitors : [],
+        }
+    }
+
+    // Keywords searched in this chat, with the brand and competitor names
+    // their Google results carry, for the keyword picker: from the chat's
+    // stored research and from the Google results tabs of a streaming run.
+    const chatKeywords = computed(() => {
+        const found = new Map()
+        const add = (capture) => {
+            const terms = captureTerms(capture)
+            if (!terms.keyword) return
+            const key = terms.keyword.toLowerCase()
+            const known = found.get(key)
+            found.set(
+                key,
+                known
+                    ? {
+                          keyword: known.keyword,
+                          brand: uniqueNames([...known.brand, ...terms.brand]),
+                          competitors: uniqueNames([...known.competitors, ...terms.competitors]),
+                      }
+                    : terms
+            )
+        }
+        const key = chatKey.value
+        if (key && key !== 'new') {
+            for (const m of messageList(key)) {
+                const serps = (m && m.research && m.research.serp) || {}
+                for (const capture of Object.values(serps)) add(capture)
+            }
+        }
+        for (const t of tabs.value) if (t.kind === 'serp') add(t.data)
+        return Array.from(found.values()).slice(0, MAX_CHAT_KEYWORDS)
+    })
+
     function clearChatState() {
+        finds.value = {}
+        keywordHighlight.value = null
         tabs.value = []
         activeId.value = null
         expanded.value = false
@@ -1220,6 +1347,16 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         scope = null
         clearChatState()
     }
+
+    // A tab that leaves the strip (closed, evicted or replaced) takes its find
+    // bar with it. Sync, so a tab opened and closed in one tick still counts.
+    watch(
+        () => tabs.value.map((t) => t.id).join('|'),
+        () => {
+            for (const id of Object.keys(finds.value)) if (!byId(id)) delete finds.value[id]
+        },
+        { flush: 'sync' }
+    )
 
     // Persist only the stored fields; data patches do not cause a write.
     watch(
@@ -1323,5 +1460,18 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         setReturnFocus,
         setLayout,
         reset,
+        finds,
+        keywordHighlight,
+        chatKeywords,
+        findOf,
+        openFind,
+        closeFind,
+        toggleFind,
+        setFindText,
+        setFindCount,
+        stepFind,
+        setKeywordHighlight,
+        clearKeywordHighlight,
+        highlightGroups,
     }
 })

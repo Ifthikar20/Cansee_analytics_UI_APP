@@ -13,6 +13,18 @@
         </AgIconButton>
       </div>
       <UrlBar class="ag-ph-url" compact :value="pageAddress" @submit="go" />
+      <AgIconButton
+        :id="findToggleId(tab.id)"
+        label="Find on page"
+        :size="28"
+        muted
+        :active="findOpen"
+        :aria-expanded="findOpen ? 'true' : 'false'"
+        :aria-controls="findOpen ? findBarId(tab.id) : undefined"
+        @click="toggleFind"
+      >
+        <Search :size="15" aria-hidden="true" />
+      </AgIconButton>
       <div class="ag-ph-mode" role="group" aria-label="View">
         <AgTooltip :text="liveReason" :disabled="liveOk">
           <button
@@ -111,6 +123,16 @@
       </h2>
       <div class="ag-ph-actions">
         <template v-if="tab.kind === 'serp'">
+          <AgIconButton
+            v-if="serpTerms.keyword"
+            label="Highlight this keyword in pages"
+            :size="28"
+            muted
+            :pressed="serpHighlighting"
+            @click="toggleSerpHighlight"
+          >
+            <Highlighter :size="15" aria-hidden="true" />
+          </AgIconButton>
           <AgTooltip v-if="googleHref" text="Open in Google">
             <a class="ag-ph-ext" :href="googleHref" target="_blank" rel="noopener noreferrer nofollow" aria-label="Open in Google">
               <ExternalLink :size="15" aria-hidden="true" />
@@ -152,7 +174,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick } from 'vue'
 import { DropdownMenuRoot, DropdownMenuTrigger } from 'reka-ui'
 import {
   ArrowLeft,
@@ -163,9 +185,11 @@ import {
   Download,
   ExternalLink,
   FileDown,
+  Highlighter,
   History,
   Monitor,
   RotateCw,
+  Search,
 } from '@lucide/vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
 import AgMenuContent from '@/components/agent/common/AgMenuContent.vue'
@@ -182,12 +206,14 @@ import { approvalLine } from '@/lib/agent/review'
 import { structuredType } from '@/lib/agent/structured'
 import ReviewChip from '@/components/agent/review/ReviewChip.vue'
 import { downloadText } from '@/lib/agent/download'
+import { captureTerms } from '@/lib/agent/highlight'
 import { googleSearchUrl } from '@/lib/agent/url'
 import { safeHref } from '@/utils/safeHref'
 import ExportMenu from './ExportMenu.vue'
 import UrlBar from './UrlBar.vue'
 import VersionMenu from './VersionMenu.vue'
 import { formatCapturedAt } from './format'
+import { findBarId, findToggleId } from './ids'
 import { liveAllowed, liveUnavailableReason, pageMode, pageUrl } from './pageMode'
 
 // The row under the tab strip: a title with Export (and versions) for
@@ -283,6 +309,15 @@ function setMode(next) {
   pane.updateTab(props.tab.id, { mode: next })
 }
 
+const findOpen = computed(() => Boolean(pane.findOf(props.tab.id)?.open))
+
+function toggleFind() {
+  const opening = !findOpen.value
+  const id = props.tab.id
+  pane.toggleFind(id)
+  if (opening) nextTick(() => document.querySelector(`#${findBarId(id)} input`)?.focus())
+}
+
 // ── Google results ──
 
 const capture = computed(() => props.tab.data || {})
@@ -291,6 +326,21 @@ const googleHref = computed(() => googleSearchUrl(capture.value.query, capture.v
 
 function serpContext() {
   return { title: pane.titleOf(props.tab), capture: capture.value }
+}
+
+// Marks this search's keyword, with its brand and competitor names, in every
+// reader and Google results view of the pane.
+const serpTerms = computed(() =>
+  props.tab.kind === 'serp' ? captureTerms(capture.value) : { keyword: '', brand: [], competitors: [] }
+)
+const serpHighlighting = computed(() => {
+  const k = pane.keywordHighlight
+  return Boolean(k && serpTerms.value.keyword && k.keyword.toLowerCase() === serpTerms.value.keyword.toLowerCase())
+})
+
+function toggleSerpHighlight() {
+  if (serpHighlighting.value) pane.clearKeywordHighlight()
+  else pane.setKeywordHighlight({ ...serpTerms.value, sourceTabId: props.tab.id })
 }
 
 // ── Research results tables ──
