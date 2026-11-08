@@ -79,4 +79,11 @@ export const TIPS = Object.freeze({
             documents: 'Articles and pages the agents wrote.',
         }),
     }),
+    // The Agents page.
+    agents: Object.freeze({
+        setup: 'What this workspace has set up for the agents. Google results or an AI engine that is not set up is skipped and reported as not set up, never as not mentioning you.',
+        ceiling:
+            'How many research agents one research can run, set on the server. Each prompt takes one agent per Google results page, per AI engine asked and per competitor page read, plus three that compare pages and collect the cited sources.',
+        presets: 'Each preset drafts a request for the Gap Analyst, who plans the research. You review the message in a new chat before anything runs.',
+    }),
 })

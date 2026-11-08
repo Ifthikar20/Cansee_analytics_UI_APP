@@ -1,14 +1,22 @@
 <script setup>
 // The agents the workspace offers (GET agents/), by team (p2_contract.md
-// 12). The four general agents start a new chat with that agent picked;
-// the six specialists ask for their inputs first and draft the task into a
-// new chat, where the person reviews it and sends it.
+// 12), and the research agents (research_swarm, the Gap Analyst's tool),
+// which have no catalog entry and get their own card with presets. Use
+// opens the agent's task dialog: the six specialists ask for their inputs,
+// the four general agents and the research agents start from a task
+// template. Every task is drafted into a new chat, where the person reviews
+// it and sends it.
+//
+// GET status/ says what is set up (the strip on top) and why an agent
+// cannot run (lib/agent/availability); a missing status blocks nothing.
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
 import { useAgentStore } from '@/stores/agent'
 import { useAppStore } from '@/stores/app'
 import { agentList } from '@/lib/agent/agentsMeta'
+import { agentBlock, workspaceBlock } from '@/lib/agent/availability'
+import { RESEARCH_AGENTS } from '@/lib/agent/researchAgents'
 import { TEAMS, TEAM_KEYS } from '@/lib/agent/teams'
 import { ASK_TEMPLATES } from '@/lib/analytics/askTemplates'
 import { boardLocation } from '@/lib/board/links'
@@ -19,11 +27,9 @@ import AgEmptyState from '@/components/agent/common/AgEmptyState.vue'
 import { IconAgents } from '@/components/agent/icons'
 import { asList, errorMessage } from '@/components/agent/common/agentText'
 import AgentCard from '@/components/agent/agents/AgentCard.vue'
+import AgentSetupStrip from '@/components/agent/agents/AgentSetupStrip.vue'
 import AgentTaskDialog from '@/components/agent/agents/AgentTaskDialog.vue'
-
-// The agents that open a chat directly; the others take their inputs first.
-const CHAT_AGENTS = new Set(['gap_analyst', 'landing_page', 'aeo_article', 'ad_campaign'])
-const OFF_REASON = 'The agent workspace is turned off on this server.'
+import ResearchAgentsCard from '@/components/agent/agents/ResearchAgentsCard.vue'
 
 const props = defineProps({
   websiteId: { type: String, default: null },
@@ -41,9 +47,22 @@ const error = ref('')
 const wid = computed(() => props.websiteId || (route.params?.websiteId ? String(route.params.websiteId) : null))
 const website = computed(() => app.websites.find((w) => String(w.id) === wid.value) || null)
 const catalog = computed(() => asList(agent.catalog))
-// With GET status/, a writing agent the AI allowance cannot start says why.
 const agents = computed(() => (catalog.value.length ? agentList(catalog.value, agent.status) : []))
-const offReason = computed(() => (agent.status && agent.status.enabled === false ? OFF_REASON : ''))
+
+/* ── Why an agent cannot run ── */
+
+const blocks = computed(() => {
+  const out = {}
+  for (const a of agents.value) out[a.key] = agentBlock(a.key, agent.status)
+  return out
+})
+const researchBlock = computed(() => agentBlock(RESEARCH_AGENTS.key, agent.status))
+const everyAgentBlock = computed(() => workspaceBlock(agent.status))
+const checking = computed(() => Boolean(agent.statusLoading))
+
+function recheck() {
+  if (typeof agent.loadStatus === 'function') agent.loadStatus()
+}
 
 /* ── Team tabs, kept in ?team= ── */
 
@@ -68,6 +87,8 @@ function agentsOf(key) {
   return agents.value.filter((a) => (a.teams || []).some((t) => t.key === key))
 }
 
+const researchIn = (key) => key === 'all' || RESEARCH_AGENTS.teams.some((t) => t.key === key)
+
 /* ── Starts from: the widgets whose Ask the agent drafts name the agent ── */
 
 const startsFromByAgent = computed(() => {
@@ -91,19 +112,20 @@ const startsFromByAgent = computed(() => {
   return out
 })
 
-function useTo(item) {
-  if (!wid.value || !CHAT_AGENTS.has(item.key)) return null
-  return { name: 'agent-home', params: { websiteId: wid.value }, query: { agent: item.key } }
-}
-
-/* ── The task dialog of the six specialists ── */
+/* ── The task dialog ── */
 
 const taskAgent = ref(null)
+const taskTemplate = ref('')
 const taskOpen = ref(false)
 
-function openTask(item) {
+function openTask(item, template = '') {
   taskAgent.value = item
+  taskTemplate.value = template
   taskOpen.value = true
+}
+
+function openResearch(template) {
+  openTask(RESEARCH_AGENTS, template)
 }
 
 async function load({ force = false } = {}) {
@@ -149,29 +171,46 @@ onMounted(() => {
       body="The workspace has not published any agents yet."
     />
 
-    <TabsRoot v-else v-model="tab" class="ag-agents-tabs" activation-mode="manual">
-      <TabsList class="ag-agents-tablist" aria-label="Teams">
-        <TabsTrigger v-for="t in tabs" :key="t.key" :value="t.key" class="ag-agents-tab">{{ t.label }}</TabsTrigger>
-      </TabsList>
-      <TabsContent v-for="t in tabs" :key="t.key" :value="t.key" class="ag-agents-panel">
-        <ul class="ag-agents" role="list">
-          <AgentCard
-            v-for="item in agentsOf(t.key)"
-            :key="item.key"
-            :agent="item"
-            :to="useTo(item)"
-            :starts-from="startsFromByAgent[item.key] || []"
-            :off-reason="offReason"
-            :no-project="!wid"
-            @use="openTask"
-          />
-        </ul>
-      </TabsContent>
-    </TabsRoot>
+    <template v-else>
+      <AgentSetupStrip
+        class="ag-agents-setup"
+        :status="agent.status"
+        :block="everyAgentBlock"
+        :checking="checking"
+        @refresh="recheck"
+      />
+
+      <TabsRoot v-model="tab" class="ag-agents-tabs" activation-mode="manual">
+        <TabsList class="ag-agents-tablist" aria-label="Teams">
+          <TabsTrigger v-for="t in tabs" :key="t.key" :value="t.key" class="ag-agents-tab">{{ t.label }}</TabsTrigger>
+        </TabsList>
+        <TabsContent v-for="t in tabs" :key="t.key" :value="t.key" class="ag-agents-panel">
+          <ul class="ag-agents" role="list">
+            <ResearchAgentsCard
+              v-if="researchIn(t.key)"
+              :status="agent.status"
+              :block="researchBlock"
+              :no-project="!wid"
+              @use="openResearch"
+            />
+            <AgentCard
+              v-for="item in agentsOf(t.key)"
+              :key="item.key"
+              :agent="item"
+              :starts-from="startsFromByAgent[item.key] || []"
+              :block="blocks[item.key]"
+              :no-project="!wid"
+              @use="openTask"
+            />
+          </ul>
+        </TabsContent>
+      </TabsRoot>
+    </template>
 
     <AgentTaskDialog
       v-model:open="taskOpen"
       :agent="taskAgent"
+      :template="taskTemplate"
       :website-id="wid"
       :website="website"
       :status="agent.status"
@@ -180,6 +219,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.ag-agents-setup {
+  margin-bottom: 16px;
+}
+
 .ag-agents-tabs {
   display: flex;
   flex-direction: column;

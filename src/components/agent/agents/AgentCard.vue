@@ -1,13 +1,19 @@
 <script setup>
 // One agent on the Agents page: what it is, its teams, what it delivers,
 // the analytics tabs whose Ask the agent drafts hand work to it, a starter
-// and Use. The four general agents open a new chat with the agent picked;
-// the six specialists ask for their inputs first (AgentTaskDialog).
+// and Use, which opens its task dialog (AgentTaskDialog).
+//
+// An agent that cannot run says why under Use, with what to do in a HelpTip
+// (setting names only for staff and DEBUG; lib/agent/availability). Use is
+// then aria-disabled, never a native disabled or title=, so keyboard and
+// screen reader users reach the reason: it is the button's description.
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import AgButton from '@/components/agent/common/AgButton.vue'
-import AgTooltip from '@/components/agent/common/AgTooltip.vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
 import { kindMeta } from '@/lib/agent/agentsMeta'
+import { blockHelp } from '@/lib/agent/availability'
+import { TIPS } from '@/lib/help/tips'
 
 const DELIVERS_BY_KIND = {
   report: 'Writes a report you can save to Reports',
@@ -26,14 +32,12 @@ const DELIVERS_BY_AGENT = {
 }
 
 const props = defineProps({
-  // agentList() entry: {key, name, icon, outputKind, description, starter, teams, unavailable}
+  // agentList() entry: {key, name, icon, outputKind, description, starter, teams}
   agent: { type: Object, required: true },
-  // a router location for Use (the four general agents), null to emit `use`
-  to: { type: Object, default: null },
   // [{key, label, to}] analytics tabs that hand work to this agent
   startsFrom: { type: Array, default: () => [] },
-  // why Use is off for every agent ('' when it is on)
-  offReason: { type: String, default: '' },
+  // why it cannot run ({title, action, setting}; lib/agent/availability), or null
+  block: { type: Object, default: null },
   // no project in scope
   noProject: { type: Boolean, default: false },
 })
@@ -44,12 +48,19 @@ const delivers = computed(
   () => DELIVERS_BY_AGENT[props.agent.key] || DELIVERS_BY_KIND[props.agent.outputKind] || '',
 )
 const teams = computed(() => (Array.isArray(props.agent.teams) ? props.agent.teams : []))
-const blockedReason = computed(() => props.offReason || props.agent.unavailable || '')
+const reason = computed(() => props.block?.title || (props.noProject ? TIPS.agent.noProject : ''))
+const help = computed(() => blockHelp(props.block))
+const off = computed(() => Boolean(reason.value))
 const whyId = computed(() => `ag-agent-why-${props.agent.key}`)
+
+function use() {
+  if (off.value) return
+  emit('use', props.agent)
+}
 </script>
 
 <template>
-  <li class="ag-agent">
+  <li class="ag-agent" :class="{ 'is-off': off }">
     <div class="ag-agent-head">
       <span class="ag-agent-icon" :style="{ color: kindMeta(agent.outputKind).color }" aria-hidden="true">
         <component :is="agent.icon" :size="14" />
@@ -75,27 +86,16 @@ const whyId = computed(() => `ag-agent-why-${props.agent.key}`)
       <span class="ag-agent-starter-text">{{ agent.starter }}</span>
     </p>
     <div class="ag-agent-actions">
-      <p v-if="!offReason && agent.unavailable" :id="whyId" class="ag-agent-why">{{ agent.unavailable }}</p>
-      <AgTooltip v-if="offReason" :text="offReason">
-        <button type="button" class="ag-agent-use-off" aria-disabled="true" :aria-label="`Use ${agent.name}`">Use</button>
-      </AgTooltip>
+      <p v-if="reason" class="ag-agent-why">
+        <span :id="whyId">{{ reason }}</span>
+        <HelpTip v-if="help" :text="help" :label="`What to do: ${agent.name}`" />
+      </p>
       <AgButton
-        v-else-if="to"
         size="sm"
-        :to="!blockedReason && !noProject ? to : null"
-        :disabled="noProject || Boolean(blockedReason)"
         :aria-label="`Use ${agent.name}`"
-        :aria-describedby="agent.unavailable ? whyId : undefined"
-      >
-        Use
-      </AgButton>
-      <AgButton
-        v-else
-        size="sm"
-        :disabled="noProject || Boolean(blockedReason)"
-        :aria-label="`Use ${agent.name}`"
-        :aria-describedby="agent.unavailable ? whyId : undefined"
-        @click="emit('use', agent)"
+        :aria-disabled="off ? 'true' : undefined"
+        :aria-describedby="off ? whyId : undefined"
+        @click="use"
       >
         Use
       </AgButton>
@@ -230,7 +230,10 @@ const whyId = computed(() => `ag-agent-why-${props.agent.key}`)
 }
 
 .ag-agent-why {
+  display: flex;
   flex: 1;
+  align-items: flex-start;
+  gap: 4px;
   min-width: 0;
   margin: 0;
   color: var(--ag-warning);
@@ -238,23 +241,7 @@ const whyId = computed(() => `ag-agent-why-${props.agent.key}`)
   line-height: 18px;
 }
 
-.ag-agent-use-off {
-  height: 30px;
-  padding: 0 8px;
-  border: 1px solid var(--ag-btn-border);
-  border-radius: 8px;
-  background: var(--ag-btn-bg);
-  color: var(--ag-fg-1);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  opacity: 0.5;
-  cursor: default;
-}
-
-.ag-agent-use-off:focus-visible {
-  border-radius: 8px;
-  outline: 2px solid var(--ag-ring);
-  outline-offset: 2px;
+.ag-agent-why :deep(.cs-helptip) {
+  flex-shrink: 0;
 }
 </style>
