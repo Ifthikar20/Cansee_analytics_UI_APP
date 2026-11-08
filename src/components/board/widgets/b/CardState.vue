@@ -6,6 +6,7 @@
 // (`to`) or asks the card to reload its source (`retry`, emits retry).
 import { useBoard } from '@/lib/board/context'
 import AgButton from '@/components/agent/common/AgButton.vue'
+import SetupPointer from '@/components/board/SetupPointer.vue'
 
 const props = defineProps({
   title: { type: String, required: true },
@@ -38,6 +39,7 @@ function run() {
     <p v-if="body" class="wb-state-body">{{ body }}</p>
     <AgButton v-if="action && action.label && action.to" size="sm" :to="action.to">{{ action.label }}</AgButton>
     <AgButton v-else-if="action && action.label" size="sm" @click="run">{{ action.label }}</AgButton>
+    <SetupPointer v-if="kind === 'empty'" />
   </div>
 </template>
 

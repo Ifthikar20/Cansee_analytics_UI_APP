@@ -10,8 +10,16 @@ export const BOARD_CONTEXT = Symbol('board-context')
 export const IN_PANEL = Symbol('board-in-panel')
 // BoardWidget's retry, for the card it could not load (CardLoadError).
 export const CARD_RETRY = Symbol('board-card-retry')
+// The setup panel's pointer for empty cards: {text (ref: '' when the panel
+// is hidden), show()}. The board page provides it (SetupPointer reads it).
+export const SETUP_POINTER = Symbol('board-setup-pointer')
 
 const BOARD_KEYS = ['websiteId', 'open', 'close', 'invalidate', 'revalidate']
+
+/** The board's setup pointer, or null outside a board page. */
+export function useSetupPointer() {
+    return inject(SETUP_POINTER, null)
+}
 
 /** True inside the board's side panel. */
 export function useInPanel() {

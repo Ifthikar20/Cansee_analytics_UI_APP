@@ -4,6 +4,7 @@
 // one more link. It never shows sample figures. An action with `to` is a
 // link; any other emits `action` for the card to run.
 import AgButton from '@/components/agent/common/AgButton.vue'
+import SetupPointer from '@/components/board/SetupPointer.vue'
 
 defineProps({
   title: { type: String, required: true },
@@ -18,6 +19,8 @@ defineProps({
   inline: { type: Boolean, default: false },
 })
 const emit = defineEmits(['action'])
+// The states the setup panel can explain (a project still being set up).
+const POINTED = new Set(['empty', 'not_available'])
 </script>
 
 <template>
@@ -29,6 +32,7 @@ const emit = defineEmits(['action'])
       <AgButton v-else-if="action && action.label" size="sm" @click="emit('action')">{{ action.label }}</AgButton>
       <AgButton v-if="link && link.label" size="sm" variant="ghost" :to="link.to">{{ link.label }}</AgButton>
     </div>
+    <SetupPointer v-if="POINTED.has(kind)" />
   </div>
 </template>
 

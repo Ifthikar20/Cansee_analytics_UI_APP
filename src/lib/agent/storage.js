@@ -15,6 +15,9 @@
 // | cs-feedback-tokens-v1:<uid>           | Help & feedback ticket tokens         |
 // | cs-feedback-seen-v1:<uid>             | Help & feedback messages seen, per    |
 // |                                       | ticket                                |
+// | cs-setup-v1:<uid>:<wid>               | the analytics setup panel: first      |
+// |                                       | research chat, dismissed, collapsed   |
+// |                                       | (lib/setup/storage.js)                |
 //
 // Pane state tabs are {id, kind} plus `url` (url tabs), `artifact_id` and
 // `version` (artifact tabs), `swarm_id` and `version` (research table tabs).
@@ -36,6 +39,8 @@ const BOARD_PREFIX = 'cs-board-v1:'
 // A token opens its ticket, so another account on this browser must never see it.
 const FEEDBACK_TOKENS_PREFIX = 'cs-feedback-tokens-v1:'
 const FEEDBACK_SEEN_PREFIX = 'cs-feedback-seen-v1:'
+// The analytics setup panel's record per project (lib/setup/storage.js).
+const SETUP_PREFIX = 'cs-setup-v1:'
 // Before they were per user: owned by nobody we can tell, so never read,
 // and removed on logout.
 const LEGACY_SHARED_KEYS = Object.freeze(['cs-feedback-tokens', 'cs-feedback-seen'])
@@ -50,6 +55,7 @@ export const USER_KEY_PREFIXES = Object.freeze([
     BOARD_PREFIX,
     FEEDBACK_TOKENS_PREFIX,
     FEEDBACK_SEEN_PREFIX,
+    SETUP_PREFIX,
 ])
 
 const FINDINGS_PREF_KEYS = Object.freeze(['status', 'category', 'severity'])
@@ -68,6 +74,7 @@ export const storageKeys = Object.freeze({
     findings: (uid, wid) => `${FINDINGS_PREFIX}${uid}:${wid}`,
     feedbackTokens: (uid) => `${FEEDBACK_TOKENS_PREFIX}${uid}`,
     feedbackSeen: (uid) => `${FEEDBACK_SEEN_PREFIX}${uid}`,
+    setup: (uid, wid) => `${SETUP_PREFIX}${uid}:${wid}`,
 })
 
 function backend() {

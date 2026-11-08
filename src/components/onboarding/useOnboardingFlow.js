@@ -29,6 +29,7 @@ import { useAppStore } from '@/stores/app'
 import { useToast } from '@/composables/useToast'
 import { useFirstResearch } from '@/composables/agent/useFirstResearch'
 import { saveDraft } from '@/lib/agent/storage'
+import { noteSetupFinished } from '@/lib/setup/storage'
 import { NEW_CHAT_KEY } from '@/lib/agent/types'
 import { countryLabel, DEFAULT_COUNTRY } from '@/lib/countries'
 import { settingsVisible } from '@/lib/agent/setup'
@@ -920,6 +921,9 @@ export function provideOnboardingFlow({ onComplete } = {}) {
       finishing.value = ''
       return
     }
+
+    // The analytics board's Setup panel greets this project's first landings.
+    noteSetupFinished(auth.user?.id, websiteId, research ? 'research' : 'skip')
 
     if (agentStatus.value?.enabled !== false) await saveBrandContext(websiteId)
 
