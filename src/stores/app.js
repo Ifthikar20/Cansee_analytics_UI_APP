@@ -86,6 +86,13 @@ export const useAppStore = defineStore('app', () => {
         }
     }
 
+    /** Forget the signed-in user's projects (sign-out, expired session). */
+    function reset() {
+        websites.value = []
+        activeWebsite.value = null
+        projectLimit.value = -1
+    }
+
     return {
         activeWebsite,
         websites,
@@ -99,5 +106,6 @@ export const useAppStore = defineStore('app', () => {
         setProjectLimit,
         setActiveWebsite,
         setWebsites,
+        reset,
     }
 })

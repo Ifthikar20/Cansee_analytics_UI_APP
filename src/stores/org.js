@@ -56,7 +56,12 @@ export const useOrgStore = defineStore('org', () => {
 
     // ── Invitations ──
     async function loadInvitations() {
-        if (!hasOrg()) return
+        // The invitations endpoint is admin-only (IsOrgAdmin). Members would
+        // get a guaranteed 403 and a permission toast on every Team visit.
+        if (!hasOrg() || !useAuthStore().isOrgAdmin) {
+            invitations.value = []
+            return
+        }
         const { data } = await orgsApi.listInvitations()
         invitations.value = Array.isArray(data) ? data : []
     }
@@ -143,7 +148,22 @@ export const useOrgStore = defineStore('org', () => {
         return data
     }
 
+    /** Drop every list; the next account must not see this one's org. */
+    function reset() {
+        members.value = []
+        invitations.value = []
+        domains.value = []
+        usage.value = null
+        membersLoading.value = false
+        domainsLoading.value = false
+    }
+
+    // Sign-out clears the lists before clearAuth returns, as the agent and
+    // board stores do.
+    useAuthStore().onClearAuth(() => reset())
+
     return {
+        reset,
         members,
         invitations,
         domains,

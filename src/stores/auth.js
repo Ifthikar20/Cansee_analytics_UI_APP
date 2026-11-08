@@ -172,6 +172,10 @@ export const useAuthStore = defineStore('auth', () => {
         // Agent workspace keys (last chat, drafts, pane tabs) of every user
         // of this browser; the signed-in user may be unknown by now.
         clearAgentUserData()
+        // The project list belongs to the user who just left. Without this
+        // the next sign-in in the same tab is routed to their projects
+        // (ensureWebsites and the route guard skip loading a non-empty list).
+        useAppStore().reset()
         clearAuthHooks.forEach((fn) => {
             try { fn(uid) } catch { /* a hook must not block sign-out */ }
         })
