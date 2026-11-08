@@ -51,6 +51,18 @@ export function authHeaders() {
 }
 
 /**
+ * Where an expired session sends the user: the login page, with the page
+ * they were on as `redirect` so signing back in returns them there (as the
+ * route guard does for a cold load). Public and guest pages are not
+ * returned to.
+ */
+function loginLocation(here) {
+    const path = here?.fullPath
+    if (!path || here.meta?.public || here.meta?.guest || !path.startsWith('/')) return { name: 'login' }
+    return { name: 'login', query: { redirect: path } }
+}
+
+/**
  * Exchange the refresh cookie for a new access token. Single-flight:
  * concurrent callers share one request. Resolves with the new token. On a
  * 401/403 the session is over: auth is cleared and the user is sent to
@@ -82,8 +94,9 @@ export function refreshAccessToken() {
                 auth.clearAuth()
                 // Don't pile up duplicate navigations if we're already
                 // on /login (other in-flight requests may also 401).
-                if (router.currentRoute.value?.name !== 'login') {
-                    router.push({ name: 'login' })
+                const here = router.currentRoute.value
+                if (here?.name !== 'login') {
+                    router.push(loginLocation(here))
                 }
             }
             throw refreshError
