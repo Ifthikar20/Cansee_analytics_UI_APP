@@ -18,9 +18,17 @@ export function isHelpShortcut(event) {
 }
 
 // Another reka layer (dialog, menu, popover) is open, not the help drawer.
+// Tooltips are dismissable layers too (they open on hover and keyboard
+// focus), so they are skipped, as BoardPanel does: a tooltip on the
+// focused Help button must not swallow the key.
 function otherLayerOpen() {
   if (typeof document === 'undefined') return false
-  return [...document.querySelectorAll('[data-dismissable-layer]')].some((el) => !el.classList.contains('help-drawer'))
+  return [...document.querySelectorAll('[data-dismissable-layer]')].some(
+    (el) =>
+      !el.classList.contains('help-drawer') &&
+      el.getAttribute('role') !== 'tooltip' &&
+      !el.querySelector('[role="tooltip"]'),
+  )
 }
 
 export function useHelpShortcut({ target = typeof window !== 'undefined' ? window : null } = {}) {
