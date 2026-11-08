@@ -10,7 +10,11 @@
 //
 // The page titles itself (its route has no meta.title) and provides the
 // board context (lib/board/context.js) to every card and panel.
-import { computed, nextTick, onBeforeUnmount, provide, ref, watch } from 'vue'
+//
+// Setup (SetupStatusPanel) sits at the top of the board on the first
+// landings after onboarding and whenever setup is missing; empty cards
+// point to it (SETUP_POINTER) instead of staying silent.
+import { computed, nextTick, onBeforeUnmount, provide, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useScroll } from '@vueuse/core'
 import { DropdownMenuRoot, DropdownMenuTrigger } from 'reka-ui'
@@ -27,9 +31,11 @@ import BoardGrid from '@/components/board/BoardGrid.vue'
 import BoardPanel from '@/components/board/BoardPanel.vue'
 import BoardSaveState from '@/components/board/BoardSaveState.vue'
 import WidgetCatalog from '@/components/board/WidgetCatalog.vue'
-import { invalidate, revalidate } from '@/composables/board/useBoardSource'
+import SetupStatusPanel from '@/components/onboarding/SetupStatusPanel.vue'
+import { invalidate, revalidate, useBoardSource } from '@/composables/board/useBoardSource'
+import { useSetupStatus } from '@/composables/setup/useSetupStatus'
 import { useScrollParent } from '@/composables/board/useScrollParent'
-import { BOARD_CONTEXT } from '@/lib/board/context'
+import { BOARD_CONTEXT, SETUP_POINTER } from '@/lib/board/context'
 import { DEFAULT_LAYOUT, panelTitle, widgetMeta } from '@/lib/board/widgets'
 import { useAppStore } from '@/stores/app'
 import { useBoardStore } from '@/stores/board'
@@ -263,6 +269,21 @@ provide(BOARD_CONTEXT, {
   revalidate: () => revalidate(props.websiteId),
 })
 
+/* ── Setup ── */
+
+// Whether Autopilot runs here (the Prompt ranking card's source, shared).
+const ranking = useBoardSource('ranking')
+const autopilotOn = computed(() => {
+  const enabled = ranking.data.value?.autopilot?.enabled
+  return typeof enabled === 'boolean' ? enabled : null
+})
+const setup = reactive(useSetupStatus(() => props.websiteId, { autopilotOn }))
+const setupPanel = ref(null)
+provide(SETUP_POINTER, {
+  text: computed(() => setup.panel.pointer),
+  show: () => setupPanel.value?.show(),
+})
+
 /* ── Header actions ── */
 
 // Menus and dialogs give focus back to their trigger once they close (in
@@ -365,6 +386,12 @@ watch(
       </div>
 
       <div class="bd-body">
+        <SetupStatusPanel
+          ref="setupPanel"
+          :key="`setup-${websiteId}`"
+          :setup="setup"
+          @add-prompts="open('prompts', { add: '1' })"
+        />
         <AgEmptyState
           v-if="!layoutLoading && !widgets.length"
           class="bd-empty"

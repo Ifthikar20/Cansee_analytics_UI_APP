@@ -2005,6 +2005,9 @@ export const useAgentStore = defineStore('agent', () => {
         loadStatus,
         loadChats,
         openChat,
+        // A chat's detail without showing it (no viewing or unseen change);
+        // resolves its chat state, or null after a project change.
+        loadChatDetail,
         setViewingChat,
         // chats
         renameChat,

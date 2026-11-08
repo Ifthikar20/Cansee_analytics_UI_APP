@@ -33,6 +33,11 @@ export const TIPS = Object.freeze({
         options: 'Board options. Reset board puts back Ask AI and Prompt ranking; your data is not touched.',
         emptyBody: 'Widgets show how Google and the AI engines treat your brand. Start with Ask AI or Prompt ranking.',
     }),
+    setup: Object.freeze({
+        panel:
+            'Setup shows your first research while it runs, what is not set up on this workspace yet, and what to do next. You can close it once everything is set up and the research has finished.',
+        runs: 'One prompt run is one prompt answered by one AI engine. Free prompt runs are shared by all your projects and renew each month.',
+    }),
     askAi: Object.freeze({
         times: 'How many times each engine gets the question. More answers give a steadier share; each answer counts toward your AI allowance.',
         engines: 'Pick which engines to ask. At least one stays on.',

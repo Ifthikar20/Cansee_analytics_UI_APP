@@ -23,6 +23,7 @@
           <HelpTip v-if="!empty.action" :text="TIPS.ranking.notRanked" label="Why prompts are not ranked yet" />
         </p>
         <AgButton v-if="empty.action" size="sm" @click="board.open('prompts', { add: '1' })">{{ empty.action }}</AgButton>
+        <SetupPointer />
       </div>
       <div v-else class="rk-lists">
         <section class="rk-list" :aria-labelledby="topId">
@@ -63,6 +64,7 @@ import AgButton from '@/components/agent/common/AgButton.vue'
 import BarList from '@/components/board/BarList.vue'
 import CardFoot from '@/components/board/CardFoot.vue'
 import CardSkeleton from '@/components/board/CardSkeleton.vue'
+import SetupPointer from '@/components/board/SetupPointer.vue'
 import HelpTip from '@/components/ui/help/HelpTip.vue'
 import { useBoardSource } from '@/composables/board/useBoardSource'
 import { useBoard } from '@/lib/board/context'

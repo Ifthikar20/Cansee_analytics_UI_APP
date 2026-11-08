@@ -71,6 +71,7 @@ import { useToast } from '@/composables/useToast'
 import { ASK_FROM_LABELS } from '@/lib/agent/askAgent'
 import { writerUnavailable } from '@/lib/agent/agentsMeta'
 import { saveDraft } from '@/lib/agent/storage'
+import { noteFirstResearchChat } from '@/lib/setup/storage'
 import { AGENT_KEY_LIST, NEW_CHAT_KEY } from '@/lib/agent/types'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentPaneStore } from '@/stores/agentPane'
@@ -296,6 +297,8 @@ async function sendFirstResearch(entry) {
   const wid = String(props.websiteId)
   try {
     const cid = await store.send({ chatId: null, text: entry.text, agent: FIRST_RESEARCH_AGENT })
+    // The analytics board's Setup panel follows the research in this chat.
+    if (cid) noteFirstResearchChat(auth.user?.id, wid, cid)
     if (String(props.websiteId) === wid && cid) {
       router.replace({ name: 'agent-chat', params: { websiteId: wid, chatId: String(cid) } })
     }
