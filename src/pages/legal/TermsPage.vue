@@ -1,3 +1,9 @@
+<!--
+  LEGAL REVIEW REQUIRED: this Terms of Service text is a working draft that
+  describes the live product. It must be reviewed and approved by counsel
+  before launch, including the operating party (no legal entity has been
+  chosen yet, so it reads "Cansee") and Section 14.
+-->
 <template>
   <div class="legal-page min-h-screen bg-background text-foreground">
     <header class="sticky top-0 z-[100] flex items-center justify-between border-b border-border bg-card px-10 py-4 backdrop-blur-md">
@@ -11,20 +17,25 @@
     </header>
 
     <main class="legal-content mx-auto max-w-[780px] px-6 pb-20 pt-12 leading-[1.8]">
-      <div class="mb-4 flex items-center gap-3">
+      <!-- Version 2026-11-08: keep this date in step with the API's current
+           terms version (session terms.current_version). Changing the terms
+           means a new version there, which asks every user to accept again. -->
+      <div class="mb-4 flex flex-wrap items-center gap-3">
         <Badge variant="secondary">Legal</Badge>
-        <span class="text-sm text-muted-foreground">Last updated: March 26, 2026</span>
+        <span class="text-sm text-muted-foreground">Last updated: November 8, 2026</span>
+        <span class="text-sm text-muted-foreground">Effective: November 8, 2026</span>
       </div>
 
       <h1>Terms of Service</h1>
       <p class="legal-intro">
         Welcome to Cansee. These Terms of Service ("Terms") govern your use of the Cansee
-        platform, website, APIs, and related services (collectively, the "Service") provided by
-        Cansee ("Company", "we", "us", or "our").
+        platform, website, analytics pixel, and related services (collectively, the "Service")
+        provided by Cansee ("we", "us", or "our").
       </p>
       <p class="legal-intro">
-        By accessing or using the Service, you agree to be bound by these Terms. If you do not
-        agree to these Terms, you may not access or use the Service.
+        By creating an account, accepting these Terms in the Service, or otherwise using the
+        Service, you agree to be bound by these Terms. If you do not agree, you may not use the
+        Service.
       </p>
 
       <div class="legal-toc my-8 rounded-xl bg-muted px-7 py-6">
@@ -34,11 +45,11 @@
           <li><a href="#eligibility">Eligibility & Account Registration</a></li>
           <li><a href="#service">Description of Service</a></li>
           <li><a href="#plans">Plans, Billing & Payments</a></li>
-          <li><a href="#trial">Free plan</a></li>
+          <li><a href="#trial">Free plan & Trials</a></li>
           <li><a href="#acceptable-use">Acceptable Use Policy</a></li>
           <li><a href="#data-ownership">Data Ownership & Licensing</a></li>
           <li><a href="#ai">AI-Generated Content</a></li>
-          <li><a href="#integrations">Third-Party Integrations</a></li>
+          <li><a href="#integrations">Third-Party Services & Integrations</a></li>
           <li><a href="#uptime">Service Level & Uptime</a></li>
           <li><a href="#termination">Termination & Suspension</a></li>
           <li><a href="#liability">Limitation of Liability</a></li>
@@ -54,13 +65,13 @@
       <section id="definitions">
         <h2>1. Definitions</h2>
         <ul>
-          <li><strong>"User"</strong> refers to any individual who creates an account and uses the Service.</li>
-          <li><strong>"Individual Plan"</strong> means the self-serve subscription at $14/month designed for solopreneurs, freelancers, and indie hackers.</li>
-          <li><strong>"Enterprise Plan"</strong> means a custom-priced subscription for teams, agencies, and organizations, including additional features such as SSO, API access, and dedicated support.</li>
-          <li><strong>"Content"</strong> refers to all data, text, analytics, reports, and materials generated through the Service.</li>
-          <li><strong>"Your Data"</strong> means data you provide to us or that we collect on your behalf, including website analytics, lead information, and campaign data.</li>
-          <li><strong>"AI Credits"</strong> refers to the consumable units used to access AI-powered features such as keyword analysis and competitive intelligence.</li>
-          <li><strong>"Workspace"</strong> means a project environment within Cansee tied to a specific website or domain.</li>
+          <li><strong>"User"</strong> or <strong>"you"</strong> means any individual who creates an account and uses the Service, and the business on whose behalf that individual acts.</li>
+          <li><strong>"Plan"</strong> means the Free plan or a paid subscription plan as described on our <router-link to="/pricing">Pricing page</router-link>, or a plan agreed in a separate written order with us.</li>
+          <li><strong>"Project"</strong> means a workspace within the Service tied to a specific brand, website, or domain.</li>
+          <li><strong>"Prompt"</strong> means a question or instruction that you choose, or that the Service suggests and you approve, which the Service sends to AI engines to measure how your brand appears in their answers.</li>
+          <li><strong>"AI Engine"</strong> means a third-party AI model or AI search product that the Service queries, such as those offered by OpenAI, Anthropic, Google, xAI, and Perplexity.</li>
+          <li><strong>"Your Data"</strong> means data you provide to the Service or that the Service collects on your behalf, including project and brand details, Prompts, brand facts, data collected by the analytics pixel on your websites, and data from services you connect.</li>
+          <li><strong>"Content"</strong> means the results, reports, analyses, and other materials the Service produces for you, including AI Engine answers it records and AI-generated output.</li>
         </ul>
       </section>
 
@@ -74,55 +85,53 @@
         <p>When registering, you must provide accurate, complete, and current information. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.</p>
 
         <h3>2.3 One Account Per Person</h3>
-        <p>Each individual may maintain only one account. Creating multiple accounts to circumvent usage limits, exploit promotional offers, or evade enforcement actions is strictly prohibited and will result in immediate termination of all associated accounts.</p>
+        <p>Each individual may maintain only one account. Creating multiple accounts to circumvent plan limits, exploit promotional offers, or evade enforcement actions is prohibited and may result in termination of all associated accounts.</p>
 
         <h3>2.4 Account Security</h3>
-        <p>You agree to immediately notify us of any unauthorized use of your account or any other breach of security. We will not be liable for any loss or damage arising from your failure to comply with this requirement. We strongly recommend enabling two-factor authentication (2FA) on your account.</p>
+        <p>You agree to notify us promptly of any unauthorized use of your account or any other breach of security. We are not liable for any loss or damage arising from your failure to protect your credentials.</p>
       </section>
 
       <!-- ── 3. Description of Service ── -->
       <section id="service">
         <h2>3. Description of Service</h2>
-        <p>Cansee is a marketing intelligence platform that provides:</p>
+        <p>Cansee measures and helps you improve how your brand appears in AI-generated answers. The Service includes:</p>
         <ul>
-          <li><strong>Website Analytics</strong> — Real-time visitor tracking, session recording, and behavioral analysis.</li>
-          <li><strong>Lead Scoring & Management</strong> — Automated identification, scoring, and pipeline management of potential customers.</li>
-          <li><strong>Heatmaps</strong> — Visual representation of user interaction patterns on your pages.</li>
-          <li><strong>Keyword Research</strong> — Search engine keyword analysis and tracking with competitive positioning data.</li>
-          <li><strong>Campaign Management</strong> — Tools to plan, execute, and track multi-channel marketing campaigns.</li>
-          <li><strong>LLM Dashboard</strong> — Monitor how your brand appears in AI search results across ChatGPT, Claude, Gemini, and others.</li>
-          <li><strong>Competitive Intelligence</strong> — Track competitor websites, keywords, and market positioning.</li>
-          <li><strong>Integrations</strong> — Connect with Slack, Discord, Telegram, and other platforms for real-time alerts and reports.</li>
+          <li><strong>Prompt runs across AI Engines</strong>: the Service sends your Prompts to multiple AI Engines on a schedule and records whether, where, and how your brand and your competitors are mentioned.</li>
+          <li><strong>Citations and source analysis</strong>: the Service identifies the sources and pages AI answers cite, and analyzes how they relate to your content and your competitors.</li>
+          <li><strong>Brand security</strong>: the Service compares AI answers with the brand facts you provide and flags answers that conflict with them.</li>
+          <li><strong>Analytics pixel</strong>: a script you may install on websites you own that measures visits from AI assistants and AI search products and related site activity, as described on our <router-link to="/what-we-track">What we track</router-link> page.</li>
+          <li><strong>Agent</strong>: an AI assistant that works with your Project data to answer questions, run analyses, and draft content and recommendations. Drafts and suggestions the agent produces are yours to review before you use them.</li>
+          <li><strong>Reports and alerts</strong>: dashboards, daily reports, and notifications delivered in the Service and to channels you connect.</li>
         </ul>
-        <p>Features may vary by plan. We reserve the right to modify, enhance, or discontinue any features with reasonable notice.</p>
+        <p>Features and limits vary by Plan. We may modify, enhance, or discontinue features. Where a change materially reduces the paid features you rely on, we will give you reasonable notice.</p>
       </section>
 
       <!-- ── 4. Plans, Billing & Payments ── -->
       <section id="plans">
         <h2>4. Plans, Billing & Payments</h2>
-        <h3>4.1 Monthly plans</h3>
-        <p>The 100 prompts plan is $80 a month and the 200 prompts plan is $140 a month, billed in advance by Polar. Each includes the tracked prompts its name says, the AI usage shown on the pricing page and daily checks. By subscribing, you authorize us to charge your payment method on a recurring monthly basis.</p>
+        <h3>4.1 Plans and Prices</h3>
+        <p>The Plans available, their prices, and their limits (such as the number of Projects and tracked Prompts, how often Prompts run, and AI usage allowances) are shown on our <router-link to="/pricing">Pricing page</router-link> and at checkout. The Plan, price, and limits shown when you subscribe apply to your subscription until changed under Section 4.6. Paid Plans are billed in advance on a recurring basis, and by subscribing you authorize us and our payment processor to charge your payment method for each billing period until you cancel.</p>
 
-        <h3>4.2 Enterprise Plan (Custom Pricing)</h3>
-        <p>Enterprise plans are custom-quoted based on team size, usage requirements, and feature needs. Enterprise pricing is agreed upon via a separate order form or service agreement. Contact <a href="mailto:sales@cansee.ai">sales@cansee.ai</a> for details.</p>
+        <h3>4.2 Custom Agreements</h3>
+        <p>If you subscribe under a separate written order form or service agreement with us, that agreement governs pricing and any terms it states expressly, and these Terms govern everything else. Contact <a href="mailto:sales@cansee.ai">sales@cansee.ai</a> for details.</p>
 
         <h3>4.3 Payment Processing</h3>
-        <p>All payments are processed securely by Polar. We never store, access, or handle your credit card numbers directly. Your payment information is subject to Polar's privacy policy and terms of service.</p>
+        <p>Payments are processed by our payment processor, Polar. We do not store or handle your full card details. Your payment information is subject to Polar's terms and privacy policy.</p>
 
-        <h3>4.4 Refund Policy</h3>
-        <p>Subscription fees are non-refundable. If you cancel your subscription, you will retain access to paid features until the end of your current billing period. We do not provide prorated refunds for partial months.</p>
+        <h3>4.4 Taxes</h3>
+        <p>Prices do not include taxes unless stated. Applicable sales, use, value added, or similar taxes may be added at checkout.</p>
 
-        <h3>4.5 Failed Payments</h3>
-        <p>If a payment fails, we will provide a 7-day grace period during which you can update your payment method. After 7 days, your account will be downgraded to the free tier and access to paid features will be restricted.</p>
+        <h3>4.5 Cancellation, Refunds, and Failed Payments</h3>
+        <p>You may cancel a paid Plan at any time. Cancellation takes effect at the end of the current billing period, and you keep access to paid features until then. Except where required by law, fees already paid are non-refundable and we do not provide prorated refunds for partial periods. If a payment fails and is not resolved, your account moves to the Free plan and paid features are restricted.</p>
 
         <h3>4.6 Price Changes</h3>
-        <p>We reserve the right to change subscription prices with 30 days' advance written notice. Price changes will take effect at the start of your next billing cycle following the notice period.</p>
+        <p>We may change Plan prices or limits with at least 30 days' advance notice by email or in the Service. Changes take effect at the start of your next billing period after the notice period. If you do not agree, you may cancel before the change takes effect.</p>
       </section>
 
       <!-- ── 5. Free plan (the id stays #trial so old links still land here) ── -->
       <section id="trial">
-        <h2>5. Free plan</h2>
-        <p>The Free plan stays free with its limits. The 100 and 200 prompt plans have no free trial.</p>
+        <h2>5. Free plan & Trials</h2>
+        <p>The Free plan is provided at no charge with the limits shown on the Pricing page. Where a paid Plan offers a free trial, its length is shown at checkout, and the subscription is billed when the trial ends unless you cancel before then. We may change or end the Free plan or trial offers with notice.</p>
       </section>
 
       <!-- ── 6. Acceptable Use Policy ── -->
@@ -131,74 +140,77 @@
         <p>You agree that you will NOT use the Service to:</p>
         <ul>
           <li>Violate any applicable laws, regulations, or third-party rights.</li>
-          <li>Scrape, crawl, or harvest data from websites you do not own or have explicit authorization to analyze.</li>
-          <li>Use analytics tracking scripts on websites without proper user consent (GDPR, CCPA, or equivalent).</li>
-          <li>Generate, distribute, or promote spam, phishing, or fraudulent content.</li>
+          <li>Track or analyze websites or brands you do not own or are not authorized to act for, except for the competitor and market analysis the Service is designed to provide.</li>
+          <li>Install the analytics pixel on websites without the visitor notices and consents required by applicable law (such as the GDPR, ePrivacy rules, or the CCPA).</li>
+          <li>Submit Prompts or other input designed to make AI Engines produce harmful, deceptive, or illegal content, or that violate the AI Engine providers' usage policies.</li>
+          <li>Generate, distribute, or promote spam, phishing, fake reviews, or fraudulent content.</li>
           <li>Attempt to gain unauthorized access to any part of the Service, other users' accounts, or our infrastructure.</li>
-          <li>Reverse engineer, decompile, or attempt to extract the source code of the Service.</li>
-          <li>Use the AI features to generate harmful, deceptive, or illegal content.</li>
+          <li>Reverse engineer, decompile, or attempt to extract the source code of the Service, except where applicable law permits it.</li>
           <li>Resell, sublicense, or redistribute the Service without our express written consent.</li>
-          <li>Circumvent usage limits, rate limits, or feature restrictions through technical means.</li>
-          <li>Use automated tools (bots, scripts) to interact with the Service beyond our provided APIs.</li>
+          <li>Circumvent Plan limits, rate limits, or feature restrictions through technical or other means.</li>
+          <li>Access the Service with automated tools (bots, scripts, scrapers) other than through interfaces we provide for that purpose.</li>
           <li>Introduce malware, viruses, or other harmful code into the Service.</li>
           <li>Interfere with or disrupt the integrity or performance of the Service.</li>
         </ul>
-        <p>Violation of this Acceptable Use Policy may result in immediate suspension or termination of your account without notice or refund.</p>
+        <p>Violation of this Acceptable Use Policy may result in suspension or termination of your account, without refund where permitted by law.</p>
       </section>
 
       <!-- ── 7. Data Ownership ── -->
       <section id="data-ownership">
         <h2>7. Data Ownership & Licensing</h2>
         <h3>7.1 Your Data</h3>
-        <p>You retain full ownership of Your Data. We do not claim any intellectual property rights over data you provide to the Service or data collected on your behalf through analytics tracking.</p>
+        <p>You retain ownership of Your Data. We do not claim intellectual property rights over data you provide to the Service or data collected on your behalf through the analytics pixel.</p>
 
         <h3>7.2 License to Process</h3>
-        <p>By using the Service, you grant us a limited, non-exclusive, worldwide license to process, analyze, and store Your Data solely for the purpose of providing the Service to you. This license terminates when you delete your account.</p>
+        <p>You grant us a limited, non-exclusive, worldwide license to host, process, analyze, and transmit Your Data solely to provide, secure, and support the Service for you, including sending Prompts and related Project details to AI Engines. This license ends when Your Data is deleted under Section 11.3.</p>
 
         <h3>7.3 Aggregated Data</h3>
-        <p>We may use anonymized, aggregated data (which cannot identify you or your users) for the purposes of improving the Service, developing new features, and generating industry benchmarks. This aggregated data does not constitute Personal Data under any applicable privacy law.</p>
+        <p>We may use de-identified, aggregated data that does not identify you, your brand, or your website visitors to operate and improve the Service and to produce general benchmarks.</p>
 
-        <h3>7.4 Data Portability</h3>
-        <p>You may export Your Data at any time through our API or the data export features available in your account settings. Upon account termination, we will retain Your Data for 30 days before permanent deletion, during which time you may request an export.</p>
+        <h3>7.4 Data Export</h3>
+        <p>You may export reports and data using the export features available in the Service. After your account is closed, we keep Your Data for 30 days before deletion, as described in our <router-link to="/privacy">Privacy Policy</router-link>, and you may ask for an export during that time.</p>
+
+        <h3>7.5 Our Service</h3>
+        <p>We own the Service, including its software, design, and the methods it uses to measure AI visibility. Apart from the rights these Terms grant you to use the Service, no rights are transferred to you.</p>
       </section>
 
       <!-- ── 8. AI-Generated Content ── -->
       <section id="ai">
         <h2>8. AI-Generated Content</h2>
         <h3>8.1 Nature of AI Output</h3>
-        <p>Cansee uses artificial intelligence to provide trend analysis, keyword suggestions, and other marketing insights. AI-generated content is provided as informational guidance and should not be treated as professional advice.</p>
+        <p>The Service records answers produced by third-party AI Engines and uses AI to analyze them, explain results, and suggest content or changes (including through the agent). AI Engine answers reflect those third parties, not us. AI-generated output is provided as information and is not professional, legal, or financial advice.</p>
 
-        <h3>8.2 Accuracy</h3>
-        <p>While we strive for accuracy, AI-generated content may contain errors, outdated information, or biases. You are responsible for independently verifying any AI-generated content before making business decisions based on it.</p>
+        <h3>8.2 Accuracy and Variability</h3>
+        <p>AI Engine answers vary over time, by location, and between runs, and AI-generated output may contain errors, outdated information, or biases. Visibility measurements are estimates based on the Prompts run. You are responsible for reviewing AI-generated content before publishing it or relying on it for decisions.</p>
 
         <h3>8.3 Ownership of AI Output</h3>
-        <p>AI-generated content produced within your account is owned by you. However, similar or identical outputs may be generated for other users, and no exclusivity is granted over AI-generated content.</p>
+        <p>As between you and us, AI-generated output produced for your account belongs to you, subject to the rights of third parties and the AI Engine providers' terms. Similar or identical output may be generated for other users, and no exclusivity is granted.</p>
 
-        <h3>8.4 AI Credit Usage</h3>
-        <p>AI features consume credits from your plan allocation. Credits reset at the beginning of each billing period and do not roll over. Unused credits expire at the end of each billing cycle.</p>
+        <h3>8.4 No Control over AI Engines</h3>
+        <p>We do not control how AI Engines rank, mention, or describe any brand, and we do not guarantee any change in your visibility from using the Service or following its suggestions.</p>
       </section>
 
-      <!-- ── 9. Third-Party Integrations ── -->
+      <!-- ── 9. Third-Party Services & Integrations ── -->
       <section id="integrations">
-        <h2>9. Third-Party Integrations</h2>
-        <p>The Service allows you to connect with third-party platforms including Slack, Discord, and Telegram. When you connect an integration:</p>
+        <h2>9. Third-Party Services & Integrations</h2>
+        <p>The Service relies on third-party AI Engine providers (such as OpenAI, Anthropic, Google, xAI, and Perplexity) to run your Prompts, and lets you connect other services, including Slack, Discord, Microsoft Teams, text messages, and Google Search Console and Google Analytics. When you use these:</p>
         <ul>
-          <li>You authorize us to send data to the connected platform on your behalf.</li>
-          <li>Your use of the third-party platform is governed by that platform's terms and privacy policy.</li>
-          <li>We are not responsible for the availability, accuracy, or security of third-party platforms.</li>
-          <li>You may disconnect any integration at any time through your account settings.</li>
+          <li>You authorize us to send the data needed for the feature to the provider or connected service on your behalf, and to read the data you authorize from services you connect.</li>
+          <li>Your use of a third-party service is governed by that provider's terms and privacy policy.</li>
+          <li>We are not responsible for the availability, accuracy, or security of third-party services, and a provider may change or withdraw access to its service.</li>
+          <li>You may disconnect any integration at any time in your account settings.</li>
         </ul>
-        <p>We transmit only the notification data you configure (e.g., growth reports, lead alerts). We do not read or store data from your third-party accounts.</p>
+        <p>For chat and text message integrations, we send only the reports and notifications you configure and the replies to requests you make. We read data from a connected service only to provide the features you use with it.</p>
       </section>
 
       <!-- ── 10. Service Level & Uptime ── -->
       <section id="uptime">
         <h2>10. Service Level & Uptime</h2>
-        <h3>10.1 Uptime Target</h3>
-        <p>We target 99.9% uptime for the Service, measured on a monthly basis. This excludes scheduled maintenance windows, which will be communicated at least 24 hours in advance.</p>
+        <h3>10.1 Availability</h3>
+        <p>We aim to keep the Service available at all times, excluding scheduled maintenance, which we will try to announce in advance. Features that depend on AI Engines or other third-party services are available only when those services are.</p>
 
-        <h3>10.2 Enterprise SLA</h3>
-        <p>Enterprise Plan customers may be eligible for a formal Service Level Agreement (SLA) with defined uptime guarantees and service credits for downtime. SLA terms are specified in the Enterprise order form.</p>
+        <h3>10.2 Service Level Agreements</h3>
+        <p>Formal uptime commitments and service credits apply only where agreed in a separate written agreement under Section 4.2.</p>
 
         <h3>10.3 No Warranty</h3>
         <p>THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.</p>
@@ -208,25 +220,25 @@
       <section id="termination">
         <h2>11. Termination & Suspension</h2>
         <h3>11.1 By You</h3>
-        <p>You may cancel your subscription and delete your account at any time through the Settings page. Cancellation takes effect at the end of your current billing period.</p>
+        <p>You may cancel your subscription and delete your account at any time in Settings. Cancellation of a paid Plan takes effect at the end of the current billing period.</p>
 
         <h3>11.2 By Us</h3>
-        <p>We may suspend or terminate your account immediately, without prior notice, if:</p>
+        <p>We may suspend or terminate your account, with notice where practical, if:</p>
         <ul>
           <li>You violate these Terms or the Acceptable Use Policy.</li>
           <li>Your account is used for fraudulent or illegal activities.</li>
-          <li>Your payment method fails and is not updated within the grace period.</li>
           <li>We are required to do so by law or regulatory action.</li>
+          <li>Continued service would create a security risk for the Service or other users.</li>
         </ul>
 
         <h3>11.3 Effect of Termination</h3>
-        <p>Upon termination, your right to access the Service ceases immediately. We will retain Your Data for 30 days following termination, after which it will be permanently deleted. Any accrued rights or obligations survive termination.</p>
+        <p>Upon termination, your right to access the Service ends. We retain Your Data for 30 days following termination, after which it is deleted, except where we must keep it longer by law. Sections that by their nature should survive termination, including Sections 7, 8, 10.3, 12, 13, and 14, survive.</p>
       </section>
 
       <!-- ── 12. Limitation of Liability ── -->
       <section id="liability">
         <h2>12. Limitation of Liability</h2>
-        <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, CANSEE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, DATA, BUSINESS OPPORTUNITIES, OR GOODWILL, ARISING OUT OF OR IN CONNECTION WITH YOUR USE OF THE SERVICE.</p>
+        <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, CANSEE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, DATA, BUSINESS OPPORTUNITIES, OR GOODWILL, ARISING OUT OF OR IN CONNECTION WITH YOUR USE OF THE SERVICE, INCLUDING ANY RELIANCE ON AI ENGINE ANSWERS OR AI-GENERATED CONTENT.</p>
         <p>OUR TOTAL LIABILITY UNDER THESE TERMS SHALL NOT EXCEED THE AMOUNT PAID BY YOU TO US IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM.</p>
       </section>
 
@@ -237,14 +249,16 @@
         <ul>
           <li>Your use of the Service.</li>
           <li>Your violation of these Terms.</li>
-          <li>Your violation of any applicable law or third-party rights.</li>
-          <li>Any data you submit to the Service.</li>
+          <li>Your violation of any applicable law or third-party rights, including installing the analytics pixel without required consents.</li>
+          <li>Any data or Prompts you submit to the Service, and any content you publish based on it.</li>
         </ul>
       </section>
 
       <!-- ── 14. Dispute Resolution ── -->
       <section id="disputes">
         <h2>14. Dispute Resolution</h2>
+        <!-- Governing law, venue and arbitration must be confirmed by counsel
+             before launch; the text below is unchanged pending that review. -->
         <h3>14.1 Governing Law</h3>
         <p>These Terms shall be governed by and construed in accordance with the laws of the State of Delaware, United States, without regard to its conflict of law provisions.</p>
 
@@ -258,7 +272,7 @@
       <!-- ── 15. Changes to Terms ── -->
       <section id="changes">
         <h2>15. Changes to Terms</h2>
-        <p>We may update these Terms from time to time. When we make material changes, we will notify you by email to the address associated with your account and post the updated Terms on this page with a revised "Last updated" date. Your continued use of the Service after the effective date of the revised Terms constitutes acceptance of the changes.</p>
+        <p>We may update these Terms from time to time. When we make material changes, we will post the updated Terms on this page with a new "Last updated" date, notify you by email or in the Service, and ask you to accept the updated Terms the next time you use the Service. If you do not accept them, you may stop using the Service and close your account. Changes do not apply retroactively.</p>
       </section>
 
       <!-- ── 16. Text messages (linked from the consent box as /terms#sms) ── -->
