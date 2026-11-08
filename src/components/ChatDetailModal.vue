@@ -1,10 +1,11 @@
 <script setup>
 import { engineMeta } from '@/lib/engines'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, useId } from 'vue'
 import { X, ExternalLink, ArrowLeft, ArrowRight, Loader2 } from '@lucide/vue'
 import api from '@/api/client'
 import BrandLogo from '@/components/BrandLogo.vue'
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
+import { useDialogFocus } from '@/composables/useDialogFocus'
 import { safeHref } from '@/utils/safeHref'
 
 const props = defineProps({
@@ -158,6 +159,14 @@ watch(() => [props.open, props.resultId], load, { immediate: true })
 
 // Scrolling inside the viewer must never scroll the page behind it.
 useBodyScrollLock(computed(() => props.open))
+
+// A modal dialog: focus moves in and stays in, returns to the row that
+// opened it, and Escape closes only this viewer (not the board panel that
+// hosts the page underneath).
+const dialogRef = ref(null)
+const titleId = useId()
+const dialogTitle = computed(() => (detail.value?.model ? `${modelLabel.value} answer` : 'AI answer'))
+useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
 </script>
 
 <template>
@@ -165,7 +174,15 @@ useBodyScrollLock(computed(() => props.open))
        clip and place a fixed overlay inside it. -->
   <Teleport to="body">
   <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="emit('close')">
-    <div class="flex h-[85vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+    <div
+      ref="dialogRef"
+      role="dialog"
+      aria-modal="true"
+      :aria-labelledby="titleId"
+      tabindex="-1"
+      class="flex h-[85vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl outline-none"
+    >
+      <h2 :id="titleId" class="sr-only">{{ dialogTitle }}</h2>
       <!-- Conversation -->
       <div class="flex min-w-0 flex-1 flex-col">
         <header class="flex items-center justify-between border-b border-border px-5 py-3">
@@ -178,7 +195,7 @@ useBodyScrollLock(computed(() => props.open))
             <span v-if="detail?.model_id" class="rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">{{ detail.model_id }}</span>
             <span v-if="detail?.country" class="ml-1 text-xs text-muted-foreground">{{ detail.country.toUpperCase() }}</span>
           </div>
-          <button class="text-muted-foreground hover:text-foreground" @click="emit('close')"><X :size="18" /></button>
+          <button type="button" class="rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close" @click="emit('close')"><X :size="18" aria-hidden="true" /></button>
         </header>
 
         <div class="flex-1 overflow-y-auto overscroll-contain px-6 py-5">
@@ -215,10 +232,10 @@ useBodyScrollLock(computed(() => props.open))
 
         <!-- Only callers that pass a list of answers can step through it. -->
         <footer v-if="hasPrev || hasNext" class="flex items-center justify-between border-t border-border px-5 py-3">
-          <button class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
-            :disabled="!hasPrev" @click="emit('prev')"><ArrowLeft :size="15" /> Previous</button>
-          <button class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
-            :disabled="!hasNext" @click="emit('next')">Next <ArrowRight :size="15" /></button>
+          <button type="button" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
+            :disabled="!hasPrev" @click="emit('prev')"><ArrowLeft :size="15" aria-hidden="true" /> Previous</button>
+          <button type="button" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
+            :disabled="!hasNext" @click="emit('next')">Next <ArrowRight :size="15" aria-hidden="true" /></button>
         </footer>
       </div>
 

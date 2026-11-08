@@ -2,17 +2,28 @@
   <Teleport to="body">
     <Transition name="modal">
       <div v-if="modelValue" class="modal-overlay" @click.self="close">
-        <div class="modal-card" :class="{ 'modal-wide': wide }" :style="{ maxWidth: wide ? '760px' : maxWidth }" role="dialog" aria-modal="true">
-          <button class="modal-close" @click="close" aria-label="Close">&times;</button>
+        <div
+          ref="cardRef"
+          class="modal-card"
+          :class="{ 'modal-wide': wide }"
+          :style="{ maxWidth: wide ? '760px' : maxWidth }"
+          role="dialog"
+          aria-modal="true"
+          tabindex="-1"
+          :aria-labelledby="title || $slots.header ? titleId : undefined"
+          :aria-label="!title && !$slots.header ? ariaLabel || undefined : undefined"
+          :aria-describedby="subtitle && !$slots.header ? subtitleId : undefined"
+        >
+          <button type="button" class="modal-close" @click="close" aria-label="Close">&times;</button>
 
-          <div v-if="title || $slots.header" class="bm-header">
+          <div v-if="title || $slots.header" :id="$slots.header ? titleId : undefined" class="bm-header">
             <slot name="header">
-              <h3 class="bm-title">{{ title }}</h3>
-              <p v-if="subtitle" class="bm-subtitle">{{ subtitle }}</p>
+              <h3 :id="titleId" class="bm-title">{{ title }}</h3>
+              <p v-if="subtitle" :id="subtitleId" class="bm-subtitle">{{ subtitle }}</p>
             </slot>
           </div>
 
-          <div class="bm-body">
+          <div class="bm-body" data-dialog-body>
             <slot />
           </div>
 
@@ -26,27 +37,33 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { ref, useId } from 'vue'
+import { useDialogFocus } from '@/composables/useDialogFocus'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
   title: { type: String, default: '' },
   subtitle: { type: String, default: '' },
+  // Accessible name when the dialog shows neither a title nor a header.
+  ariaLabel: { type: String, default: '' },
   maxWidth: { type: String, default: '520px' },
   wide: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue', 'close'])
+
+const cardRef = ref(null)
+const titleId = useId()
+const subtitleId = useId()
 
 function close() {
   emit('update:modelValue', false)
   emit('close')
 }
 
-function onEscape(e) {
-  if (e.key === 'Escape' && props.modelValue) close()
-}
-onMounted(() => window.addEventListener('keydown', onEscape))
-onUnmounted(() => window.removeEventListener('keydown', onEscape))
+// Focus moves into the dialog, Tab stays inside it, closing gives focus back
+// to what opened it, and Escape closes the dialog opened last (only while it
+// is open).
+useDialogFocus(cardRef, () => props.modelValue, { onEscape: close })
 
 defineExpose({ close })
 </script>
@@ -55,6 +72,9 @@ defineExpose({ close })
 /* Surface styles inherited from global .modal-overlay / .modal-card in
    components.css. This component only adds header/body/footer layout
    and the open/close transition. */
+/* The card takes focus itself when it has no field to focus first; the
+   dialog's name is announced, an outline around the whole card adds nothing. */
+.modal-card:focus { outline: none; }
 .bm-header {
   margin-bottom: 16px;
   padding-right: 28px;
