@@ -46,15 +46,24 @@ const agentCrawl = ref({ enabled: false, enabled_at: null, last_seeded_at: null 
 const agentCrawlState = ref('loading')
 const agentCrawlSaving = ref(false)
 
+// Each load gets a ticket; an answer whose ticket is no longer the latest
+// (the project switched, or a newer load started) is dropped, so another
+// project's state never lands under this one's name.
+let crawlTicket = 0
+
 async function loadAgentCrawl() {
   if (!websiteId.value) return
+  const ticket = ++crawlTicket
+  const id = websiteId.value
   agentCrawlState.value = 'loading'
   try {
     // Silent: a failure renders next to the switch.
-    const res = await api.get(`/rag/${websiteId.value}/agent-crawl/`, { _silentError: true })
+    const res = await api.get(`/rag/${id}/agent-crawl/`, { _silentError: true })
+    if (ticket !== crawlTicket || id !== websiteId.value) return
     if (res.data) agentCrawl.value = res.data
     agentCrawlState.value = 'ready'
   } catch {
+    if (ticket !== crawlTicket || id !== websiteId.value) return
     agentCrawlState.value = 'failed'
   }
 }
@@ -62,9 +71,12 @@ async function loadAgentCrawl() {
 async function toggleAgentCrawl() {
   if (agentCrawlSaving.value || !websiteId.value || agentCrawlState.value !== 'ready') return
   agentCrawlSaving.value = true
+  const id = websiteId.value
   const next = !agentCrawl.value.enabled
   try {
-    const res = await ragApi.setAgentCrawl(websiteId.value, next)
+    const res = await ragApi.setAgentCrawl(id, next)
+    // Switched projects while saving: the answer is the old project's.
+    if (id !== websiteId.value) return
     if (res.data) agentCrawl.value = res.data
     if (next && res.data?.seeded) {
       toast.success('Agent enabled — first crawl queued. New sources will appear below as pages are read.')
@@ -122,8 +134,13 @@ watch([
 ], () => { page.value = 1; loadSources() })
 watch(page, () => loadSources())
 
+let listTicket = 0
+
 async function loadSources() {
   if (!websiteId.value) return
+  const ticket = ++listTicket
+  const id = websiteId.value
+  const current = () => ticket === listTicket && id === websiteId.value
   listLoading.value = true
   try {
     const params = { page: page.value, page_size: pageSize }
@@ -133,7 +150,8 @@ async function loadSources() {
     if (filters.value.search) params.search = filters.value.search
 
     // Silent: the list shows the failure inline.
-    const res = await api.get(`/rag/${websiteId.value}/sources/`, { params, _silentError: true })
+    const res = await api.get(`/rag/${id}/sources/`, { params, _silentError: true })
+    if (!current()) return
     sources.value = res.data || []
     const meta = res.meta || {}
     pageMeta.value = {
@@ -146,9 +164,9 @@ async function loadSources() {
     listFailed.value = false
     syncIngestPolling()
   } catch {
-    listFailed.value = true
+    if (current()) listFailed.value = true
   } finally {
-    listLoading.value = false
+    if (current()) listLoading.value = false
   }
 }
 
@@ -381,6 +399,9 @@ watch(websiteId, async (v) => {
   stats.value = { total: 0, ready: 0, ingesting: 0, pending: 0, failed: 0 }
   listLoaded.value = false
   listFailed.value = false
+  selectedSource.value = null
+  agentCrawl.value = { enabled: false, enabled_at: null, last_seeded_at: null }
+  agentCrawlState.value = 'loading'
   if (v) {
     page.value = 1
     loadAgentCrawl()
