@@ -50,10 +50,14 @@ export function matchShortcut(event, mac = detectMac()) {
   return null
 }
 
-// Reka menus, popovers and dialogs handle Escape themselves.
+// Reka menus, popovers and dialogs handle Escape themselves, and so does
+// any other modal dialog (BaseModal is role="dialog" aria-modal="true"):
+// while one is open, Escape is its key and never stops a run underneath.
+const DIALOG = '[aria-modal="true"], [role="dialog"], [role="alertdialog"]'
+
 function layerOpen() {
   if (typeof document === 'undefined') return false
-  return Boolean(document.querySelector('[data-dismissable-layer]'))
+  return Boolean(document.querySelector(`[data-dismissable-layer], ${DIALOG}`))
 }
 
 function inField(event) {
@@ -120,7 +124,7 @@ export function useAgentHotkeys({ target = typeof window !== 'undefined' ? windo
   function escape(event) {
     if (layerOpen()) return false
     const el = event.target
-    if (el && typeof el.closest === 'function' && el.closest('aside, [data-ag-escape-ignore]')) return false
+    if (el && typeof el.closest === 'function' && el.closest(`aside, [data-ag-escape-ignore], ${DIALOG}`)) return false
     if (!ui.docked && ui.drawerOpen) {
       ui.closeDrawer()
       return true
