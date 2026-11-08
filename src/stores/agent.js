@@ -516,8 +516,15 @@ export const useAgentStore = defineStore('agent', () => {
         if (!r) return null
         const known = runs.value[r.id]
         if (known) {
-            // A web API chat detail never knows the line (null); only a place reported by the agent process is taken.
-            if (known.phase === RUN_PHASE.QUEUED && r.queue) known.queue = r.queue
+            if (known.phase === RUN_PHASE.QUEUED && phaseFromRunStatus(r.status) === RUN_PHASE.RUNNING) {
+                // The server has started it: a resync resumes after the
+                // snapshot's parts_seq, so run.started may never arrive here.
+                known.phase = RUN_PHASE.RUNNING
+                known.queue = null
+            } else if (known.phase === RUN_PHASE.QUEUED && r.queue) {
+                // A web API chat detail never knows the line (null); only a place reported by the agent process is taken.
+                known.queue = r.queue
+            }
             return known
         }
         runs.value[r.id] = {
