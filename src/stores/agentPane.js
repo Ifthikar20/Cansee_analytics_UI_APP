@@ -4,6 +4,7 @@ import { useAgentStore } from '@/stores/agent'
 import { useAuthStore } from '@/stores/auth'
 import { hostOf, isHttpUrl, normalizeAddress } from '@/lib/agent/url'
 import { captureTerms, keywordTerms, uniqueNames } from '@/lib/agent/highlight'
+import { collectSerpCaptures, rankChatKeywords } from '@/lib/agent/keywordRanking'
 import { taskError } from '@/lib/agent/normalize'
 import { swarmTabOrder } from '@/lib/agent/reducer'
 import { loadPaneState, loadUiPrefs, movePaneState, savePaneState, saveUiPrefs } from '@/lib/agent/storage'
@@ -25,7 +26,9 @@ import { loadPaneState, loadUiPrefs, movePaneState, savePaneState, saveUiPrefs }
 // captures still open on click (a task row calls openCapture). A swarm's
 // results table is a `table` tab, one per swarm: {id: 'table:<swarmId>',
 // kind: 'table', swarmId, version, title}, where a null version follows the
-// latest.
+// latest. The project's tracked keywords are one `keywords` tab per pane:
+// {id: 'keywords', kind: 'keywords', sort, changedOnly}; its view keeps what
+// it fetched in `data`, which is never stored (only the sort is).
 //
 // Tab statuses: idle (a URL not fetched yet), loading, ready, error, missing
 // (restored from storage, waiting for the chat's research) and gone (the
@@ -50,7 +53,12 @@ const TAB_FIELDS = new Set([
     'artifactId',
     'swarmId',
     'nonce',
+    'sort',
+    'changedOnly',
 ])
+// The keywords tab (one per pane) and its sorts; 'gap' is the default.
+export const KEYWORDS_TAB_ID = 'keywords'
+export const KEYWORD_SORTS = Object.freeze(['gap', 'google', 'ai', 'changed'])
 const ACTIVE_AGENT_STATUSES = new Set(['planning', 'drafting', 'validating'])
 const SETTLED_AGENT_STATUSES = new Set(['done', 'error', 'cancelled'])
 // Reply statuses after which none of its steps is still running, whatever
@@ -438,6 +446,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         }
         if (tab.kind === 'newtab') return 'New tab'
         if (tab.kind === 'table') return tab.title || 'Research results'
+        if (tab.kind === 'keywords') return 'Keywords'
         if (tab.kind === 'url' || tab.kind === 'page') {
             const d = tab.data || {}
             return d.title || d.seo?.title || tab.title || hostOf(tab.finalUrl || tab.url) || 'Page'
@@ -489,6 +498,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
                     entry.swarm_id = t.swarmId
                     entry.version = t.version ?? null
                 }
+                if (t.kind === 'keywords' && t.sort && t.sort !== 'gap') entry.sort = t.sort
                 if (t.mode) entry.mode = t.mode
                 return entry
             }),
@@ -579,6 +589,8 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
             history: null,
             artifactId: null,
             version: null,
+            sort: null,
+            changedOnly: false,
             ...tab,
         }
     }
@@ -915,6 +927,26 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         return tabId
     }
 
+    // Opens (or activates) the project's tracked keywords tab: one per pane.
+    // Like a results table it is neither research nor an artifact, so closing
+    // it never stashes it and a rebuild never brings it back.
+    function openKeywords({ activate = true, sort } = {}) {
+        const wid = agent.websiteId
+        if (wid === undefined || wid === null || wid === '') return null
+        const chosen = KEYWORD_SORTS.includes(sort) && sort !== 'gap' ? sort : null
+        let tab = byId(KEYWORDS_TAB_ID)
+        if (tab) {
+            if (sort !== undefined) tab.sort = chosen
+        } else {
+            tab = addTab({ id: KEYWORDS_TAB_ID, kind: 'keywords', title: 'Keywords', status: 'ready', sort: chosen })
+        }
+        if (activate) {
+            select(tab)
+            show()
+        }
+        return tab.id
+    }
+
     // Opens (or activates) the tab of a Google results page or page capture
     // ("serp:<id>" / "page:<id>") of the bound chat: one a step showed, one
     // a research agent took, or any capture in its messages' research.
@@ -1069,6 +1101,10 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
             return { ...base, title: hostOf(entry.url), status: 'idle', ...pageFields({ url: entry.url }) }
         }
         if (entry.kind === 'newtab') return { ...base, title: 'New tab' }
+        if (entry.kind === 'keywords' && entry.id === KEYWORDS_TAB_ID) {
+            const sort = KEYWORD_SORTS.includes(entry.sort) && entry.sort !== 'gap' ? entry.sort : null
+            return { ...base, title: 'Keywords', status: 'ready', sort }
+        }
         return null
     }
 
@@ -1296,6 +1332,24 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         return Array.from(found.values()).slice(0, MAX_CHAT_KEYWORDS)
     })
 
+    // The tracked prompts searched in this chat, ranked by your Google
+    // position ({rows, byPromptId}, lib/agent/keywordRanking): from the visible
+    // branch's research only. A streaming run's captures reach its message
+    // (research.recorded), and the open Google tabs can still hold another
+    // branch's pages, so tabs never count. The ranking is kept while the same
+    // capture objects come back (a capture is replaced, never edited, when it
+    // changes), so streamed text neither re-ranks nor re-renders it.
+    let ranked = { captures: [], value: rankChatKeywords([]) }
+    const chatRanking = computed(() => {
+        const key = chatKey.value
+        const messages = key && key !== 'new' ? messageList(key) : []
+        const captures = collectSerpCaptures(messages, [])
+        const same =
+            captures.length === ranked.captures.length && captures.every((c, i) => c === ranked.captures[i])
+        if (!same) ranked = { captures, value: rankChatKeywords(captures) }
+        return ranked.value
+    })
+
     function clearChatState() {
         finds.value = {}
         keywordHighlight.value = null
@@ -1349,11 +1403,14 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
     }
 
     // A tab that leaves the strip (closed, evicted or replaced) takes its find
-    // bar with it. Sync, so a tab opened and closed in one tick still counts.
+    // bar with it, and the keywords tab the keyword it highlighted. Sync, so a
+    // tab opened and closed in one tick still counts.
     watch(
         () => tabs.value.map((t) => t.id).join('|'),
         () => {
             for (const id of Object.keys(finds.value)) if (!byId(id)) delete finds.value[id]
+            const k = keywordHighlight.value
+            if (k && k.sourceTabId === KEYWORDS_TAB_ID && !byId(KEYWORDS_TAB_ID)) keywordHighlight.value = null
         },
         { flush: 'sync' }
     )
@@ -1445,6 +1502,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         openPage,
         openUrl,
         openTable,
+        openKeywords,
         openCapture,
         openNewTab,
         navigateTab,
@@ -1463,6 +1521,7 @@ export const useAgentPaneStore = defineStore('agentPane', () => {
         finds,
         keywordHighlight,
         chatKeywords,
+        chatRanking,
         findOf,
         openFind,
         closeFind,

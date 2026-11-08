@@ -52,26 +52,51 @@
             <ChevronDown :size="14" aria-hidden="true" />
           </button>
         </DropdownMenuTrigger>
-        <AgMenuContent align="end" :width="320">
+        <AgMenuContent align="end" :width="340">
           <AgMenuLabel>Highlight a keyword from this chat</AgMenuLabel>
           <DropdownMenuRadioGroup
-            v-if="pane.chatKeywords.length"
+            v-if="ranked.length || others.length"
             :model-value="activeKey"
             @update:model-value="pickKey"
           >
-            <DropdownMenuRadioItem
-              v-for="k in pane.chatKeywords"
-              :key="k.keyword"
-              :value="keyOf(k)"
-              class="ag-menu-item"
-            >
-              <span class="ag-menu-text">{{ k.keyword }}</span>
-              <span class="ag-menu-trail">
-                <DropdownMenuItemIndicator>
-                  <Check :size="16" aria-hidden="true" />
-                </DropdownMenuItemIndicator>
-              </span>
-            </DropdownMenuRadioItem>
+            <template v-if="ranked.length">
+              <AgMenuLabel>Searched in this chat · ranked by your Google position</AgMenuLabel>
+              <DropdownMenuRadioItem
+                v-for="row in ranked"
+                :key="`ranked:${row.promptId}`"
+                :value="keyOf(row)"
+                class="ag-menu-item ag-find-ranked"
+                :aria-label="rankedLabel(row)"
+              >
+                <span class="ag-menu-text">{{ row.keyword }}</span>
+                <span class="ag-menu-trail ag-find-rank">
+                  <span class="ag-tnum">{{ row.googleText }}</span>
+                  <span v-if="row.aiText" class="ag-find-ai">{{ row.aiText }}</span>
+                  <DropdownMenuItemIndicator>
+                    <Check :size="16" aria-hidden="true" />
+                  </DropdownMenuItemIndicator>
+                </span>
+              </DropdownMenuRadioItem>
+            </template>
+            <template v-if="others.length">
+              <template v-if="ranked.length">
+                <AgMenuSeparator />
+                <AgMenuLabel>Other searches in this chat</AgMenuLabel>
+              </template>
+              <DropdownMenuRadioItem
+                v-for="k in others"
+                :key="`other:${k.keyword}`"
+                :value="keyOf(k)"
+                class="ag-menu-item"
+              >
+                <span class="ag-menu-text">{{ k.keyword }}</span>
+                <span class="ag-menu-trail">
+                  <DropdownMenuItemIndicator>
+                    <Check :size="16" aria-hidden="true" />
+                  </DropdownMenuItemIndicator>
+                </span>
+              </DropdownMenuRadioItem>
+            </template>
           </DropdownMenuRadioGroup>
           <AgMenuItem v-else disabled>
             <span class="ag-menu-text">No Google searches in this chat yet.</span>
@@ -114,6 +139,7 @@ import AgIconButton from '@/components/agent/common/AgIconButton.vue'
 import AgMenuContent from '@/components/agent/common/AgMenuContent.vue'
 import AgMenuItem from '@/components/agent/common/AgMenuItem.vue'
 import AgMenuLabel from '@/components/agent/common/AgMenuLabel.vue'
+import AgMenuSeparator from '@/components/agent/common/AgMenuSeparator.vue'
 import { MAX_MARKS } from '@/lib/agent/highlight'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { findBarId, findToggleId } from './ids'
@@ -234,9 +260,41 @@ function keyOf(k) {
 
 const activeKey = computed(() => (keyword.value ? keyOf(keyword.value) : ''))
 
+// The tracked prompts searched in this chat, ranked by your Google position;
+// then the chat's other searches (ad-hoc ones), offered for highlighting only.
+// A highlight is a keyword, so two tracked prompts of the same text (in any
+// case) are one item: the better ranked one.
+const ranked = computed(() => {
+  const seen = new Set()
+  return pane.chatRanking.rows.filter((row) => {
+    const key = keyOf(row)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+})
+const others = computed(() => {
+  const taken = new Set(ranked.value.map(keyOf))
+  return pane.chatKeywords.filter((k) => !taken.has(keyOf(k)))
+})
+
+function rankedLabel(row) {
+  const google = row.position ? `#${row.position} on Google` : `${row.googleText} on Google`
+  return row.aiText
+    ? `${row.keyword}, ${google}, AI Overview: ${row.aiText}`
+    : `${row.keyword}, ${google}`
+}
+
+// A ranked keyword also takes the names every other search of it found.
 function pickKey(value) {
-  const k = pane.chatKeywords.find((item) => keyOf(item) === value)
-  if (k) pane.setKeywordHighlight({ ...k, sourceTabId: null })
+  const found = [...ranked.value, ...pane.chatKeywords].filter((item) => keyOf(item) === value)
+  if (!found.length) return
+  pane.setKeywordHighlight({
+    keyword: found[0].keyword,
+    brand: found.flatMap((k) => k.brand),
+    competitors: found.flatMap((k) => k.competitors),
+    sourceTabId: null,
+  })
 }
 
 // Clear removes its own row; keep focus in the bar.
@@ -394,6 +452,24 @@ function clearKeyword() {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+/* A ranked keyword's Google position and AI Overview, as in the research
+   results table. */
+.ag-find-rank {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  color: var(--ag-fg-3);
+  font-size: 12px;
+}
+
+.ag-find-ai {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @container ag-page (max-width: 420px) {
