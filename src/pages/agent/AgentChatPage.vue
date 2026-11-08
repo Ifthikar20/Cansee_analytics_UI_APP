@@ -71,6 +71,7 @@ import { useToast } from '@/composables/useToast'
 import { ASK_FROM_LABELS } from '@/lib/agent/askAgent'
 import { writerUnavailable } from '@/lib/agent/agentsMeta'
 import { saveDraft } from '@/lib/agent/storage'
+import { hidesUsd, meteredRuns, runsLeftText } from '@/lib/promptRuns'
 import { AGENT_KEY_LIST, NEW_CHAT_KEY } from '@/lib/agent/types'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentPaneStore } from '@/stores/agentPane'
@@ -217,7 +218,11 @@ const draftNotice = computed(() => {
   const status = store.status || null
   const parts = []
   const cap = usd(status?.limits?.run_cost_usd)
-  if (cap) {
+  if (hidesUsd(status)) {
+    // Free accounts see their prompt runs, never dollars.
+    const left = runsLeftText(meteredRuns(status?.prompt_runs))
+    if (left) parts.push(`${left} this month.`)
+  } else if (cap) {
     parts.push(`A reply stops once it has used ${cap} of AI allowance; the request already running finishes.`)
     const capUsd = Number(status?.allowance?.cap_usd)
     const spent = Number(status?.allowance?.spent_usd)

@@ -96,6 +96,8 @@ import api from '@/api/client'
 import { useToast } from '@/composables/useToast'
 import { askAgent } from '@/lib/agent/askAgent'
 import { splitPromptLines } from '@/lib/analytics/promptIntent'
+import { useSessionRuns } from '@/composables/useHideUsd'
+import { isRunsError, runsErrorText, runsNeeded } from '@/lib/promptRuns'
 
 const props = defineProps({
   websiteId: { type: String, required: true },
@@ -149,18 +151,29 @@ function plural(n, one, many) {
   return `${n} ${n === 1 ? one : many}`
 }
 
+// A free account's prompt runs (null on paid plans): it sees runs, never
+// the AI allowance.
+const freeRuns = useSessionRuns()
+
 // What adding costs now: each configured engine answers each prompt once.
 const costNote = computed(() => {
   const e = props.engineCount
+  const charged = freeRuns.value ? 'one free prompt run per answer' : 'charged to your AI allowance'
   if (e === null || e === undefined || !Number.isFinite(e)) {
-    return 'Adding prompts asks each connected AI engine now, charged to your AI allowance.'
+    return `Adding prompts asks each connected AI engine now, ${charged}.`
   }
   if (e <= 0) return "AI engines aren't available yet."
   const n = lines.value.length
   if (!n) return ''
+  const runs = runsNeeded(n * e, freeRuns.value)
+  const cost = runs
+    ? runs.enough
+      ? ` ${runs.text}`
+      : ` ${runs.text} The prompts are still added, but the engines are not asked now.`
+    : ', charged to your AI allowance.'
   return (
     `Adding ${plural(n, 'prompt', 'prompts')} asks ${plural(n * e, 'AI answer', 'AI answers')} now ` +
-    `(${plural(e, 'engine', 'engines')}), charged to your AI allowance. ` +
+    `(${plural(e, 'engine', 'engines')})${runs ? '.' : ''}${cost} ` +
     'Google is checked when you choose Check Google, and nothing runs again unless you set a schedule.'
   )
 })
@@ -261,8 +274,14 @@ async function save(toSave) {
       { _silentError: true },
     )
     const added = `Added ${plural(res.data?.created_count ?? list.length, 'prompt', 'prompts')}.`
-    // A run is only queued when the API returns its id.
-    toast.success(res.data?.scan_audit_id ? `${added} The AI engines are being asked now.` : added)
+    // A run is only queued when the API returns its id. Out of free prompt
+    // runs, the prompts are saved but not asked: the server says why.
+    const scanError = res.data?.scan_error
+    if (scanError && isRunsError(scanError.error)) {
+      toast.warning(`${added} ${runsErrorText(scanError.error, scanError)}`)
+    } else {
+      toast.success(res.data?.scan_audit_id ? `${added} The AI engines are being asked now.` : added)
+    }
     text.value = ''
     notice.value = null
     open.value = false

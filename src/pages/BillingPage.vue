@@ -184,8 +184,7 @@
           <!-- Limits come from the session (resolved server-side). -->
           <p class="bp-current-note">
             The Free plan doesn't expire.
-            <template v-if="freeProjectsText">It includes {{ freeProjectsText }} and a small monthly AI allowance.</template>
-            <template v-else>It includes a small monthly AI allowance.</template>
+            {{ freeIncludesText }}
           </p>
         </div>
       </section>
@@ -237,6 +236,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 import { SUPPORT_EMAIL, SUPPORT_SUBJECT } from '@/constants/support'
 import { describeSubscription, paidPlanId } from '@/lib/plan'
+import { meteredRuns, runsLeftText } from '@/lib/promptRuns'
 import { isPolarUrl } from '@/utils/polarRedirect'
 
 const route = useRoute()
@@ -389,6 +389,22 @@ const projectsAllowanceText = computed(() => {
 
 // The Free banner states the allowance the session resolved for this account.
 const freeProjectsText = computed(() => projectsText(authStore.session?.limits?.projects))
+
+// "20 prompt runs a month" (one prompt answered by one AI engine) when the
+// session says how many; free accounts never see dollars.
+const freeRuns = computed(() => meteredRuns(authStore.session?.limits?.prompt_runs))
+const freeRunsText = computed(() => {
+  const limit = freeRuns.value?.limit
+  if (!limit) return 'a small monthly AI allowance'
+  return `${limit} ${limit === 1 ? 'prompt run' : 'prompt runs'} a month`
+})
+const freeIncludesText = computed(() => {
+  const includes = freeProjectsText.value
+    ? `It includes ${freeProjectsText.value} and ${freeRunsText.value}.`
+    : `It includes ${freeRunsText.value}.`
+  const left = runsLeftText(freeRuns.value)
+  return left ? `${includes} ${left} this month.` : includes
+})
 
 function formatDate(d) {
   if (!d) return '—'

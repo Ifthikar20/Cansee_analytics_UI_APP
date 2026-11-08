@@ -42,6 +42,7 @@ import StatusBanner from './StatusBanner.vue'
 import JumpToLatest from '@/components/agent/chat/JumpToLatest.vue'
 import { errorInfo } from '@/components/agent/message/parts'
 import { agentList } from '@/lib/agent/agentsMeta'
+import { meteredRuns } from '@/lib/promptRuns'
 import { useComposerDraft } from '@/composables/agent/useComposerDraft'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentPaneStore } from '@/stores/agentPane'
@@ -92,6 +93,7 @@ const bannerCode = computed(() => {
   if (KNOWN.has(sendError.value)) return sendError.value
   if (s) {
     if (s.live_available === false) return 'agent_unavailable'
+    if (meteredRuns(s.prompt_runs)?.remaining === 0) return 'prompt_runs_exhausted'
     if (s.allowance?.warning) return 'allowance_warning'
   } else if (store.statusError) {
     const code = store.statusError.code

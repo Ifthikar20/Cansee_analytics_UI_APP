@@ -6,6 +6,7 @@
 // measured zero reads 0. Shares are whole percents; ranges are the 95%
 // Wilson bounds the server sends.
 import { engineMeta } from '@/lib/engines'
+import { estimateRuns } from '@/lib/promptRuns'
 import { timeAgo } from '@/utils/timeAgo'
 
 // ── Copy ──
@@ -113,10 +114,18 @@ export function usdAmount(value) {
 
 /**
  * "6 answers, up to $0.48 of your AI allowance ($2.24 left this month).",
- * or "6 answers, up to $0.48." when the allowance is unlimited.
+ * or "6 answers, up to $0.48." when the allowance is unlimited. A free
+ * account (prompt_runs.unlimited false) sees runs, never dollars:
+ * "6 answers. Uses 6 of your 13 free prompt runs left."
  */
 export function estimateLine(estimate) {
     if (!estimate || !isNumber(estimate.answers)) return ''
+    const runs = estimateRuns(estimate.prompt_runs)
+    if (estimate.prompt_runs?.unlimited === false) {
+        const answers = `${plural(estimate.answers, 'answer', 'answers')}.`
+        // When too few are left the estimate's blocker says so instead.
+        return runs?.enough ? `${answers} ${runs.text}` : answers
+    }
     const head = `${plural(estimate.answers, 'answer', 'answers')}, up to ${usdUpTo(estimate.usd_max)}`
     const allowance = estimate.allowance || {}
     const left = toNumber(allowance.left_usd)
@@ -239,12 +248,12 @@ export function engineResult(engine, { active = false } = {}) {
 
 const TONES = Object.freeze({ positive: 'Positive', neutral: 'Neutral', negative: 'Negative' })
 
-/** "Asked 5m ago, 3 per engine, AI $0.07" */
-export function askedLine(run) {
+/** "Asked 5m ago, 3 per engine, AI $0.07"; without the dollars for a free account (hideUsd). */
+export function askedLine(run, { hideUsd = false } = {}) {
     const when = timeAgo(run?.created_at)
-    return [when ? `Asked ${when}` : 'Asked', `${count(run?.samples)} per engine`, `AI ${usdCost(run?.cost?.ai_usd) || '$0.00'}`].join(
-        ', '
-    )
+    const parts = [when ? `Asked ${when}` : 'Asked', `${count(run?.samples)} per engine`]
+    if (!hideUsd) parts.push(`AI ${usdCost(run?.cost?.ai_usd) || '$0.00'}`)
+    return parts.join(', ')
 }
 
 /** One answer's outcome: "Named, rank #2", "Not named", "Failed: {message}"... */

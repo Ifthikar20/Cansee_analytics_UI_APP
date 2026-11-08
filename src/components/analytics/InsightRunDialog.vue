@@ -17,6 +17,8 @@ import {
 } from 'reka-ui'
 import { injectInsightRun } from '@/composables/analytics/useInsightRun'
 import { money } from '@/lib/analytics/countrySpecs'
+import { useHideUsd } from '@/composables/useHideUsd'
+import { estimateRuns } from '@/lib/promptRuns'
 import { useAppStore } from '@/stores/app'
 import { timeAgo } from '@/utils/timeAgo'
 import PeriodSelect from './PeriodSelect.vue'
@@ -145,15 +147,24 @@ const description = computed(() => {
 
 const serp = computed(() => options.value?.configured?.google_provider === 'serpapi')
 
+// Free accounts never see dollars: AI work draws on the free AI
+// allowance, engine answers on the free prompt runs.
+const hideUsd = useHideUsd(() => estimate.value)
+
 function leftPart(e) {
   if (!e?.allowance || e.allowance.unlimited) return ''
   return ` (${money(e.allowance.left_usd)} left this month)`
 }
 
+/** "up to $0.04 of your AI allowance ($2.10 left this month)", or the free words. */
+function aiPart(ai, e, { left = true } = {}) {
+  if (hideUsd.value) return "from this month's free AI allowance"
+  return `up to ${money(ai.usd_max)} of your AI allowance${left ? leftPart(e) : ''}`
+}
+
 function googleCost(g) {
-  return serp.value
-    ? `up to ${money(g.usd_max)}`
-    : `about ${integer.format(Number(g.credits_max) || 0)} ScraperAPI credits`
+  if (serp.value) return hideUsd.value ? '' : `up to ${money(g.usd_max)}`
+  return `about ${integer.format(Number(g.credits_max) || 0)} ScraperAPI credits`
 }
 
 // One line per part of the run; a line whose part is zero is left out.
@@ -171,7 +182,7 @@ const lines = computed(() => {
         out.push(`${answers === 1 ? '1 answer that names you' : `${integer.format(answers)} answers that name you`}, last ${days} days.`)
       }
       if (Number(ai.calls_max)) {
-        out.push(`AI: up to ${plural(ai.calls_max, 'request', 'requests')}, up to ${money(ai.usd_max)} of your AI allowance${leftPart(e)}.`)
+        out.push(`AI: up to ${plural(ai.calls_max, 'request', 'requests')}, ${aiPart(ai, e)}.`)
       }
       const facts = Number(choices.value.evidence?.facts) || 0
       const pages = Number(e.fetches?.pages_max) || 0
@@ -188,12 +199,18 @@ const lines = computed(() => {
       break
     }
     case 'prompt_research': {
-      if (Number(ai.calls_max)) out.push(`AI suggestions: up to ${money(ai.usd_max)} of your AI allowance.`)
-      if (Number(g.pages_max)) out.push(`Google: ${plural(g.pages_max, 'results page', 'results pages')}, ${googleCost(g)}.`)
+      if (Number(ai.calls_max)) out.push(`AI suggestions: ${aiPart(ai, e, { left: false })}.`)
+      if (Number(g.pages_max)) {
+        const cost = googleCost(g)
+        out.push(`Google: ${plural(g.pages_max, 'results page', 'results pages')}${cost ? `, ${cost}` : ''}.`)
+      }
       break
     }
     case 'fanout_google': {
-      if (Number(g.pages_max)) out.push(`${plural(g.pages_max, 'search', 'searches')}, page one only: ${googleCost(g)}.`)
+      if (Number(g.pages_max)) {
+        const cost = googleCost(g)
+        out.push(`${plural(g.pages_max, 'search', 'searches')}, page one only${cost ? `: ${cost}` : ''}.`)
+      }
       break
     }
     case 'shopping_check': {
@@ -202,7 +219,12 @@ const lines = computed(() => {
       }
       const answers = Number(e.units?.answers ?? ai.calls_max) || 0
       if (answers) {
-        out.push(`AI engines: ${plural(answers, 'answer', 'answers')}, up to ${money(ai.usd_max)} of your AI allowance${leftPart(e)}.`)
+        const runs = hideUsd.value ? estimateRuns(e.prompt_runs) : null
+        out.push(
+          hideUsd.value
+            ? `AI engines: ${plural(answers, 'answer', 'answers')}.${runs?.enough ? ` ${runs.text}` : ''}`
+            : `AI engines: ${plural(answers, 'answer', 'answers')}, ${aiPart(ai, e)}.`,
+        )
       }
       break
     }
@@ -220,6 +242,10 @@ const runLabel = computed(() => {
   if (props.kind === 'site_audit') return 'Run audit'
   const e = estimate.value
   if (!e) return 'Run'
+  if (hideUsd.value) {
+    const credits = serp.value ? 0 : Number(e.google?.credits_max || 0)
+    return credits > 0 ? `Run for ${integer.format(credits)} credits` : 'Run'
+  }
   const usd = Number(e.ai?.usd_max || 0) + (serp.value ? Number(e.google?.usd_max || 0) : 0)
   const credits = serp.value ? 0 : Number(e.google?.credits_max || 0)
   if (usd <= 0 && credits > 0) return `Run for ${integer.format(credits)} credits`

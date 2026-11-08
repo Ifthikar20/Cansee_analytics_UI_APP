@@ -365,17 +365,21 @@ export function urlModelsSpec(rows) {
 /* ── Settings ── */
 
 /** AI spend per day across the current billing period. */
-export function aiUsageSpec(daily, { subtitle = '' } = {}) {
+export function aiUsageSpec(daily, { subtitle = '', metric = 'cost' } = {}) {
     const days = Array.isArray(daily) ? daily : []
+    // Free accounts never see dollars: their chart counts AI requests.
+    const calls = metric === 'calls'
     return {
         id: 'settings.ai_usage',
         title: 'Daily usage',
         subtitle,
         x: 'time',
         time_unit: 'day',
-        value: 'usd',
+        value: calls ? 'count' : 'usd',
         labels: days.map((d) => String(d.day ?? '')),
-        datasets: [{ key: 'cost', label: 'Estimated cost', data: days.map((d) => num(d.cost)) }],
+        datasets: calls
+            ? [{ key: 'calls', label: 'AI requests', data: days.map((d) => num(d.calls)) }]
+            : [{ key: 'cost', label: 'Estimated cost', data: days.map((d) => num(d.cost)) }],
         type: 'bar',
         representations: ['bar', 'line', 'table'],
     }

@@ -11,6 +11,7 @@ import {
 import {
   COUNTRY_STATUS_TEXT, costLine, finishedChecks, isActiveRun, progressSummary, runTitle,
 } from '@/lib/analytics/countrySpecs'
+import { useHideUsd } from '@/composables/useHideUsd'
 import { Button } from '@/components/ui/button'
 
 const props = defineProps({
@@ -36,6 +37,9 @@ function confirmStop() {
   confirmOpen.value = false
   emit('stop')
 }
+
+// Free accounts never see dollars.
+const hideUsd = useHideUsd()
 </script>
 
 <template>
@@ -86,7 +90,7 @@ function confirmStop() {
     </template>
     <template v-else>
       <p class="crp-summary">{{ progressSummary(run.progress) }}</p>
-      <p class="crp-cost">{{ costLine(run) }}</p>
+      <p v-if="costLine(run, { hideUsd })" class="crp-cost">{{ costLine(run, { hideUsd }) }}</p>
     </template>
 
     <p v-if="cancelError" class="crp-error" role="alert">

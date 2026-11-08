@@ -110,6 +110,7 @@ import CardSkeleton from '@/components/board/CardSkeleton.vue'
 import { useBoard } from '@/lib/board/context'
 import { engineMeta } from '@/lib/engines'
 import { safeHref } from '@/utils/safeHref'
+import { useHideUsd } from '@/composables/useHideUsd'
 import TrackPrompt from './TrackPrompt.vue'
 import {
   COPY,
@@ -216,7 +217,9 @@ watch(
   },
 )
 
-const asked = computed(() => askedLine(run.value))
+// Free accounts never see dollars.
+const hideUsd = useHideUsd()
+const asked = computed(() => askedLine(run.value, { hideUsd: hideUsd.value }))
 const progress = computed(() => progressLine(run.value))
 const ended = computed(() => endLine(run.value))
 

@@ -36,9 +36,9 @@ export const TIPS = Object.freeze({
         emptyBody: 'Widgets show how Google and the AI engines treat your brand. Start with Ask AI or Prompt ranking.',
     }),
     askAi: Object.freeze({
-        times: 'How many times each engine gets the question. More answers give a steadier share; each answer counts toward your AI allowance.',
+        times: 'How many times each engine gets the question. More answers give a steadier share; on the Free plan each answer uses one prompt run.',
         engines: 'Pick which engines to ask. At least one stays on.',
-        estimate: 'The most this question can use. It comes out of your AI allowance, which renews each billing period.',
+        estimate: 'The most this question can use. On the Free plan each answer uses one prompt run; paid plans draw on the AI allowance. Both renew each billing period.',
         track: 'Track adds this question to your tracked prompts, so it shows in Prompt ranking. With Autopilot on, it is asked the same way every day, so changes are comparable.',
     }),
     ranking: Object.freeze({

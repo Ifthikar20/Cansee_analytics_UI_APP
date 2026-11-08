@@ -11,6 +11,7 @@ import agentApi from '@/api/agent'
 import insightsApi from '@/api/insights'
 import { askAgent } from '@/lib/agent/askAgent'
 import { writerUnavailable } from '@/lib/agent/agentsMeta'
+import { hidesUsd } from '@/lib/promptRuns'
 import { CHANNELS, CHANNEL_KEYS, PR_FORMATS, taskText } from '@/lib/agent/taskTemplates'
 import { domainOf, normalizeUrl, onSite } from '@/lib/agent/contextSections'
 import { money } from '@/lib/analytics/countrySpecs'
@@ -168,6 +169,8 @@ const costLine = computed(() => {
   const max = s?.writers?.[key.value]?.max_usd
   const cap = s?.limits?.run_cost_usd
   if (max === undefined || max === null || cap === undefined || cap === null) return ''
+  // Free accounts never see dollars.
+  if (hidesUsd(s)) return `The ${name.value} draws on this month's free AI allowance.`
   const head = `The ${name.value}'s own request costs at most ${money(max)} for a new draft; the whole reply, the agent's requests included, stops at ${money(cap)}.`
   const allowanceCap = Number(s?.allowance?.cap_usd)
   const spent = Number(s?.allowance?.spent_usd)

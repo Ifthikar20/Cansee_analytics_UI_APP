@@ -10,6 +10,7 @@ import AgButton from '@/components/agent/common/AgButton.vue'
 import AgDialog from '@/components/agent/common/AgDialog.vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
 import { money } from '@/lib/analytics/countrySpecs'
+import { useHideUsd } from '@/composables/useHideUsd'
 import { CONTEXT_LIMITS } from '@/lib/agent/contextSections'
 
 const props = defineProps({
@@ -98,6 +99,7 @@ function toggleDocument(id, checked) {
 }
 
 const estimate = computed(() => props.builder.estimate.value)
+const hideUsd = useHideUsd(() => estimate.value)
 const unlimited = computed(() => Boolean(estimate.value?.allowance?.unlimited))
 // The estimate's own counts (units: pages, rechecks, documents), else the options'.
 const recheck = computed(() => {
@@ -130,7 +132,10 @@ const lines = computed(() => {
       `${integer.format(pagesToRead.value)} pages of ${siteDomain.value}, ${integer.format(documentCount.value)} documents and ${integer.format(factCount.value)} approved brand facts.`,
     )
   }
-  if (aiCalls.value > 0) {
+  if (aiCalls.value > 0 && hideUsd.value) {
+    // Free accounts never see dollars.
+    out.push(`AI: up to ${integer.format(aiCalls.value)} requests, from this month's free AI allowance.`)
+  } else if (aiCalls.value > 0) {
     const left = unlimited.value ? '' : ` (${money(estimate.value.allowance?.left_usd)} left this month)`
     out.push(
       `AI: up to ${integer.format(aiCalls.value)} requests, up to ${money(aiUsd.value)} of your AI allowance${left}.`,

@@ -22,10 +22,11 @@
 import { computed } from 'vue'
 import { CircleAlert, CirclePause, CloudOff, Gauge, PlugZap, Wrench } from '@lucide/vue'
 import { agentFix } from '@/lib/agent/setup'
+import { hidesUsd, meteredRuns, renewDate } from '@/lib/promptRuns'
 
 const props = defineProps({
   // agent_disabled | agent_unavailable | maintenance | agent_not_configured | allowance_exceeded
-  // | allowance_warning | status_unknown (status/ failed and nothing is known)
+  // | allowance_warning | prompt_runs_exhausted | status_unknown (status/ failed and nothing is known)
   code: { type: String, default: '' },
   allowance: { type: Object, default: null },
   // Why status/ failed, for status_unknown.
@@ -43,7 +44,12 @@ function usd(value) {
   return n.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// Free accounts never see dollars (status allowance.show_usd false, or a
+// metered prompt_runs block).
+const free = computed(() => hidesUsd({ allowance: props.allowance, prompt_runs: props.status?.prompt_runs }))
+
 const usage = computed(() => {
+  if (free.value) return ''
   const spent = usd(props.allowance?.spent_usd)
   const cap = usd(props.allowance?.cap_usd)
   return spent && cap ? `${spent} of ${cap} used.` : ''
@@ -99,21 +105,41 @@ const copy = computed(() => {
       }
     }
     case 'allowance_exceeded':
-      return {
-        tone: 'warning',
-        icon: Gauge,
-        title: "You've used your AI allowance for this period.",
-        body: [usage.value, 'Upgrade your plan to keep working with the agent.'].filter(Boolean).join(' '),
-        billing: true,
-      }
+      return free.value
+        ? {
+            tone: 'warning',
+            icon: Gauge,
+            title: "This month's free AI allowance is used up.",
+            body: 'It renews next month. Upgrade your plan to keep working with the agent.',
+            billing: true,
+          }
+        : {
+            tone: 'warning',
+            icon: Gauge,
+            title: "You've used your AI allowance for this period.",
+            body: [usage.value, 'Upgrade your plan to keep working with the agent.'].filter(Boolean).join(' '),
+            billing: true,
+          }
     case 'allowance_warning':
       return {
         tone: 'warning',
         icon: Gauge,
-        title: 'You are close to your AI allowance.',
+        title: free.value ? "You are close to this month's free AI allowance." : 'You are close to your AI allowance.',
         body: usage.value,
         billing: true,
       }
+    // Not blocking: the agent still answers, but asks no AI engine.
+    case 'prompt_runs_exhausted': {
+      const runs = meteredRuns(props.status?.prompt_runs)
+      const date = renewDate(runs?.resetsAt)
+      return {
+        tone: 'warning',
+        icon: Gauge,
+        title: runs?.limit ? `You have used this month's ${runs.limit} free prompt runs.` : "This month's free prompt runs are used up.",
+        body: `The agent still answers, but it can't ask the AI engines until they renew${date ? ` on ${date}` : ''}.`,
+        billing: true,
+      }
+    }
     default:
       return null
   }

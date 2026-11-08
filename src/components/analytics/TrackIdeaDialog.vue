@@ -11,6 +11,8 @@ import insightsApi from '@/api/insights'
 import { useToast } from '@/composables/useToast'
 import { listText } from '@/lib/analytics/askTemplates'
 import { money } from '@/lib/analytics/countrySpecs'
+import { useHideUsd } from '@/composables/useHideUsd'
+import { estimateRuns } from '@/lib/promptRuns'
 import { engineMeta } from '@/lib/engines'
 import { Button } from '@/components/ui/button'
 
@@ -20,7 +22,7 @@ const props = defineProps({
   websiteId: { type: String, required: true },
   // The idea to track (contract 7 `ideas[]`).
   idea: { type: Object, default: null },
-  // The payload's `track` block: {engines, usd_max_per_prompt, allowance}.
+  // The payload's `track` block: {engines, usd_max_per_prompt, allowance, prompt_runs}.
   track: { type: Object, default: null },
 })
 const emit = defineEmits(['tracked'])
@@ -46,10 +48,18 @@ watch(
   { immediate: true },
 )
 
+// Free accounts see prompt runs, never dollars.
+const hideUsd = useHideUsd(() => shown.value)
+
 const body = computed(() => {
   const t = shown.value
   if (!t || !props.idea) return ''
   const engines = listText((t.engines || []).map((e) => e.label || engineMeta(e.key).label))
+  if (hideUsd.value) {
+    const runs = estimateRuns(t.prompt_runs)
+    const head = `Cansee adds "${props.idea.text}" to your tracked prompts and asks ${engines} now.`
+    return runs ? `${head} ${runs.text}` : head
+  }
   const head = `Cansee adds "${props.idea.text}" to your tracked prompts and asks ${engines} now: up to ${money(t.usd_max_per_prompt)} of your AI allowance`
   const allowance = t.allowance || {}
   return allowance.unlimited ? `${head}.` : `${head} (${money(allowance.left_usd)} left this month).`

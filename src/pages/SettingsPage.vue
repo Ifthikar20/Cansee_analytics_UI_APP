@@ -55,11 +55,13 @@
         </div>
 
         <template v-else-if="usage">
+          <!-- Free accounts count prompt runs and never see dollars. -->
+          <PromptRunsMeter v-if="freeRuns" :runs="usage.prompt_runs" :plan-label="authStore.planState.tierLabel" />
           <!-- The allowance is a dollar spend cap — the same number
                enforcement uses. Tokens are shown as real counts, never
                converted into an invented "token capacity". -->
           <div
-            v-if="usage.allowance && usage.allowance.cap_usd > 0"
+            v-else-if="usage.allowance && usage.allowance.cap_usd > 0"
             class="sp-allowance"
             :class="{ 'is-warn': usage.allowance.warning, 'is-exceeded': usage.allowance.exceeded }"
           >
@@ -124,7 +126,11 @@
             <p>No AI usage recorded this billing period yet.</p>
           </div>
 
-          <p class="sp-footnote">
+          <p v-if="freeRuns" class="sp-footnote">
+            Token counts are reported by the AI providers per request. A prompt
+            run counts each prompt answered by one AI engine.
+          </p>
+          <p v-else class="sp-footnote">
             Token counts are reported by the AI providers per request. Costs
             are calculated against the current market rates of the underlying
             providers (Anthropic, OpenAI, xAI, Perplexity, Google); the
@@ -252,6 +258,8 @@ import SettingsSection from '@/components/settings/SettingsSection.vue'
 import OrgMembersSection from '@/components/org/OrgMembersSection.vue'
 import OrgDomainsSection from '@/components/org/OrgDomainsSection.vue'
 import VizChart from '@/components/charts/VizChart.vue'
+import PromptRunsMeter from '@/components/settings/PromptRunsMeter.vue'
+import { meteredRuns } from '@/lib/promptRuns'
 import { aiUsageSpec } from '@/lib/analytics/polishSpecs'
 import { SUPPORT_EMAIL, SUPPORT_SUBJECT } from '@/constants/support'
 import { Button } from '@/components/ui/button'
@@ -366,8 +374,15 @@ const periodLabel = computed(() => {
   return `${start} – ${end}`
 })
 
-// The estimated AI cost of each day in the billing period.
-const dailyChart = computed(() => aiUsageSpec(dailySeries.value, { subtitle: periodLabel.value }))
+// A free account's prompt runs (null for paid accounts): it sees runs and
+// AI requests, never dollars.
+const freeRuns = computed(() => meteredRuns(usage.value?.prompt_runs))
+
+// The estimated AI cost of each day in the billing period; for free
+// accounts, the AI requests of each day.
+const dailyChart = computed(() =>
+  aiUsageSpec(dailySeries.value, { subtitle: periodLabel.value, metric: freeRuns.value ? 'calls' : 'cost' }),
+)
 
 function formatNum(n) { return (n || 0).toLocaleString() }
 function formatTokens(n) {

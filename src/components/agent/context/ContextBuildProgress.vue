@@ -9,6 +9,7 @@ import AgConfirmDialog from '@/components/agent/common/AgConfirmDialog.vue'
 import AgSpinner from '@/components/agent/common/AgSpinner.vue'
 import { isActiveInsightRun } from '@/composables/analytics/useInsightRun'
 import { durationText, money } from '@/lib/analytics/countrySpecs'
+import { useHideUsd } from '@/composables/useHideUsd'
 
 const props = defineProps({
   run: { type: Object, required: true },
@@ -55,9 +56,13 @@ const title = computed(() => {
 
 const errorText = computed(() => (props.run.status === 'failed' ? props.run.error?.message || '' : ''))
 
+// Free accounts never see dollars.
+const hideUsd = useHideUsd()
+
 const costLine = computed(() => {
   const ai = Number(props.run.cost?.ai_usd) || 0
-  return ai > 0 ? `Used ${money(props.run.cost.ai_usd)} of AI allowance.` : 'Nothing was billed.'
+  if (!(ai > 0)) return 'Nothing was billed.'
+  return hideUsd.value ? "Used some of this month's free AI allowance." : `Used ${money(props.run.cost.ai_usd)} of AI allowance.`
 })
 
 function confirmStop() {

@@ -459,19 +459,23 @@ export function finishedChecks(progress) {
     return (p.done || 0) + (p.failed || 0) + (p.skipped || 0) + (p.cancelled || 0)
 }
 
-/** What a run used: Google pages (credits or dollars) and AI allowance. */
-export function costLine(run) {
+/**
+ * What a run used: Google pages (credits or dollars) and AI allowance. A
+ * free account (hideUsd) sees no dollars: the Google pages, or nothing.
+ */
+export function costLine(run, { hideUsd = false } = {}) {
     const cost = run?.cost || {}
     const pages = cost.google_pages_fetched || 0
     const asked = (run?.confirmed?.engine_answers || 0) > 0 || (run?.engines?.length || 0) > 0
     let google = ''
     if (run?.include_google) {
         const used = plural(pages, 'Google page', 'Google pages')
-        if (run.provider === 'serpapi') google = `${used} (${money(cost.google_usd)})`
+        if (run.provider === 'serpapi') google = hideUsd ? used : `${used} (${money(cost.google_usd)})`
         else if (typeof cost.scraperapi_credits === 'number') {
             google = `${used} (about ${integer.format(cost.scraperapi_credits)} ScraperAPI credits)`
         } else google = used
     }
+    if (hideUsd) return google ? `Used ${google}.` : ''
     const ai = `${money(cost.ai_usd)} of AI allowance`
     if (google && asked) return `Used ${google} and ${ai}.`
     if (google) return `Used ${google}.`

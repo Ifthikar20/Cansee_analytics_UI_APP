@@ -11,6 +11,7 @@ import {
 } from 'reka-ui'
 import { isActiveInsightRun } from '@/composables/analytics/useInsightRun'
 import { durationText, money, progressSummary } from '@/lib/analytics/countrySpecs'
+import { useHideUsd } from '@/composables/useHideUsd'
 import { RUN_KIND_LABELS } from '@/lib/analytics/insightWords'
 import { Button } from '@/components/ui/button'
 
@@ -67,11 +68,21 @@ const title = computed(() => {
 
 const failedMessage = computed(() => (props.run.status === 'failed' ? props.run.error?.message || '' : ''))
 
+// Free accounts never see dollars.
+const hideUsd = useHideUsd()
+
 const costLine = computed(() => {
   const cost = props.run.cost || {}
   const ai = Number(cost.ai_usd) || 0
   const pages = Number(cost.google_pages) || 0
   if (!ai && !pages) return 'Nothing was billed.'
+  if (hideUsd.value) {
+    if (!pages) return "Used some of this month's free AI allowance."
+    const used = `${integer.format(pages)} Google ${pages === 1 ? 'page' : 'pages'}`
+    return typeof cost.scraperapi_credits === 'number'
+      ? `Used ${used} (about ${integer.format(cost.scraperapi_credits)} ScraperAPI credits).`
+      : `Used ${used}.`
+  }
   let line = `Used ${money(cost.ai_usd)} of AI allowance`
   if (pages) {
     const used = `${integer.format(pages)} Google ${pages === 1 ? 'page' : 'pages'}`

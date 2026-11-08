@@ -19,6 +19,7 @@ import {
     Table as TableIcon,
 } from '@lucide/vue'
 import { agentTeams } from './teams'
+import { hidesUsd } from '@/lib/promptRuns'
 
 // Raw so a consumer keeping this metadata in reactive state does not wrap
 // the components in proxies.
@@ -198,6 +199,8 @@ export function writerUnavailable(key, status = null) {
     const writers = status && typeof status.writers === 'object' ? status.writers : null
     const writer = writers ? writers[key] : null
     if (!writer || writer.available !== false) return ''
+    // Free accounts never see dollars.
+    if (hidesUsd(status)) return "Needs more of this month's free AI allowance than is left."
     const needs = usd(writer.needs_usd)
     const cap = Number(status.allowance?.cap_usd)
     const spent = Number(status.allowance?.spent_usd)

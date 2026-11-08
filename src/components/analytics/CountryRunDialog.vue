@@ -15,6 +15,8 @@ import {
 import countriesApi from '@/api/countries'
 import { useToast } from '@/composables/useToast'
 import { money, visitorSuggestions } from '@/lib/analytics/countrySpecs'
+import { useHideUsd } from '@/composables/useHideUsd'
+import { estimateRuns } from '@/lib/promptRuns'
 import { Button } from '@/components/ui/button'
 
 const open = defineModel('open', { type: Boolean, default: false })
@@ -160,15 +162,20 @@ function plural(n, one, many) {
   return `${integer.format(n)} ${n === 1 ? one : many}`
 }
 
+// Free accounts count prompt runs and never see dollars.
+const hideUsd = useHideUsd(() => estimate.value)
+
 const googleLines = computed(() => {
   const g = estimate.value?.google
   if (!g?.included) return []
   const pages = `up to ${plural(g.pages_max || 0, 'results page', 'results pages')}`
   const cost =
     g.provider === 'serpapi'
-      ? `up to ${money(g.usd_max)}`
+      ? hideUsd.value
+        ? ''
+        : `up to ${money(g.usd_max)}`
       : `about ${integer.format(g.credits_max || 0)} ScraperAPI credits`
-  const lines = [`Google: ${pages}, ${cost}.`]
+  const lines = [cost ? `Google: ${pages}, ${cost}.` : `Google: ${pages}.`]
   if (typeof g.daily_left === 'number' && typeof g.daily_limit === 'number') {
     lines.push(`${integer.format(g.daily_left)} of ${integer.format(g.daily_limit)} Google pages left today for this project.`)
   }
@@ -179,6 +186,11 @@ const engineLine = computed(() => {
   const e = estimate.value?.engines
   if (!e || !e.answers) return ''
   const answers = plural(e.answers, 'answer', 'answers')
+  if (hideUsd.value) {
+    // One answer is one prompt run; a shortfall shows as the estimate's blocker.
+    const runs = estimateRuns(estimate.value?.prompt_runs)
+    return runs?.enough ? `AI engines: ${answers}. ${runs.text}` : `AI engines: ${answers}.`
+  }
   const allowance = estimate.value?.allowance
   if (!allowance || allowance.unlimited) return `AI engines: ${answers}, up to ${money(e.usd_max)}.`
   return `AI engines: ${answers}, up to ${money(e.usd_max)} of your AI allowance (${money(allowance.left_usd)} left this month).`
@@ -190,6 +202,10 @@ const blockers = computed(() => estimate.value?.blockers || [])
 const runLabel = computed(() => {
   const e = estimate.value
   if (!e) return 'Run check'
+  if (hideUsd.value) {
+    const n = Number(e.engines?.answers) || 0
+    return n ? `Run for ${plural(n, 'free prompt run', 'free prompt runs')}` : 'Run check'
+  }
   const usd = Number(e.engines?.usd_max || 0) + (e.google?.included ? Number(e.google.usd_max || 0) : 0)
   const credits = e.google?.included && e.google.provider !== 'serpapi' ? e.google.credits_max || 0 : 0
   const parts = []

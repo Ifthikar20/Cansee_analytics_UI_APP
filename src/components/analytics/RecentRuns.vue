@@ -3,6 +3,7 @@
 // countries, how each ended, and what it used.
 import { CircleCheck, CircleMinus, CirclePause, CircleStop, CircleX, LoaderCircle } from '@lucide/vue'
 import { RUN_STATUS_TEXT, costLine, finishedChecks, isActiveRun } from '@/lib/analytics/countrySpecs'
+import { useHideUsd } from '@/composables/useHideUsd'
 
 defineProps({
   runs: { type: Array, default: () => [] },
@@ -36,6 +37,9 @@ function dateText(iso) {
   const d = new Date(iso)
   return Number.isNaN(d.getTime()) ? '' : when.format(d)
 }
+
+// Free accounts never see dollars.
+const hideUsd = useHideUsd()
 </script>
 
 <template>
@@ -54,8 +58,10 @@ function dateText(iso) {
       </ul>
       <p class="rr-line">
         {{ checksDone(run) }} of {{ run.progress?.total || 0 }} checks
-        <span class="rr-sep" aria-hidden="true">·</span>
-        <span class="rr-cost">{{ costLine(run) }}</span>
+        <template v-if="costLine(run, { hideUsd })">
+          <span class="rr-sep" aria-hidden="true">·</span>
+          <span class="rr-cost">{{ costLine(run, { hideUsd }) }}</span>
+        </template>
       </p>
       <p v-if="run.created_by_name" class="rr-by">By {{ run.created_by_name }}</p>
     </li>
