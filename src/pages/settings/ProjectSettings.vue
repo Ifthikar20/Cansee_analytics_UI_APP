@@ -87,7 +87,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Plus, X } from '@lucide/vue'
 import SettingsShell from '@/components/settings/SettingsShell.vue'
@@ -176,6 +176,9 @@ async function saveCompetitors() {
     const { data } = await saveProject({ competitors: rows })
     competitors.value = (data.competitors || []).map((c) => ({ ...c }))
     syncStore(data)
+    // The list just changed, which queues the edit watcher below that clears
+    // the note; let it run first, or 'Saved' would be wiped before it shows.
+    await nextTick()
     compState.value = 'saved'
   } catch {
     compState.value = 'error'
@@ -207,8 +210,11 @@ async function deleteProject() {
 }
 
 watch(websiteId, load, { immediate: true })
-watch([details, competitors], () => {
+// An edit after a save hides that section's 'Saved' or error note.
+watch(details, () => {
   detailsState.value = ''
+}, { deep: true })
+watch(competitors, () => {
   compState.value = ''
 }, { deep: true })
 </script>
