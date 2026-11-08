@@ -1,6 +1,6 @@
 <template>
   <div class="ag-prose" :class="{ 'ag-prose-quiet': quiet }" @click="onClick">
-    <div v-for="block in blocks" :key="block.key" class="ag-md-block" v-html="block.html"></div>
+    <div v-for="block in marked" :key="block.key" class="ag-md-block" v-html="block.html"></div>
   </div>
 </template>
 
@@ -8,11 +8,16 @@
 // Markdown for a text part. While the reply streams, the smoothed text goes
 // through the streaming renderer so only the growing last block is parsed
 // again; finished blocks keep their DOM. Links open in the browser pane
-// (a modified click keeps the browser's own behaviour).
+// (a modified click keeps the browser's own behaviour). The project's brand
+// and its competitors are highlighted in finished replies (brandMarks.js),
+// so a reply shows at a glance where the brand stands.
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { createStreamingRenderer, isSafeUrl, onHighlighterReady } from '@/lib/agent/markdown/renderer'
+import { brandMatcher, markBrands } from '@/lib/agent/markdown/brandMarks'
 import { useSmoothText } from '@/composables/agent/useSmoothText'
 import { useAgentPaneStore } from '@/stores/agentPane'
+import { useAgentStore } from '@/stores/agent'
+import { useAppStore } from '@/stores/app'
 import { copyText } from '@/lib/agent/download'
 
 const props = defineProps({
@@ -33,6 +38,24 @@ const stopListening = onHighlighterReady(() => {
 const blocks = computed(() => {
   void highlightTick.value
   return renderer.render(shown.value, { final: !props.streaming && !catchingUp.value })
+})
+
+const agent = useAgentStore()
+const app = useAppStore()
+
+// The tracked brand and its competitors for the agent's project.
+const matcher = computed(() => {
+  if (props.quiet) return null
+  const id = agent.websiteId
+  const site = (app.websites || []).find((w) => w && w.id === id) || app.activeWebsite
+  if (!site) return null
+  return brandMatcher({ own: site.name, competitors: site.competitors || [] })
+})
+
+const marked = computed(() => {
+  const m = matcher.value
+  if (!m) return blocks.value
+  return blocks.value.map((block) => ({ ...block, html: markBrands(block.html, m) }))
 })
 
 const copyTimers = new Set()
@@ -75,3 +98,22 @@ onBeforeUnmount(() => {
   copyTimers.forEach(clearTimeout)
 })
 </script>
+
+<style>
+/* Unscoped: the marks are inserted into v-html content, which scoped CSS
+   cannot reach. */
+.ag-prose mark.ag-brand {
+  border-radius: 3px;
+  padding: 0 2px;
+  color: inherit;
+  font-weight: 600;
+}
+.ag-prose mark.ag-brand--own {
+  background: color-mix(in srgb, var(--ag-accent, #2f7d4f) 18%, transparent);
+  box-shadow: inset 0 -2px 0 var(--ag-accent, #2f7d4f);
+}
+.ag-prose mark.ag-brand--competitor {
+  background: color-mix(in srgb, var(--ag-warning, #b07d28) 16%, transparent);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--ag-warning, #b07d28) 70%, transparent);
+}
+</style>
