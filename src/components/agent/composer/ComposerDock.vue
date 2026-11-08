@@ -9,6 +9,7 @@
         :allowance="store.status?.allowance || null"
         :detail="store.statusError?.message || ''"
         :checking="store.statusLoading"
+        :status="store.status"
         @recheck="recheck"
       />
       <Composer

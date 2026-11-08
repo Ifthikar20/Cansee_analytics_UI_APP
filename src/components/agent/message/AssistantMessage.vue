@@ -6,6 +6,7 @@
       :phase="run?.phase || ''"
       :transport="run?.transport?.state || ''"
       :retrying="Boolean(run?.retrying)"
+      :queue="run?.queue || null"
       :started-at="startedAt"
       :ended-at="message.finished_at || null"
       :duration-ms="durationMs"
@@ -85,7 +86,10 @@
       :retryable="serverRetryable"
       :website-id="websiteId"
       :busy="busy"
+      :hint="errorHint"
+      :can-reload="Boolean(message.chat_id)"
       @retry="retry"
+      @reload="reloadChat"
     />
 
     <div v-if="message.status === 'truncated' && !live" class="ag-truncated">
@@ -132,6 +136,7 @@ import SwarmBlock from '@/components/agent/swarm/SwarmBlock.vue'
 import SwarmTable from '@/components/agent/swarm/SwarmTable.vue'
 import { errorInfo, messageCitations, messageText, splitParts } from './parts'
 import { agentMeta } from '@/lib/agent/agentsMeta'
+import { agentFix } from '@/lib/agent/setup'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { useAgentUiStore } from '@/stores/agentUi'
@@ -157,8 +162,12 @@ const toast = useToast()
 
 const LIVE_PHASES = new Set(['queued', 'running', 'cancelling'])
 
+const TERMINAL_PHASES = new Set(['done', 'cancelled', 'failed'])
+
+// A message saved as streaming is live unless its run is known to be over
+// (the store then shows it as interrupted; this covers the moment between).
 const live = computed(() => {
-  if (props.message.status === 'streaming') return true
+  if (props.message.status === 'streaming') return !(props.run && TERMINAL_PHASES.has(props.run.phase))
   return Boolean(props.run && LIVE_PHASES.has(props.run.phase))
 })
 
@@ -190,6 +199,15 @@ function toggleSteps() {
 const failed = computed(() => ['failed', 'interrupted'].includes(props.message.status) && !live.value)
 const errorCode = computed(() => props.message.error_code || props.run?.error?.code || '')
 const errorMessage = computed(() => props.message.error_message || props.run?.error?.message || '')
+// Staff, DEBUG and local builds also see the setting to change.
+const errorHint = computed(() => agentFix(errorCode.value, store.status).staff)
+
+// This tab lost track of the reply: load the chat again. A run the server
+// still runs is followed again; a finished one shows its saved reply.
+// openChat never throws; a failed load shows on the chat.
+function reloadChat() {
+  if (props.message.chat_id) store.openChat(props.message.chat_id, { force: true })
+}
 const canRetry = computed(() => !isTemp.value && props.message.status !== 'streaming')
 // run.failed says whether trying again can help. A run settled on this side
 // (the stream was lost) leaves the reply interrupted, and its flag is about

@@ -21,6 +21,13 @@
 <script setup>
 // "Working" (shimmer) while the run is live, then "Worked for 10s". It is the
 // disclosure button for the step list when there are steps to show.
+//
+// A queued run waits for a free run slot on the agent server. When the
+// server says so (`queue`, from run.queued events or the run payload) the
+// label says "Waiting for a free slot" with the place in line. A server that
+// does not report the line is inferred from the run staying queued (no
+// run.started) for QUEUE_HINT_MS: a run with a free slot starts within a
+// second or two.
 import { computed } from 'vue'
 import { ChevronRight } from '@lucide/vue'
 import { useElapsed } from '@/composables/agent/useElapsed'
@@ -35,6 +42,8 @@ const props = defineProps({
   transport: { type: String, default: '' },
   // The server is retrying a model request (run.retrying).
   retrying: { type: Boolean, default: false },
+  // RunQueue {position, ahead, slots} while a queued run waits, else null.
+  queue: { type: Object, default: null },
   startedAt: { type: [String, Number], default: null },
   endedAt: { type: [String, Number], default: null },
   durationMs: { type: Number, default: null },
@@ -44,6 +53,8 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['toggle'])
+
+const QUEUE_HINT_MS = 5000
 
 const elapsed = useElapsed(
   () => props.startedAt,
@@ -59,12 +70,23 @@ const known = computed(
 const label = computed(() => {
   if (props.running) {
     if (props.phase === 'cancelling') return 'Stopping'
-    if (props.phase === 'queued') return 'Starting'
+    if (props.phase === 'queued') return waiting.value ? 'Waiting for a free slot' : 'Starting'
     return elapsed.ms.value >= 1000 ? `Working for ${elapsed.label.value}` : 'Working'
   }
   if (props.status === 'cancelled') return known.value ? `Stopped after ${elapsed.label.value}` : 'Stopped'
   return known.value ? `Worked for ${elapsed.label.value}` : 'Finished'
 })
+
+const waiting = computed(
+  () => props.phase === 'queued' && (Number(props.queue?.position) > 0 || elapsed.ms.value >= QUEUE_HINT_MS)
+)
+
+function placeInLine(queue) {
+  const ahead = Number(queue?.ahead)
+  if (!Number.isInteger(ahead) || ahead < 0) return ''
+  if (ahead === 0) return 'Next in line'
+  return ahead === 1 ? '1 reply ahead' : `${ahead} replies ahead`
+}
 
 const note = computed(() => {
   if (!props.running) return ''
@@ -72,6 +94,7 @@ const note = computed(() => {
   if (props.transport === 'offline') return 'Connection lost, retrying'
   if (props.transport === 'maintenance') return 'Down for maintenance, retrying'
   if (props.retrying) return 'Retrying'
+  if (waiting.value) return placeInLine(props.queue)
   return ''
 })
 </script>

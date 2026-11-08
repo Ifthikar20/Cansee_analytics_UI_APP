@@ -36,6 +36,8 @@
  * @property {number|null} startedAt  epoch ms
  * @property {number|null} durationMs
  * @property {Object|null} usage   cumulative run.usage payload
+ * @property {{position: number, ahead: number, slots: number|null}|null} queue
+ *           its place in line while it waits for a free run slot (run.queued, or the run payload)
  * @property {boolean} cancelRequested
  * @property {{code: string, message: string, retryable: boolean}|null} error
  */
@@ -86,6 +88,8 @@
  */
 
 export const EVENT = Object.freeze({
+    // A run waiting for a free run slot: {position, ahead, slots} (contract RunQueue).
+    RUN_QUEUED: 'run.queued',
     RUN_STARTED: 'run.started',
     RUN_RETRYING: 'run.retrying',
     RUN_USAGE: 'run.usage',

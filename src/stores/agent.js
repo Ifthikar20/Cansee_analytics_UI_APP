@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref, toRaw, watch } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref, toRaw, watch } from 'vue'
 import agentApi from '@/api/agent'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
@@ -76,7 +76,7 @@ const STOP_FALLBACK_MS = 8000
 // the server is asked again after each of these delays.
 const TITLE_CHECKS_MS = [2000, 6000, 15000]
 const SERVER_RUNS_TO_FOLLOW = 3
-const RUN_KEYS = ['phase', 'lastSeq', 'startedAt', 'durationMs', 'usage', 'error', 'retrying', 'model', 'stopReason', 'outcome']
+const RUN_KEYS = ['phase', 'lastSeq', 'startedAt', 'durationMs', 'usage', 'error', 'retrying', 'model', 'stopReason', 'outcome', 'queue']
 
 const idOf = (v) => (v === null || v === undefined || v === '' ? null : String(v))
 const positiveInt = (v) => {
@@ -188,11 +188,39 @@ export const useAgentStore = defineStore('agent', () => {
         applyEvents: (runId, events) => applyEvents(runId, events),
         onTransport: (runId, transport) => {
             const run = runs.value[runId]
-            if (run) run.transport = transport
+            if (!run) return
+            const before = run.transport?.state
+            run.transport = transport
+            // The agent process stopped answering: refresh status/, so the
+            // banner above the composer says so and what to do.
+            if (transport?.state === TRANSPORT_STATE.OFFLINE && before !== TRANSPORT_STATE.OFFLINE) loadStatus()
         },
         onResync: (runId) => resyncRun(runId),
+        onQueue: (runId, queue) => {
+            const run = runs.value[runId]
+            if (run && run.phase === RUN_PHASE.QUEUED) run.queue = queue || null
+        },
         onClose: (runId, info) => onTransportClosed(runId, info),
     })
+
+    // Back online, or back to a hidden tab: reconnect now instead of after
+    // the backoff, and let a transport that lost the agent ask the server.
+    function nudgeTransports() {
+        if (typeof manager.nudge === 'function') manager.nudge()
+    }
+    function onVisibility() {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') nudgeTransports()
+    }
+    if (typeof window !== 'undefined') {
+        window.addEventListener('online', nudgeTransports)
+        document.addEventListener('visibilitychange', onVisibility)
+        if (getCurrentScope()) {
+            onScopeDispose(() => {
+                window.removeEventListener('online', nudgeTransports)
+                document.removeEventListener('visibilitychange', onVisibility)
+            })
+        }
+    }
 
     /* ── Getters ── */
 
@@ -479,7 +507,12 @@ export const useAgentStore = defineStore('agent', () => {
     function upsertRun(raw, { chatId = null, messageId = null } = {}) {
         const r = normalizeRun(raw)
         if (!r) return null
-        if (runs.value[r.id]) return runs.value[r.id]
+        const known = runs.value[r.id]
+        if (known) {
+            // A web API chat detail never knows the line (null); only a place reported by the agent process is taken.
+            if (known.phase === RUN_PHASE.QUEUED && r.queue) known.queue = r.queue
+            return known
+        }
         runs.value[r.id] = {
             id: r.id,
             chatId: idOf(chatId) || r.chat_id,
@@ -497,6 +530,8 @@ export const useAgentStore = defineStore('agent', () => {
             model: '',
             stopReason: '',
             outcome: '',
+            // {position, ahead, slots} while it waits for a free run slot.
+            queue: phaseFromRunStatus(r.status) === RUN_PHASE.QUEUED ? r.queue : null,
         }
         return runs.value[r.id]
     }
@@ -535,6 +570,7 @@ export const useAgentStore = defineStore('agent', () => {
         const { messages: list, active_run: activeRunRaw, current_leaf_id: leafId, ...summary } = detail
         upsertChatSummary(summary)
         for (const m of list) upsertMessage(m, { chatId, keepLiveParts: !resync })
+        settleOrphanedReplies(list, activeRunRaw)
         const st = ensureChatState(chatId)
         if (leafId) st.leafId = leafId
         st.loaded = true
@@ -562,6 +598,29 @@ export const useAgentStore = defineStore('agent', () => {
             }
         }
         return detail
+    }
+
+    /**
+     * A reply the server saved as `streaming` whose run is no longer active
+     * (the run ended, but writing the message failed) is not live: nothing
+     * will ever finish it. Show it as interrupted, so it stops spinning and
+     * can be retried. The reply of the chat's active run, and one this tab
+     * still streams, are left alone.
+     */
+    function settleOrphanedReplies(list, activeRunRaw) {
+        const activeRunning = activeRunRaw && !isTerminalPhase(phaseFromRunStatus(activeRunRaw.status))
+        const liveId = activeRunning ? idOf(activeRunRaw.message_id) : null
+        for (const raw of list) {
+            const message = messages.value[raw.id]
+            if (!message || message.status !== MESSAGE_STATUS.STREAMING || message.id === liveId) continue
+            const run = Object.values(runs.value).find((r) => r.messageId === message.id)
+            if (run && !isTerminalPhase(run.phase) && manager.isAttached(run.id)) continue
+            markInterrupted(message)
+        }
+    }
+
+    function markInterrupted(message) {
+        message.status = MESSAGE_STATUS.INTERRUPTED
     }
 
     function loadChatDetail(id, { force = false, resync = false } = {}) {
@@ -702,7 +761,11 @@ export const useAgentStore = defineStore('agent', () => {
     /** The server has finished `run` but no terminal event reached this tab: its saved message says how. */
     function finishFromSavedMessage(run) {
         const message = messages.value[run.messageId]
+        // Saved as still streaming although the server runs it no more:
+        // it will not finish, so it ends interrupted rather than live.
+        if (message && message.status === MESSAGE_STATUS.STREAMING) markInterrupted(message)
         run.phase = phaseFromMessageStatus(message?.status) || RUN_PHASE.DONE
+        run.queue = null
         onRunTerminal(run)
     }
 

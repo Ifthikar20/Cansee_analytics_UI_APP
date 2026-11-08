@@ -204,11 +204,15 @@ const ERROR_COPY = {
   },
   agent_disabled: { title: 'The agent is switched off on this server.', body: '', retry: false },
   agent_not_configured: {
-    title: "The agent isn't set up on this server yet.",
-    body: 'No model API key is configured.',
+    title: "The AI agent isn't set up on this workspace.",
+    body: 'It needs an Anthropic API key to answer. Ask your workspace admin to add it.',
     retry: false,
   },
-  agent_unavailable: { title: "The agent service isn't reachable right now.", body: 'Try again in a minute.', retry: true },
+  agent_unavailable: {
+    title: "The AI agent isn't running right now.",
+    body: 'Try again in a minute. If it stays down, contact support.',
+    retry: true,
+  },
   // nginx's maintenance switch (503 with Retry-After), not the agent being down.
   maintenance: { title: 'CanSee is down for maintenance.', body: 'Try again in a few minutes.', retry: true },
   // Another run, or sending faster than runs can start.
@@ -247,6 +251,20 @@ const ERROR_COPY = {
   internal_error: { title: 'Something went wrong on our side.', body: '', retry: true },
   interrupted: { title: 'The reply was interrupted before it finished.', body: '', retry: true },
   network: { title: 'The connection to the agent was lost.', body: '', retry: true },
+  // This tab stopped following the reply; the run may still be going on
+  // the server, so the way out is to reload the chat, not to run it again.
+  resync_failed: {
+    title: 'This reply stopped updating.',
+    body: 'It may still be running. Reload the chat to see where it is.',
+    retry: false,
+    reload: true,
+  },
+  transport: {
+    title: 'The connection to this reply was lost.',
+    body: 'Reload the chat to see where it is.',
+    retry: true,
+    reload: true,
+  },
 }
 
 /** Copy for a failed or interrupted reply, or a refused send. */

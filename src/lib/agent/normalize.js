@@ -176,6 +176,25 @@ export function normalizeChatSummary(raw) {
     }
 }
 
+/**
+ * Contract RunQueue: {position, ahead, slots} while a queued run waits for
+ * a free run slot (position counts from 1). Anything else is null: the run
+ * is not waiting, or the server did not say. Note that only the agent
+ * process knows the line; a chat detail from the web API always has null.
+ */
+export function normalizeQueue(raw) {
+    if (!raw || typeof raw !== 'object') return null
+    const position = Number(raw.position)
+    if (!Number.isInteger(position) || position < 1) return null
+    const ahead = Number(raw.ahead)
+    const slots = Number(raw.slots)
+    return {
+        position,
+        ahead: Number.isInteger(ahead) && ahead >= 0 ? ahead : position - 1,
+        slots: Number.isInteger(slots) && slots > 0 ? slots : null,
+    }
+}
+
 export function normalizeRun(raw) {
     if (!raw || typeof raw !== 'object' || raw.id === undefined || raw.id === null) return null
     return {
@@ -185,6 +204,7 @@ export function normalizeRun(raw) {
         message_id: str(raw.message_id),
         status: raw.status || 'queued',
         last_seq: num(raw.last_seq, 0),
+        queue: normalizeQueue(raw.queue),
     }
 }
 

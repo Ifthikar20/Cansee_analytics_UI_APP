@@ -4,6 +4,7 @@
     <div class="ag-banner-text">
       <p class="ag-banner-title">{{ copy.title }}</p>
       <p v-if="copy.body" class="ag-banner-body">{{ copy.body }}</p>
+      <p v-if="copy.staff" class="ag-banner-body">{{ copy.staff }}</p>
     </div>
     <router-link v-if="copy.billing" class="ag-banner-action" to="/billing">See plans</router-link>
     <button v-else-if="copy.recheck" type="button" class="ag-banner-action" :disabled="checking" @click="emit('recheck')">
@@ -15,9 +16,12 @@
 <script setup>
 // Why the agent cannot answer right now, above the composer. Every state is
 // a real server answer (status/ or a refused send), or says that status/
-// could not be reached; nothing is guessed.
+// could not be reached; nothing is guessed. When the agent cannot answer,
+// it says what to do; staff and DEBUG or local builds also get the setting
+// to change (lib/agent/setup.js).
 import { computed } from 'vue'
 import { CircleAlert, CirclePause, CloudOff, Gauge, PlugZap, Wrench } from '@lucide/vue'
+import { agentFix } from '@/lib/agent/setup'
 
 const props = defineProps({
   // agent_disabled | agent_unavailable | maintenance | agent_not_configured | allowance_exceeded
@@ -27,6 +31,8 @@ const props = defineProps({
   // Why status/ failed, for status_unknown.
   detail: { type: String, default: '' },
   checking: { type: Boolean, default: false },
+  // GET agent/status/, for the setting names the viewer may see.
+  status: { type: Object, default: null },
 })
 
 const emit = defineEmits(['recheck'])
@@ -62,14 +68,17 @@ const copy = computed(() => {
         body: props.detail.trim(),
         recheck: true,
       }
-    case 'agent_unavailable':
+    case 'agent_unavailable': {
+      const fix = agentFix('agent_unavailable', props.status)
       return {
         tone: 'muted',
         icon: PlugZap,
-        title: "The agent service isn't reachable right now.",
-        body: 'Your chats are safe. Try again in a minute.',
+        title: "The AI agent isn't running right now.",
+        body: `Your chats are safe. A reply in progress continues when the agent is back, or shows as interrupted. ${fix.customer}`,
+        staff: fix.staff,
         recheck: true,
       }
+    }
     // nginx's maintenance switch, not the agent being down.
     case 'maintenance':
       return {
@@ -79,13 +88,16 @@ const copy = computed(() => {
         body: 'Your chats are safe. Try again in a few minutes.',
         recheck: true,
       }
-    case 'agent_not_configured':
+    case 'agent_not_configured': {
+      const fix = agentFix('agent_not_configured', props.status)
       return {
         tone: 'muted',
         icon: CircleAlert,
-        title: "The agent isn't set up on this server yet.",
-        body: 'No Anthropic API key is configured, so it cannot answer.',
+        title: "The AI agent isn't set up on this workspace.",
+        body: `It needs an Anthropic API key to answer. ${fix.customer}`,
+        staff: fix.staff,
       }
+    }
     case 'allowance_exceeded':
       return {
         tone: 'warning',

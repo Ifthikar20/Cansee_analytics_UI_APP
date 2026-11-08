@@ -6,7 +6,7 @@
 //
 // snapshot = {
 //   message: Message,                  the assistant message (parts, status, research)
-//   run: {phase, lastSeq, startedAt, durationMs, usage, error, retrying, model, stopReason, outcome},
+//   run: {phase, lastSeq, startedAt, durationMs, usage, error, retrying, model, stopReason, outcome, queue},
 //   drafts: {[artifactId]: Draft},
 // }
 // Draft = {artifactId, kind, title, agentKey, baseVersion, request, status: drafting|done|failed,
@@ -28,7 +28,7 @@
 // execution and the position of the task that took it, see swarmTabOrder)
 // so a swarm's pages line up by prompt, then page. A page capture opens on
 // click (its task row).
-import { toEpochMs } from './normalize'
+import { normalizeQueue, toEpochMs } from './normalize'
 import { ACTIVE_PART_STATUSES, EVENT, MESSAGE_STATUS, PART_TYPES, RUN_PHASE, TAB_STATUSES, isTerminalPhase } from './types'
 
 export function initialRunState(overrides = {}) {
@@ -43,6 +43,7 @@ export function initialRunState(overrides = {}) {
         model: '',
         stopReason: '',
         outcome: '',
+        queue: null,
         ...overrides,
     }
 }
@@ -286,7 +287,7 @@ function terminal(state, event, phase, messagePatch, runPatch) {
         ...messagePatch,
         finished_at: state.message.finished_at || finishedAt,
     })
-    next = withRun(next, { phase, retrying: null, ...runPatch })
+    next = withRun(next, { phase, retrying: null, queue: null, ...runPatch })
     return {
         state: next,
         effects: [{ type: 'terminal', phase, status: next.message.status }],
@@ -296,8 +297,15 @@ function terminal(state, event, phase, messagePatch, runPatch) {
 /* ── handlers ── */
 
 const HANDLERS = {
+    // Still waiting for a free run slot; run.started follows once it has one.
+    [EVENT.RUN_QUEUED](state, e) {
+        if (state.run.phase !== RUN_PHASE.QUEUED) return null
+        return { state: withRun(state, { queue: normalizeQueue(e) }) }
+    },
+
     [EVENT.RUN_STARTED](state, e) {
         let next = withRun(state, {
+            queue: null,
             phase: keepCancelling(state.run.phase, RUN_PHASE.RUNNING),
             startedAt: state.run.startedAt ?? toEpochMs(e.ts),
             model: e.model || state.run.model,
