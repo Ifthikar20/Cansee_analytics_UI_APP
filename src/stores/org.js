@@ -20,7 +20,6 @@ export const useOrgStore = defineStore('org', () => {
     const domains = ref([])
 
     const membersLoading = ref(false)
-    const invitationsLoading = ref(false)
     const domainsLoading = ref(false)
 
     function hasOrg() {
@@ -57,14 +56,14 @@ export const useOrgStore = defineStore('org', () => {
 
     // ── Invitations ──
     async function loadInvitations() {
-        if (!hasOrg()) return
-        invitationsLoading.value = true
-        try {
-            const { data } = await orgsApi.listInvitations()
-            invitations.value = Array.isArray(data) ? data : []
-        } finally {
-            invitationsLoading.value = false
+        // The invitations endpoint is admin-only (IsOrgAdmin). Members would
+        // get a guaranteed 403 and a permission toast on every Team visit.
+        if (!hasOrg() || !useAuthStore().isOrgAdmin) {
+            invitations.value = []
+            return
         }
+        const { data } = await orgsApi.listInvitations()
+        invitations.value = Array.isArray(data) ? data : []
     }
 
     async function createInvitation(payload) {
@@ -127,20 +126,16 @@ export const useOrgStore = defineStore('org', () => {
 
     // ── Usage (admin-only rollup: seats + per-member prompt/AI usage) ──
     const usage = ref(null)
-    const usageLoading = ref(false)
 
     async function loadUsage() {
         // The endpoint is admin-gated; skip entirely for members so the
         // Team page never fires a guaranteed 403.
         if (!hasOrg() || !useAuthStore().isOrgAdmin) return
-        usageLoading.value = true
         try {
             const { data } = await orgsApi.getUsage()
             usage.value = data || null
         } catch {
             usage.value = null
-        } finally {
-            usageLoading.value = false
         }
     }
 
@@ -153,15 +148,28 @@ export const useOrgStore = defineStore('org', () => {
         return data
     }
 
+    /** Drop every list; the next account must not see this one's org. */
+    function reset() {
+        members.value = []
+        invitations.value = []
+        domains.value = []
+        usage.value = null
+        membersLoading.value = false
+        domainsLoading.value = false
+    }
+
+    // Sign-out clears the lists before clearAuth returns, as the agent and
+    // board stores do.
+    useAuthStore().onClearAuth(() => reset())
+
     return {
+        reset,
         members,
         invitations,
         domains,
         usage,
         membersLoading,
-        invitationsLoading,
         domainsLoading,
-        usageLoading,
         loadUsage,
         loadMembers,
         changeMemberRole,

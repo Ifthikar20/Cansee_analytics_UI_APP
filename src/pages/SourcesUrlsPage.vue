@@ -3,21 +3,19 @@
  * Sources > URLs — the AI answer sources page.
  *
  * Every row is a web page an AI assistant pulled up while answering the
- * prompts this brand tracks. The page tells that story in order: what
- * happened (header facts + AI-referred visits), what to do about it
- * (opportunities), then the evidence (retrievals chart, movers, types,
- * and the URL table with real Google/AI traffic for the brand's own
- * pages). Every metric has a tooltip definition; there are no dead
- * controls.
+ * prompts this brand tracks. The page tells that story in order: citation
+ * analytics (which sources the engines list, and where you and your
+ * competitors are cited), what happened (header facts), what to do about
+ * it (opportunities), then the evidence (retrievals chart, movers, types,
+ * and the URL table with Google clicks for the brand's own pages). Every
+ * metric has a tooltip definition; there are no dead controls.
+ *
+ * It is the board's Citations panel: there the panel's title replaces the
+ * breadcrumb, and a row opens its detail in the same panel.
  */
+import { ENGINES, engineMeta } from '@/lib/engines'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Line } from 'vue-chartjs'
-import {
-  Chart as ChartJS,
-  Title, Tooltip as ChartTooltip, Legend, LineElement, PointElement,
-  CategoryScale, LinearScale, Filler,
-} from 'chart.js'
 import {
   Search, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown,
   Check, ChevronDown, CircleX, Loader2,
@@ -25,22 +23,33 @@ import {
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 import { useAppStore } from '@/stores/app'
-import citationsApi from '@/api/citations'
-import { cssVar } from '@/lib/theme'
+import api from '@/api/client'
+import { useBoard, useInPanel } from '@/lib/board/context'
+import { boardLocation } from '@/lib/board/links'
+import { stableSlots } from '@/lib/charts/palette'
+import { retrievalsSpec, urlTypesSpec } from '@/lib/analytics/polishSpecs'
 import {
-  Card, CardHeader, CardTitle, CardContent,
+  Card, CardHeader, CardContent,
 } from '@/components/ui/card'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import CitationAnalytics from '@/components/analytics/CitationAnalytics.vue'
+import VizChart from '@/components/charts/VizChart.vue'
 import MetricInfo from '@/components/sources/MetricInfo.vue'
 import OpportunitiesRow from '@/components/sources/OpportunitiesRow.vue'
-
-ChartJS.register(Title, ChartTooltip, Legend, LineElement, PointElement, CategoryScale, LinearScale, Filler)
 
 const appStore = useAppStore()
 const route = useRoute()
 const router = useRouter()
 const websiteId = computed(() => route.params.websiteId)
 const brandLabel = computed(() => appStore.activeWebsite?.name || 'this brand')
+
+// In the board's panel the detail opens through the board (its own query keys).
+const inPanel = useInPanel()
+const board = inPanel ? useBoard() : null
+
+// No prompt has answers yet: open Prompts on the board with Add prompts.
+const addPromptsTo = computed(() => boardLocation(websiteId.value, 'prompts', { add: '1' }))
+const addPromptsPath = computed(() => router.resolve(addPromptsTo.value).fullPath)
 
 
 /* ── Metric definitions (tooltips) ── */
@@ -51,82 +60,36 @@ const HELP = {
   movers: 'Top: most retrieved. New: first ever seen in the last week. Trending and Losing: biggest change versus the first half of the period.',
   urlTypes: 'Page format classified from the URL and title. Percentages are shares of all retrievals in this period.',
   googleClicks: 'Clicks from Google Search for this page over the same period, from Search Console. Google reports with about a 3-day delay. Only available for your own pages.',
-  aiVisits: 'Visits that arrived on this page from an AI assistant (ChatGPT, Perplexity, and others), measured by your tracking pixel. Only available for your own pages.',
 }
 
 /* ── Remote state ── */
 const loading = ref(true)
+const loaded = ref(false)
 const error = ref('')
 
-const DOMAIN_PALETTE = [
-  '#475569', '#8b5cf6', '#5b8def', '#ec4899', '#f59e0b',
-  '#22c55e', '#06b6d4', '#f97316', '#14b8a6', '#eab308',
-]
-
-const domainSeries = ref([])
-const chartLabels = ref([])
+// The five most-used domains per day. Each domain keeps the colour slot it
+// first got for as long as the page is open, so a filter change never
+// repaints a domain that stays on the chart.
+const overview = ref({ labels: [], series: [] })
+const periodStart = ref(null)
+const slotMemory = new Map()
+const domainSlots = ref(new Map())
 const trafficSummary = ref(null)
 const opportunities = ref(null)
 const uniqueUrls = ref(0)
 
-const chartData = computed(() => ({
-  labels: chartLabels.value,
-  datasets: domainSeries.value.map(d => ({
-    label: d.label,
-    data: d.data,
-    borderColor: d.color,
-    backgroundColor: d.color,
-    pointHoverBackgroundColor: d.color,
-    pointHoverBorderColor: cssVar('--card', '#fff'),
-    tension: 0.4,
-    cubicInterpolationMode: 'monotone',
-    pointRadius: 0,
-    pointHoverRadius: 4,
-    pointHoverBorderWidth: 2,
-    borderWidth: 2,
-    fill: false,
-  })),
-}))
-
-const chartOptions = computed(() => {
-  const grid = cssVar('--border', 'rgba(0,0,0,0.08)')
-  const text = cssVar('--muted-foreground', '#64748b')
-  const popover = cssVar('--popover', '#ffffff')
-  const popoverFg = cssVar('--popover-foreground', '#0f172a')
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        usePointStyle: true,
-        backgroundColor: popover,
-        titleColor: popoverFg,
-        bodyColor: popoverFg,
-        borderColor: grid,
-        borderWidth: 1,
-        cornerRadius: 8,
-        padding: 12,
-        boxPadding: 4,
-        callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${ctx.parsed.y}` },
+const retrievalsChart = computed(() =>
+  retrievalsSpec(overview.value, domainSlots.value, { start: periodStart.value }),
+)
+const retrievalsEmpty = computed(() =>
+  overview.value.series.length
+    ? null
+    : {
+        title: 'No retrievals in this period yet',
+        body: 'Retrievals appear as the AI engines answer the prompts you track.',
+        action: { label: 'Add prompts', to: addPromptsTo.value },
       },
-    },
-    scales: {
-      x: {
-        grid: { display: false },
-        border: { display: false },
-        ticks: { color: text, font: { size: 12 }, padding: 8 },
-      },
-      y: {
-        beginAtZero: true,
-        grid: { color: grid, drawBorder: false },
-        border: { display: false },
-        ticks: { color: text, font: { size: 12 }, padding: 8, precision: 0 },
-      },
-    },
-  }
-})
+)
 
 /* ── URL movers ── */
 const moverTab = ref('Top')
@@ -147,24 +110,20 @@ function moverBarWidth(row) {
 
 const urlTypes = ref([])
 const totalRetrievals = ref(0)
-const urlTypeMaxPct = computed(() => Math.max(1, ...urlTypes.value.map(t => t.pct)))
+const urlTypesChart = computed(() => urlTypesSpec(urlTypes.value))
+const urlTypesEmpty = computed(() =>
+  urlTypes.value.length
+    ? null
+    : {
+        title: 'No retrievals in this period',
+        body: 'URL types break down which content formats AI reaches for once sources are collected.',
+      },
+)
 
 /* ── AI model avatars ── */
-const MODELS = {
-  chatgpt: { label: 'ChatGPT', color: '#10a37f', initial: 'C' },
-  perplexity: { label: 'Perplexity', color: '#8b5cf6', initial: 'P' },
-  gemini: { label: 'Gemini', color: '#5b8def', initial: 'G' },
-  claude: { label: 'Claude', color: '#f97316', initial: 'A' },
-  copilot: { label: 'Copilot', color: '#06b6d4', initial: 'M' },
-  grok: { label: 'Grok', color: '#0f172a', initial: 'X' },
-  deepseek: { label: 'DeepSeek', color: '#2563eb', initial: 'D' },
-  mistral: { label: 'Mistral', color: '#ef4444', initial: 'M' },
-  cohere: { label: 'Cohere', color: '#d946ef', initial: 'O' },
-  llama: { label: 'Llama', color: '#0ea5e9', initial: 'L' },
-  nova: { label: 'Nova', color: '#64748b', initial: 'N' },
-}
 function modelStyle(key) {
-  return MODELS[key] || { label: key, color: '#94a3b8', initial: (key || '?')[0].toUpperCase() }
+  const meta = engineMeta(key)
+  return { label: meta.label, color: meta.color, initial: meta.label.slice(0, 2) }
 }
 
 /* Domain-type badges. "Your site" and "Competitor" carry the ownership
@@ -182,20 +141,20 @@ function domainBadgeClass(type) {
 }
 
 /* ── Filters ── */
+// The filter sends the backend provider id; only ChatGPT's (gpt4)
+// differs from its display key.
+const MODEL_OPTIONS = ENGINES.map(e => ({
+  value: e.key === 'chatgpt' ? 'gpt4' : e.key,
+  label: e.label,
+}))
+
+// Topic and engine live in the query (the Citations panel's own keys), so
+// a URL's detail and the way back to this list keep them.
 const topics = ref([])
 const selectedTopic = ref(route.query.topic || null)
-const selectedModel = ref(null)
+const selectedModel = ref(MODEL_OPTIONS.some(m => m.value === route.query.provider) ? route.query.provider : null)
 const periodDays = ref(30)
 const openMenu = ref(null)
-
-const MODEL_OPTIONS = [
-  { value: 'gpt4', label: 'ChatGPT' },
-  { value: 'perplexity', label: 'Perplexity' },
-  { value: 'gemini', label: 'Gemini' },
-  { value: 'claude', label: 'Claude' },
-  { value: 'grok', label: 'Grok' },
-  { value: 'deepseek', label: 'DeepSeek' },
-]
 const PERIOD_OPTIONS = [
   { value: 7, label: 'Last 7 days' },
   { value: 30, label: 'Last 30 days' },
@@ -220,6 +179,7 @@ function selectTopic(name) {
 function selectModel(value) {
   selectedModel.value = value
   closeMenus()
+  router.replace({ query: { ...route.query, provider: value || undefined } })
   load()
 }
 function selectPeriod(value) {
@@ -259,7 +219,6 @@ const SORTABLE = {
   citationRate: (r) => r.citationRate,
   gap: (r) => r.gap,
   gscClicks: (r) => r.gsc?.clicks ?? -1,
-  aiVisits: (r) => r.aiVisits ?? -1,
 }
 
 function toggleSort(key) {
@@ -310,7 +269,6 @@ function mapRow(r) {
     citationRate: r.citation_rate ?? 0,
     gap: r.gap_score ?? 0,
     gsc: r.gsc || null,
-    aiVisits: r.ai_visits,
     isTarget: r.is_target,
     isCompetitor: r.is_competitor,
   }
@@ -324,30 +282,29 @@ async function load() {
     const params = { period_days: periodDays.value }
     if (selectedTopic.value) params.topic = selectedTopic.value
     if (selectedModel.value) params.provider = selectedModel.value
-    const res = await citationsApi.websiteUrls(websiteId.value, params)
+    // Silent: the page shows the failure inline.
+    const res = await api.get(`/citations/websites/${websiteId.value}/urls/`, { params, _silentError: true })
     const data = res.data || {}
     topics.value = data.topics || []
-    chartLabels.value = data.overview?.labels || []
-    domainSeries.value = (data.overview?.series || []).map((s, i) => ({
-      key: s.label,
-      label: s.label,
-      color: s.color || DOMAIN_PALETTE[i % DOMAIN_PALETTE.length],
-      data: s.data || [],
-    }))
+    const series = (data.overview?.series || []).map(s => ({ key: String(s.key ?? s.label), label: s.label, data: s.data || [] }))
+    domainSlots.value = stableSlots(series.map(s => s.key), slotMemory)
+    overview.value = { labels: data.overview?.labels || [], series }
+    periodStart.value = data.period_start || null
     movers.value = {
       Top: data.movers?.Top || [],
       New: data.movers?.New || [],
       Trending: data.movers?.Trending || [],
       Losing: data.movers?.Losing || [],
     }
-    urlTypes.value = (data.url_types || []).map(t => ({ type: t.type, pct: t.pct, color: t.color }))
+    urlTypes.value = (data.url_types || []).map(t => ({ type: t.type, pct: t.pct }))
     totalRetrievals.value = data.total_retrievals || 0
     uniqueUrls.value = data.unique_urls || 0
     trafficSummary.value = data.traffic_summary || null
     opportunities.value = data.opportunities || null
     urls.value = (data.urls || []).map(mapRow)
+    loaded.value = true
   } catch (e) {
-    error.value = e?.displayMessage || 'Failed to load URL analytics.'
+    error.value = e?.displayMessage || "We couldn't load your sources."
   } finally {
     loading.value = false
   }
@@ -365,15 +322,13 @@ function onDocClick(e) {
 }
 
 function openDetail(row) {
-  router.push({
-    name: 'sources-url-detail',
-    params: { websiteId: websiteId.value },
-    query: {
-      url: row.normalizedUrl || row.url,
-      ...(selectedTopic.value ? { topic: selectedTopic.value } : {}),
-      ...(selectedModel.value ? { provider: selectedModel.value } : {}),
-    },
-  })
+  const query = {
+    url: row.normalizedUrl || row.url,
+    ...(selectedTopic.value ? { topic: selectedTopic.value } : {}),
+    ...(selectedModel.value ? { provider: selectedModel.value } : {}),
+  }
+  if (board) board.open('citations', query)
+  else router.push({ name: 'sources-url-detail', params: { websiteId: websiteId.value }, query })
 }
 
 function openOpportunity(item) {
@@ -411,8 +366,8 @@ const headerFacts = computed(() => {
 
 <template>
   <div class="flex flex-col gap-6">
-    <!-- ── Breadcrumb ── -->
-    <div class="flex flex-wrap items-center justify-between gap-2">
+    <!-- ── Breadcrumb (the panel's title says it in the board) ── -->
+    <div v-if="!inPanel" class="flex flex-wrap items-center justify-between gap-2">
       <div class="flex items-center gap-2 text-sm text-muted-foreground">
         <span class="font-medium text-foreground">Sources</span>
         <ChevronRight class="size-3.5" />
@@ -420,14 +375,17 @@ const headerFacts = computed(() => {
       </div>
     </div>
 
-    <!-- ── Header strip: what this page is + what it means for traffic ── -->
+    <!-- ── Citation analytics: its own period and engine filters ── -->
+    <CitationAnalytics v-if="websiteId" :website-id="String(websiteId)" />
+
+    <!-- ── Header strip: what this page is ── -->
     <div>
       <h2 class="text-lg font-bold text-foreground">AI answer sources</h2>
       <p class="mt-0.5 max-w-3xl text-sm text-muted-foreground">
         Every page AI assistants pulled up while answering the prompts you track for
-        {{ brandLabel }} — and what that means for your traffic.
+        {{ brandLabel }}.
       </p>
-      <div class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+      <div v-if="loaded && !error" class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
         <span class="text-foreground/90">
           <span class="font-bold text-foreground">{{ headerFacts.pages }}</span> pages retrieved
           <template v-if="headerFacts.pages">
@@ -436,35 +394,32 @@ const headerFacts = computed(() => {
             · {{ headerFacts.third }} third-party
           </template>
         </span>
-        <template v-if="trafficSummary">
-          <span v-if="trafficSummary.pixel_active" class="text-foreground/90">
-            <span class="font-bold text-foreground">{{ trafficSummary.ai_sessions }}</span>
-            AI-referred visit{{ trafficSummary.ai_sessions === 1 ? '' : 's' }} to your site
-            ({{ trafficSummary.ai_percentage }}% of all traffic)
-          </span>
-          <router-link
-            v-else
-            to="/app/integrations"
-            class="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          >Install the tracking pixel to see AI-referred visits</router-link>
-          <router-link
-            v-if="!trafficSummary.gsc_connected"
-            to="/app/integrations"
-            class="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
-          >Connect Search Console to see Google performance</router-link>
-        </template>
+        <router-link
+          v-if="trafficSummary && !trafficSummary.gsc_connected"
+          to="/settings/connections"
+          class="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        >Connect Search Console to see Google performance</router-link>
       </div>
     </div>
 
     <Alert v-if="error" variant="destructive">
       <CircleX />
-      <AlertTitle>Could not load sources</AlertTitle>
-      <AlertDescription>{{ error }}</AlertDescription>
+      <AlertTitle>We couldn't load your sources.</AlertTitle>
+      <AlertDescription>
+        <p>{{ error }}</p>
+        <button
+          type="button"
+          class="mt-1 font-semibold text-foreground underline underline-offset-2"
+          @click="load"
+        >Try again</button>
+      </AlertDescription>
     </Alert>
-    <div v-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
+    <div v-else-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
       <Loader2 class="size-4 animate-spin" /> Loading URL analytics…
     </div>
 
+    <!-- Empty states below render only when the last load succeeded. -->
+    <template v-if="!error">
     <!-- ── What to do next ── -->
     <div v-if="!loading && opportunities">
       <h2 class="text-base font-bold text-foreground">What to do next</h2>
@@ -473,7 +428,6 @@ const headerFacts = computed(() => {
       </p>
       <OpportunitiesRow
         :opportunities="opportunities"
-        :website-id="websiteId"
         @open-url="openOpportunity"
       />
     </div>
@@ -541,49 +495,20 @@ const headerFacts = computed(() => {
             :class="selectedTopic === t.name ? 'font-semibold text-foreground' : 'text-muted-foreground'">
             <span class="truncate">{{ t.name }}</span><span class="ml-2 shrink-0 text-xs text-muted-foreground">{{ t.count }}</span>
           </button>
-          <div v-if="!topics.length" class="px-2.5 py-2 text-xs text-muted-foreground">No topics yet. Group prompts into topics on the Prompts page.</div>
+          <div v-if="!topics.length" class="px-2.5 py-2 text-xs text-muted-foreground">No topics yet.</div>
         </div>
       </div>
     </div>
 
     <!-- ── Retrievals chart ── -->
-    <Card>
-      <CardHeader class="flex-row items-start justify-between gap-4 space-y-0">
-        <div>
-          <CardTitle class="flex items-center gap-1.5 text-base">
-            Retrievals over time
-            <MetricInfo :text="HELP.retrievals" />
-          </CardTitle>
-          <p class="mt-0.5 text-xs text-muted-foreground">
-            Daily retrievals for the five most-used domains in this period
-          </p>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <template v-if="domainSeries.length">
-          <div class="h-72">
-            <Line :data="chartData" :options="chartOptions" />
-          </div>
-          <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <span v-for="d in domainSeries" :key="d.key"
-              class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span class="size-2 rounded-full" :style="{ background: d.color }" />
-              {{ d.label }}
-            </span>
-          </div>
-        </template>
-        <EmptyState
-          v-else-if="!loading"
-          title="No retrievals in this period yet"
-          body="Retrievals appear as your prompt runs complete. Run prompts to give the AI models something to answer."
-          cta-label="Run prompts"
-          :cta-to="websiteId ? `/llm-ranking/${websiteId}/prompts` : ''"
-        />
-      </CardContent>
-    </Card>
+    <VizChart :spec="retrievalsChart" :loading="loading" :empty="retrievalsEmpty" :height="288">
+      <template #actions>
+        <MetricInfo :text="HELP.retrievals" />
+      </template>
+    </VizChart>
 
     <!-- ── Movers + URL types ── -->
-    <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <div class="grid grid-cols-1 gap-4 @3xl:grid-cols-2">
       <Card>
         <CardHeader class="space-y-3">
           <div class="flex items-center justify-between">
@@ -621,39 +546,19 @@ const headerFacts = computed(() => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader class="flex-row items-center justify-between space-y-0">
-          <div class="flex items-center gap-1.5">
-            <CardTitle class="text-base">URL types</CardTitle>
-            <MetricInfo :text="HELP.urlTypes" />
-          </div>
+      <VizChart :spec="urlTypesChart" :loading="loading" :empty="urlTypesEmpty">
+        <template #actions>
+          <MetricInfo :text="HELP.urlTypes" />
           <span class="text-xs text-muted-foreground">Total retrievals: {{ formatCount(totalRetrievals) }}</span>
-        </CardHeader>
-        <CardContent class="space-y-3">
-          <div v-for="t in urlTypes" :key="t.type"
-            class="relative flex items-center justify-between gap-3 overflow-hidden rounded-md px-3 py-2">
-            <div class="absolute inset-y-0 left-0 rounded-md bg-secondary"
-              :style="{ width: (t.pct / urlTypeMaxPct * 100) + '%' }" />
-            <span class="relative z-10 inline-flex items-center gap-2 text-sm text-foreground">
-              <span class="size-2 rounded-full" :style="{ background: t.color }" />
-              {{ t.type }}
-            </span>
-            <span class="relative z-10 text-sm font-semibold tabular-nums text-foreground">{{ t.pct }}%</span>
-          </div>
-          <EmptyState
-            v-if="!loading && !urlTypes.length"
-            title="No retrievals in this period"
-            body="URL types break down which content formats AI reaches for once sources are collected."
-          />
-        </CardContent>
-      </Card>
+        </template>
+      </VizChart>
     </div>
 
     <!-- ── URLs table ── -->
     <div>
       <h2 class="text-lg font-bold text-foreground">URLs</h2>
       <p class="text-sm text-muted-foreground">
-        Every page retrieved in this period. Traffic columns are available for your own pages.
+        Every page retrieved in this period. Google clicks show for your own pages when Search Console is connected.
       </p>
     </div>
 
@@ -718,26 +623,26 @@ const headerFacts = computed(() => {
                   </button>
                   <MetricInfo :text="HELP.googleClicks" side="bottom" />
                 </th>
-                <th class="py-2 pr-3">
-                  <button type="button" class="inline-flex items-center gap-1 hover:text-foreground" @click="toggleSort('aiVisits')">
-                    AI visits
-                    <component :is="sortKey === 'aiVisits' ? (sortDir === 'desc' ? ArrowDown : ArrowUp) : ArrowUpDown" class="size-3" />
-                  </button>
-                  <MetricInfo :text="HELP.aiVisits" side="bottom" />
-                </th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, i) in filteredUrls" :key="i"
+              <!-- The whole row opens the detail on a click; the title is a
+                   button so the keyboard and screen readers reach it too. -->
+              <tr v-for="(row, i) in filteredUrls" :key="row.normalizedUrl || row.url || i"
                 @click="openDetail(row)"
                 class="cursor-pointer border-b border-border/60 transition-colors hover:bg-muted/50">
                 <td class="py-3 pr-3">
                   <div class="flex items-center gap-2.5">
                     <img :src="faviconFor(row.path)" alt="" class="size-4 shrink-0 rounded-sm" @error="onFaviconError" />
-                    <div class="min-w-0">
-                      <div class="truncate font-medium text-foreground" :title="row.title">{{ row.title }}</div>
-                      <div class="truncate text-xs text-muted-foreground" :title="row.path">{{ row.path }}</div>
-                    </div>
+                    <button
+                      type="button"
+                      class="min-w-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      data-open-url
+                      @click.stop="openDetail(row)"
+                    >
+                      <span class="block truncate font-medium text-foreground" :title="row.title">{{ row.title }}</span>
+                      <span class="block truncate text-xs text-muted-foreground" :title="row.path">{{ row.path }}</span>
+                    </button>
                   </div>
                 </td>
                 <td class="py-3 pr-3 text-muted-foreground">{{ row.type }}</td>
@@ -765,12 +670,9 @@ const headerFacts = computed(() => {
                 <td class="py-3 pr-3 tabular-nums" :class="row.gsc ? 'text-foreground' : 'text-muted-foreground'">
                   {{ row.gsc ? row.gsc.clicks : '–' }}
                 </td>
-                <td class="py-3 pr-3 tabular-nums" :class="row.aiVisits != null ? 'text-foreground' : 'text-muted-foreground'">
-                  {{ row.aiVisits != null ? row.aiVisits : '–' }}
-                </td>
               </tr>
               <tr v-if="!loading && !filteredUrls.length">
-                <td colspan="9" class="p-0">
+                <td colspan="8" class="p-0">
                   <EmptyState
                     v-if="isFiltered"
                     title="Nothing matches"
@@ -779,9 +681,9 @@ const headerFacts = computed(() => {
                   <EmptyState
                     v-else
                     title="No URLs yet"
-                    body="Pages appear here as your prompt runs collect the sources AI answers rely on."
-                    cta-label="Run prompts"
-                    :cta-to="websiteId ? `/llm-ranking/${websiteId}/prompts` : ''"
+                    body="Pages appear here as the AI engines answer the prompts you track."
+                    cta-label="Add prompts"
+                    :cta-to="addPromptsPath"
                   />
                 </td>
               </tr>
@@ -794,5 +696,6 @@ const headerFacts = computed(() => {
         </div>
       </CardContent>
     </Card>
+    </template>
   </div>
 </template>

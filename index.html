@@ -5,21 +5,24 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/png" href="/images/cansee-mark.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Cansee — brand intelligence for AI search. Measure and shape how ChatGPT, Claude, Gemini, and Perplexity talk about your brand." />
+  <meta name="description" content="Cansee compares where your brand ranks on Google with what ChatGPT, Claude, Gemini, Grok and Perplexity say about it, prompt by prompt, and shows what to change." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Instrument+Serif&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Geist:wght@400;500;600&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Geist:wght@400;500;600&display=swap"
     rel="stylesheet" />
   <title>Cansee — Brand Intelligence</title>
 
   <!-- Theme bootstrap: runs before any CSS paints so a reload in dark
-       mode never flashes white. Mirrors stores/app.js (same key/values). -->
+       mode never flashes white. Mirrors stores/app.js (same key/values).
+       FORCED_DARK mirrors composables/useForcedTheme.js: the landing page
+       and the auth screens are always dark, whatever the preference. -->
   <script>
     (function () {
       try {
+        var FORCED_DARK = /^\/(welcome|login|register|sso|forgot-password|reset-password|invite|auth)?(\/|$)/;
         var pref = localStorage.getItem('cs-theme');
-        var dark = pref === 'dark' || (pref === 'system' &&
+        var dark = FORCED_DARK.test(window.location.pathname) || pref === 'dark' || (pref === 'system' &&
           window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
         var mode = dark ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', mode);

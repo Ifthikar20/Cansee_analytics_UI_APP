@@ -8,6 +8,7 @@
     <div v-if="authStore.isOrgAdmin" class="om-toolbar">
       <span v-if="seats" class="om-seats" :class="{ 'om-seats--full': seats.used >= seats.max }">
         {{ seats.used }} of {{ seats.max }} seats used
+        <HelpTip :text="TIPS.settings.seats" label="About seats" />
       </span>
       <Button size="sm" class="om-btn" @click="composerOpen = !composerOpen">
         {{ composerOpen ? 'Close' : 'Invite people' }}
@@ -21,16 +22,17 @@
           v-model="inviteEmails"
           type="text"
           class="om-input"
-          placeholder="jane@company.com, sam@company.com"
+          placeholder="name@company.com"
           :disabled="inviteBusy"
           @keydown.enter.prevent="sendInvites"
         />
-        <select v-model="inviteRole" class="om-select" :disabled="inviteBusy">
+        <select v-model="inviteRole" class="om-select" aria-label="Role" :disabled="inviteBusy">
           <option value="member">Member</option>
           <option value="viewer">Viewer</option>
           <!-- Only the owner can mint new admins. -->
           <option v-if="authStore.isOrgOwner" value="admin">Admin</option>
         </select>
+        <HelpTip :text="TIPS.settings.roles" label="About roles" />
         <Button size="sm" class="om-btn" :disabled="inviteBusy || !inviteEmails.trim()" @click="sendInvites">
           {{ inviteBusy ? 'Sending…' : 'Send invites' }}
         </Button>
@@ -47,6 +49,11 @@
     <div v-if="orgStore.membersLoading && !orgStore.members.length" class="om-loading">
       Loading members…
     </div>
+    <div v-else-if="membersFailed && !orgStore.members.length" class="om-failed">
+      <p class="om-loading">We couldn't load your team.</p>
+      <Button variant="outline" size="sm" class="om-btn" @click="loadTeam">Try again</Button>
+    </div>
+    <p v-else-if="!orgStore.members.length" class="om-loading">No members yet.</p>
     <div v-else class="om-table-wrap">
       <Table>
         <TableHeader>
@@ -174,6 +181,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 import { useToast } from '@/composables/useToast'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+import { TIPS } from '@/lib/help/tips'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -208,6 +217,18 @@ const inviteEmails = ref('')
 const inviteRole = ref('member')
 const inviteBusy = ref(false)
 const inviteErrors = ref([]) // [{email, message}]
+
+// ── Loading ──
+const membersFailed = ref(false)
+
+async function loadTeam() {
+  membersFailed.value = false
+  try {
+    await orgStore.loadMembers()
+  } catch {
+    membersFailed.value = true
+  }
+}
 
 // ── Row actions ──
 const roleBusyId = ref(null)
@@ -290,7 +311,7 @@ async function onRoleChange(member, event) {
   } catch {
     // Global interceptor already toasted; put the select back in sync.
     event.target.value = member.role
-    await orgStore.loadMembers()
+    await loadTeam()
   } finally {
     roleBusyId.value = null
   }
@@ -337,8 +358,9 @@ async function revoke(inv) {
 }
 
 onMounted(() => {
-  orgStore.loadMembers()
-  orgStore.loadInvitations()
+  loadTeam()
+  // Pending invitations are optional extras; the interceptor reports a failure.
+  orgStore.loadInvitations().catch(() => {})
   orgStore.loadUsage()
 })
 </script>
@@ -350,6 +372,8 @@ onMounted(() => {
   align-items: center;
   gap: 14px;
   margin-bottom: 14px;
+  --cs-helptip-fg: var(--muted-foreground);
+  --cs-helptip-fg-hover: var(--foreground);
 }
 .om-seats {
   font-size: 12px;
@@ -373,8 +397,11 @@ onMounted(() => {
 }
 .om-composer-row {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  --cs-helptip-fg: var(--muted-foreground);
+  --cs-helptip-fg-hover: var(--foreground);
 }
 .om-input {
   flex: 1 1 220px;
@@ -431,6 +458,13 @@ onMounted(() => {
   font-size: 13px;
   color: var(--muted-foreground);
 }
+.om-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding-bottom: 18px;
+}
+.om-failed .om-loading { padding-bottom: 10px; }
 .om-table-wrap { overflow-x: auto; }
 
 .om-subhead {

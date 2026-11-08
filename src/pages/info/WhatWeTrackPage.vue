@@ -161,8 +161,7 @@
     <h2>8. Changes</h2>
     <p>
       Material changes to what we collect are announced at least 14 days in advance via email to
-      account owners and at the top of this page. Non-material changes (e.g. adding a new
-      sub-processor that processes the same categories) are noted in the changelog.
+      account owners and at the top of this page.
     </p>
 
     <h2>9. Cookies and storage on cansee.ai</h2>
@@ -214,7 +213,7 @@
 
     <p class="wt-footer">
       Questions about anything on this page? Email
-      <a href="mailto:privacy@cansee.ai">privacy@cansee.ai</a>.
+      <a :href="`mailto:${PRIVACY_EMAIL}`">{{ PRIVACY_EMAIL }}</a>.
     </p>
   </InfoPage>
 </template>
@@ -222,6 +221,7 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import InfoPage from './InfoPage.vue'
+import { PRIVACY_EMAIL } from '@/constants/support'
 
 // Cookiebot domain group ID — same variable index.html uses to load the
 // consent banner. Empty in environments without a Cookiebot account.

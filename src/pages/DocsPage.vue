@@ -2,57 +2,62 @@
 /**
  * Public documentation page (/docs).
  *
- * A self-contained docs shell — top bar with search, a section sidebar,
- * the content column, and an FAQ rail — styled entirely through the app's
- * design tokens so it themes light/dark with the rest of Cansee. The
- * content is the same "what we offer / what you need" documentation, now
- * living inside the app instead of a standalone page.
+ * A self-contained docs shell (top bar with search, a section sidebar,
+ * the content column, and an FAQ rail) styled through the app's design
+ * tokens so it themes light/dark with the rest of Cansee. Each section
+ * describes a screen that exists in the app.
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { SUPPORT_EMAIL } from '@/constants/support'
+import { ENGINES } from '@/lib/engines'
+import { featuredFaqs } from '@/lib/help/faq'
+import { useAuthStore } from '@/stores/auth'
+import { useHelpStore } from '@/stores/help'
+import { useHelpShortcut } from '@/composables/useHelpShortcut'
+import HelpDrawer from '@/components/help/HelpDrawer.vue'
 
 const navGroups = [
   { title: 'Get started', items: [
-    { id: 'welcome', label: 'What is Cansee' },
-    { id: 'how', label: 'How Cansee works' },
+    { id: 'welcome', label: 'What Cansee does' },
     { id: 'quickstart', label: 'Quick start' },
+    { id: 'engines', label: 'The AI engines' },
   ] },
-  { title: 'Concepts', items: [
-    { id: 'engines', label: 'The five AI engines' },
-    { id: 'metrics', label: 'Metrics that matter' },
+  { title: 'The app', items: [
+    // Section ids stay as they were, so older /docs#overview links still land.
+    { id: 'overview', label: 'Analytics' },
+    { id: 'ask-ai', label: 'Ask AI' },
+    { id: 'prompt', label: 'Prompt detail' },
+    { id: 'sources', label: 'Citations' },
   ] },
-  { title: 'What we offer', items: [
-    { id: 'visibility', label: 'AI Visibility' },
-    { id: 'prompts', label: 'Prompts' },
-    { id: 'research', label: 'Brand Research' },
-    { id: 'security', label: 'Brand Security' },
-    { id: 'sources', label: 'Source Influence' },
-    { id: 'ingestion', label: 'Brand Ingestion' },
+  { title: 'Agent', items: [
+    { id: 'agent', label: 'The Agent' },
+    { id: 'research', label: 'Research agents' },
+    { id: 'findings', label: 'Findings' },
+    { id: 'reports', label: 'Reports' },
   ] },
-  { title: 'For your business', items: [
-    { id: 'use-cases', label: 'Use cases' },
-    { id: 'integrations', label: 'Integrations' },
+  { title: 'Settings', items: [
+    { id: 'project', label: 'Project' },
+    { id: 'autopilot', label: 'Autopilot' },
+    { id: 'connections', label: 'Connections' },
+    { id: 'brand-facts', label: 'Brand facts' },
+    { id: 'team', label: 'Team' },
+    { id: 'billing', label: 'Billing' },
   ] },
   { title: 'Reference', items: [
-    { id: 'reading', label: 'Reading your results' },
-    { id: 'plans', label: 'Plans & limits' },
+    { id: 'scoring', label: 'How the gap is scored' },
     { id: 'glossary', label: 'Glossary' },
-    { id: 'contact', label: 'Contact us' },
+    { id: 'contact', label: 'Contact' },
   ] },
 ]
 
-const faqs = [
-  { q: 'Does Cansee work if my site has no traffic?', a: 'Yes. Cansee measures what AI assistants say, not your site analytics. A brand-new project with zero visitors still gets a full read on its first scan.' },
-  { q: 'Do you actually change what ChatGPT says about me?', a: 'No tool can retrain the public models from the outside. Cansee measures the gap between your facts and what AI says, then shows you exactly where to publish to close it.' },
-  { q: 'Which AI engines do you check?', a: 'Five: ChatGPT, Claude, Gemini, Perplexity, and Grok, plus Google’s AI Overview where it appears.' },
-  { q: 'How often do scans run?', a: 'On a schedule you set per prompt, or on demand whenever you want a fresh read.' },
-  { q: 'Is Brand Security live monitoring?', a: 'No. It reads the AI answers Cansee has collected and flags the harmful ones, with the exact sentence quoted. It doesn’t watch social or the live web.' },
-  { q: 'What counts as a competitor?', a: 'Any real brand an answer names alongside or instead of you. Cansee detects them automatically and filters out generic category terms so they don’t pollute your rankings.' },
-  { q: 'Can I get reports in Slack or Teams?', a: 'Yes: Slack, Discord, and Microsoft Teams. Daily reports, brand-security alerts, and hot-lead alerts all deliver to a channel.' },
-  { q: 'Do prompts have to mention my brand?', a: 'No, the opposite. A good prompt is a neutral buyer question. Cansee measures whether AI brings you up on its own.' },
-]
+// The rail's questions come from the help center's one list (lib/help/faq.js).
+const faqs = featuredFaqs('docs')
 
 const supportHref = `mailto:${SUPPORT_EMAIL}`
+
+const auth = useAuthStore()
+const help = useHelpStore()
+useHelpShortcut()
 
 // ── Section navigation state ───────────────────────────────────────────
 const activeId = ref('welcome')
@@ -112,6 +117,7 @@ onMounted(() => {
   }
 
   const onSlash = (e) => {
+    if (help.isOpen) return
     if (e.key === '/' && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) {
       e.preventDefault()
       scope.querySelector('.dx-search-input')?.focus()
@@ -158,13 +164,14 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
             <span class="dx-sr-t">{{ r.title }}</span>
             <span class="dx-sr-s">{{ r.snip.slice(0, 78) }}</span>
           </button>
-          <p v-if="!results.length" class="dx-sr-empty">No matches. Try “visibility”, “engines”, or “Slack”.</p>
+          <p v-if="!results.length" class="dx-sr-empty">No matches. Try “gap”, “engines” or “Citations”.</p>
         </div>
       </div>
       <div class="dx-spacer"></div>
       <a class="dx-link hide-sm" :href="supportHref">Contact</a>
       <router-link to="/" class="dx-link hide-sm">Home</router-link>
-      <router-link to="/login" class="dx-cta">Get started</router-link>
+      <router-link v-if="auth.isAuthenticated" to="/dashboard" class="dx-cta">Open app</router-link>
+      <router-link v-else to="/login" class="dx-cta">Sign in</router-link>
     </header>
 
     <div class="dx-shell">
@@ -190,238 +197,253 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
           <p class="dx-crumb">Docs <span aria-hidden="true">›</span> <strong>Introduction</strong></p>
 
           <div class="dx-hero">
-            <h1>Your brand, as AI describes it.</h1>
-            <p class="lede">Cansee measures and helps you shape how AI assistants (ChatGPT, Claude, Gemini, Perplexity, and Grok) answer the questions your customers ask. When someone asks an assistant “what’s the best tool for this?”, Cansee shows whether you come up, what’s said about you, and where those answers come from.</p>
+            <h1>Your brand on Google and in AI answers</h1>
+            <p class="lede">Cansee takes the questions your buyers ask, checks where your site ranks on Google for each one, and asks five AI engines (ChatGPT, Claude, Gemini, Grok and Perplexity) the same question. It shows where Google and the AI answers disagree about you, and what to change.</p>
           </div>
 
           <section id="welcome">
-            <h2>What is Cansee</h2>
-            <p class="kicker">The one-paragraph version.</p>
-            <p>Search is moving from a page of ten blue links to a single spoken answer. More buyers now start with an assistant, not a search box, and the assistant names a handful of brands, or none. Cansee is how you <strong>see your place in that answer</strong> and work to improve it: which questions mention you, who gets recommended instead, whether the tone is fair, and which pages on the open web are teaching the models what to say.</p>
-            <p>Everything in the product answers one question in different ways: <em>what do AI assistants say about your market, and can you change it?</em></p>
-          </section>
-
-          <section id="how">
-            <h2>How Cansee works</h2>
-            <p class="kicker">In plain terms.</p>
-            <p>Cansee asks the AI assistants the same questions your customers ask, reads the answers, and pulls out which brands were recommended, in what order, and in what tone. For deeper research it also looks across the open web and community discussions to see where those answers come from. The result is a clear picture of where you stand, and what to do about it.</p>
-            <div class="note">
-              <span class="note-label">Worth knowing</span>
-              <p>Some assistants answer from the live web and some from what they were trained on. Cansee shows you both, and never invents a source.</p>
-            </div>
+            <h2>What Cansee does</h2>
+            <p class="kicker">The short version.</p>
+            <p>Each question you track is a <strong>prompt</strong>. For every prompt, Cansee records two things: where your site ranks on Google, and what each AI engine answered. Comparing them shows the gap: prompts where AI recommends you but Google ranks you low, prompts where Google ranks you but AI leaves you out, and prompts where neither surfaces you.</p>
+            <p>For each prompt, Cansee then lists what to change and names the pages to work on.</p>
           </section>
 
           <section id="quickstart">
             <h2>Quick start</h2>
-            <p class="kicker">From a URL to your first result in minutes.</p>
+            <p class="kicker">From your website to your first comparison.</p>
             <ol class="steps">
-              <li><strong>Add your project.</strong> Paste your website. Cansee reads the homepage to learn what your business actually does. That’s what the prompts and measurements are built from.</li>
-              <li><strong>Review your prompts.</strong> Cansee drafts a starter set of buyer questions from your site. Keep the ones that fit, edit the rest, add your own.</li>
-              <li><strong>Run a scan.</strong> In a few minutes you get your visibility, the brands recommended instead of you, and the sources behind the answers.</li>
-              <li><strong>Take action.</strong> Teach the models what’s true about you, find live conversations to join, and catch anything harmful.</li>
+              <li><strong>Add your project.</strong> Enter your website. Cansee reads your homepage to draft a description of the business, starter prompts and competitors to compare you with. Check them and change anything that is off.</li>
+              <li><strong>Add prompts.</strong> On Analytics, choose <em>Add prompts</em> in Prompts and enter the questions your buyers ask, one per line, without your brand name. Pick the country to search from. The AI engines are asked right away.</li>
+              <li><strong>Check Google.</strong> Choose <em>Check Google</em> in Prompts to look up where your site ranks for each prompt.</li>
+              <li><strong>Open a prompt.</strong> See Google next to each engine, the brands recommended instead of you, the pages the engines cite, and a ranked list of what to change.</li>
             </ol>
           </section>
 
           <section id="engines">
-            <h2>The five AI engines</h2>
+            <h2>The AI engines</h2>
             <p class="kicker">Who Cansee asks on your behalf.</p>
-            <p>Cansee measures across five assistants, plus Google’s AI Overview where it appears. Each answers the same tracked question, so you see which favour you and which don’t.</p>
+            <p>Every prompt goes to the same engines, so you can see which ones bring you up and which leave you out.</p>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Engine</th><th>Maker</th><th>Answers from</th></tr></thead>
+                <thead><tr><th>Engine</th><th>Made by</th></tr></thead>
                 <tbody>
-                  <tr><td>ChatGPT <span class="mono">gpt-4</span></td><td>OpenAI</td><td>Training data</td></tr>
-                  <tr><td>Claude</td><td>Anthropic</td><td>Training data</td></tr>
-                  <tr><td>Gemini</td><td>Google</td><td>Training data</td></tr>
-                  <tr><td>Grok</td><td>xAI</td><td>Training data</td></tr>
-                  <tr><td>Perplexity</td><td>Perplexity</td><td><strong>Live web</strong></td></tr>
+                  <tr v-for="e in ENGINES" :key="e.key"><td>{{ e.label }}</td><td>{{ e.maker }}</td></tr>
                 </tbody>
               </table>
             </div>
-            <p>An engine that isn’t configured on your plan is shown greyed out rather than dropped. An absence is information too.</p>
+            <p>If an engine isn't available, a prompt's detail says so instead of leaving it out. The Google check also shows whether Google displayed an AI Overview for the prompt, and whether it mentions or cites you.</p>
           </section>
 
-          <section id="metrics">
-            <h2>Metrics that matter</h2>
-            <p class="kicker">The five numbers every result comes back to.</p>
-            <dl class="metrics">
-              <div class="metric"><dt>Visibility</dt><dd>How often you appear in answers for your tracked questions, as a percentage. <span class="mono">0%</span> means AI never named you. A gap to close, not a bug.</dd></div>
-              <div class="metric"><dt>Share of voice</dt><dd>Your presence weighed against every other brand named in the same answers. Who owns the conversation.</dd></div>
-              <div class="metric"><dt>Position</dt><dd>When you <em>are</em> named, where you land: first pick, or an afterthought at the bottom.</dd></div>
-              <div class="metric"><dt>Sentiment</dt><dd>The tone of the mention, from negative through neutral to positive, scored per answer.</dd></div>
-              <div class="metric"><dt>Alignment</dt><dd>How closely an answer matches what <em>you’ve</em> said is true about your brand. A similarity match against your own material, not a fact-check. A “does AI echo your messaging” score.</dd></div>
-            </dl>
-
-            <div class="measure-eg">
-              <div class="me-label">One measurement, worked through</div>
-              <div class="me-row"><span class="me-tag">Prompt</span> <span class="me-q">“What’s the best CRM for a small team?”</span></div>
-              <div class="me-row me-answer">
-                <span class="me-tag">ChatGPT answered</span>
-                <ol class="me-list">
-                  <li>HubSpot</li>
-                  <li>Pipedrive</li>
-                  <li class="me-you"><mark>Acme CRM</mark> <span class="me-you-tag">your brand</span></li>
-                  <li>Salesforce</li>
-                  <li>Zoho</li>
-                </ol>
-              </div>
-              <div class="me-out">
-                <span class="me-chip"><b>Named</b> visibility</span>
-                <span class="me-chip"><b>#3</b> position</span>
-                <span class="me-chip"><b>+0.6</b> sentiment</span>
-                <span class="me-chip"><b>2 of 5</b> engines named you</span>
-              </div>
-              <p class="me-note">Cansee reads the ranked brands and the tone out of that one answer, then rolls it up across every engine and every prompt into the five numbers above.</p>
-            </div>
-          </section>
-
-          <section id="visibility">
-            <h2>What Cansee offers</h2>
-            <p class="kicker">Six places to work, one question, each a different way in. Integrations get their own section below.</p>
-
-            <div class="service">
-              <div class="svc-head"><h3>AI Visibility</h3><span class="svc-where">Dashboard</span></div>
-              <p>The home base. Where you rank across the engines, your share of voice, who gets recommended instead of you, and how all of it moves over time.</p>
-              <p class="svc-how"><b>How you use it:</b> the dashboard fills in automatically once your prompts have run at least once. Use the filters (market, model, topic, date range) to find exactly where you’re strong and where you vanish.</p>
-              <p class="need"><span class="need-l">You need</span> at least one prompt and one completed scan. Nothing to install or configure.</p>
-            </div>
-
-            <div class="service" id="prompts">
-              <div class="svc-head"><h3>Prompts</h3><span class="svc-where">AI Visibility › Prompts</span></div>
-              <p>The buyer questions you get measured on: the searches your customers actually make. A prompt is neutral by design: it never names your brand, so a scan measures whether AI brings you up on its own.</p>
-              <p class="svc-how"><b>How you use it:</b> Cansee drafts a starter set read from your own site. Add more (one per line, or bulk-upload a CSV), organize them with tags and groups, choose which engines to test, pick a market, and set each prompt to run on a schedule or on demand.</p>
-              <p class="need"><span class="need-l">You need</span> a project. Auto-drafted prompts require your site to have been read once (its industry and description); a bare URL gets scanned first so the prompts fit the real business.</p>
-            </div>
-
-            <div class="service" id="research">
-              <div class="svc-head"><h3>Brand Research</h3><span class="svc-where">AI Visibility › Brand Research</span></div>
-              <p>A deep, one-off scan of a single query across the web, community threads, and the AI engines at once. Its payoff isn’t a chart. It’s a <strong>list of places to act</strong>: live threads that name competitors but not you (each with a reply box), unanswered questions to own on your own site, and pages recommending rivals.</p>
-              <p class="svc-how"><b>How you use it:</b> type a query a customer would search and hit Scan. In a few minutes you get the map in three views: a <strong>Dashboard</strong> of opportunity cards (the one to act on), a sortable <strong>Table</strong> of brands, or a relationship <strong>Graph</strong>.</p>
-              <p class="need"><span class="need-l">You need</span> a query. That’s it on your side. (Web search must be switched on for your workspace; if you see “web search is not configured,” that’s an admin setting.)</p>
-            </div>
-
-            <div class="service" id="security">
-              <div class="svc-head"><h3>Brand Security</h3><span class="svc-where">AI Visibility › Brand Security</span></div>
-              <p>Catches the harmful or wrong things AI says about you. Nine detectors (negative sentiment, factual misrepresentation, unfavourable comparison, weak endorsement, and more), each quoting the <em>exact sentence</em> so you see the evidence, not just a score.</p>
-              <p class="svc-how"><b>How you use it:</b> it runs on its own over the answers your scans collect. Open any finding to see the flagged phrase highlighted in place, its severity, and a link straight to the answer it came from.</p>
-              <p class="need"><span class="need-l">You need</span> some completed scans for it to read. Adding reference material in Brand Ingestion sharpens how accurately it can judge a claim.</p>
-              <div class="note"><span class="note-label">Scope</span><p>Brand Security reads the AI answers Cansee has already collected. It is not live social or SERP monitoring. Findings surface as answers land, from the models themselves.</p></div>
-            </div>
-
-            <div class="service" id="sources">
-              <div class="svc-head"><h3>Source Influence</h3><span class="svc-where">AI Visibility › URLs</span></div>
-              <p>The domains AI cites for your market, ranked, and where your visibility can grow. This is the GEO layer (Generative Engine Optimization, the AI-era cousin of SEO): if you know which pages feed the answers, you know where to earn a mention.</p>
-              <p class="svc-how"><b>How you use it:</b> browse the ranked list of cited domains, filter by model, topic, and period, and read the “what to do next” strip that flags where earning a mention would move you the most.</p>
-              <p class="need"><span class="need-l">You need</span> completed scans that produced citations. The more your prompts run, the richer this gets.</p>
-            </div>
-
-            <div class="service" id="ingestion">
-              <div class="svc-head"><h3>Brand Ingestion</h3><span class="svc-where">AI Visibility › Brand Ingestion</span></div>
-              <p>Feed Cansee what’s true about you: site pages, docs, pasted copy, quick notes. Cansee grounds its own checks in that material and measures whether the assistants’ answers reflect it (that’s the <em>Alignment</em> metric).</p>
-              <p class="svc-how"><b>How you use it:</b> add a URL (optionally crawl the whole site), paste copy or markdown, or jot a quick note. Or flip on <em>“Allow the Cansee agent to crawl your site”</em> and it gathers the material for you. Everything you add becomes context the scans and Brand Security draw on.</p>
-              <p class="need"><span class="need-l">You need</span> your own material: a page URL, a document, or a paragraph of facts. The agent crawl only runs after you turn on the consent toggle.</p>
-              <div class="note"><span class="note-label">Honest note</span><p>Feeding Cansee your facts does not retrain ChatGPT or Claude. No tool can from the outside. It lets Cansee <em>measure the gap</em> between your truth and what AI says, so you know what to go publish and where.</p></div>
-            </div>
-          </section>
-
-          <section id="use-cases">
-            <h2>How Cansee helps your business</h2>
-            <p class="kicker">The same question, answered for a few very different companies.</p>
-            <p>Whatever you sell, buyers now ask an assistant before they ask you. Here’s what that looks like in practice.</p>
-
-            <div class="usecase">
-              <h3>A local pet shop</h3>
-              <p class="uc-q">“Where’s the best place to buy premium dog food near me?” · “Good pet stores in Dallas?”</p>
-              <p>Cansee shows whether the shop comes up at all, and who the assistant recommends instead: the big chains like Chewy and PetSmart, or a rival down the road. It surfaces the local threads and community questions where those recommendations get made, so the owner knows exactly where a mention or a helpful reply would win new customers. And if an assistant gives wrong hours or says the shop has closed, Brand Security flags it with the exact wording.</p>
-            </div>
-
-            <div class="usecase">
-              <h3>A software or SaaS product</h3>
-              <p class="uc-q">“Best CRM for a 10-person team?” · “Alternatives to the market leader?”</p>
-              <p>See which assistants recommend you, where you land in the list, and which review sites and comparison articles are shaping those answers, the pages to go earn a place on. Track it over time so you can tell whether your content and PR are actually moving the needle.</p>
-            </div>
-
-            <div class="usecase">
-              <h3>A local service: clinic, law firm, agency</h3>
-              <p class="uc-q">“Best family dentist in Austin?” · “Affordable immigration lawyer near me?”</p>
-              <p>Measure how you show up market by market, in each city you serve. Catch harmful or incorrect claims early (a wrong price, an outdated service, an unfair comparison), quoted sentence and all, so you can get ahead of it before a customer does.</p>
-            </div>
-
-            <div class="usecase">
-              <h3>A product or online brand</h3>
-              <p class="uc-q">“Most comfortable running shoes for flat feet?” · “Eco-friendly water bottles?”</p>
-              <p>See whether AI puts your product on the shortlist, what it says about it, and which reviews and threads shape that opinion, then find the conversations where joining in would move you up the list.</p>
-            </div>
-          </section>
-
-          <section id="integrations">
-            <h2>Integrations</h2>
-            <p class="kicker">Get your results where your team already works.</p>
-            <p>Connect <strong>Slack</strong>, <strong>Discord</strong>, or <strong>Microsoft Teams</strong>, and Cansee posts your daily report, brand-security alerts, and hot-lead alerts straight to a channel, so the whole team sees movement without logging in. Setup takes a couple of clicks in <span class="mono">Settings › Integrations</span>, with no code, and Cansee never reads your messages. In Slack and Discord you can also ask Cansee a quick question right in the channel.</p>
-            <p class="need"><span class="need-l">You need</span> a channel you can post to. The app walks you through connecting each one, step by step.</p>
-          </section>
-
-          <section id="reading">
-            <h2>Reading your results</h2>
-            <p class="kicker">A few things that trip people up.</p>
+          <section id="overview">
+            <h2>Analytics</h2>
+            <p class="kicker">One board of widgets for the active project.</p>
+            <p>The board starts with Ask AI and Prompt ranking. <em>Add widget</em> puts more on it, such as Summary, Prompts, Countries, Traffic, Sentiment or Citations; drag a card by its top to move it, or use its menu to move, resize or remove it. Your board is saved for you. Open a card's title, or <em>Expand</em> in its menu, to see its detail in a side panel.</p>
             <ul>
-              <li><strong>“Not named” is the starting line, not a failure.</strong> A brand-new project usually shows <span class="mono">0%</span> visibility. The assistants haven’t connected you to the question yet. That number is what you’re here to move.</li>
-              <li><strong>Brands vs. information.</strong> Cansee separates real brands from generic terms (a category like “golf clubs” isn’t a competitor). Only evidence-backed brands count toward your rankings.</li>
-              <li><strong>Sentiment is per mention.</strong> One glowing thread and one harsh one don’t cancel to “neutral.” Open the detail to read the actual quotes on both sides.</li>
+              <li><strong>Ask AI.</strong> Type a question your buyers ask. Cansee asks each AI engine several times, after showing what it will cost, and shows how often you are named, at what rank, and the answers. Track it to keep checking it.</li>
+              <li><strong>Prompt ranking.</strong> Your tracked prompts, ranked by how often the AI engines name you, with each prompt's Google result.</li>
+              <li><strong>Summary.</strong> AI visibility (the share of recent AI answers that name you), your average Google position, and how many prompts are AI ahead or Google ahead. Expanded, it adds the gap, prompt by prompt: a map where further left is better on Google and higher up is better in AI answers.</li>
+              <li><strong>Prompts.</strong> The biggest gaps between Google and the AI engines. Expanded, a table with your Google position, each engine's result, the gap and the top fix, biggest gaps first. Filter by gap, then open a prompt.</li>
+              <li><strong>Who AI recommends.</strong> The share of the latest answers that name each brand, you included.</li>
             </ul>
+            <p class="need"><span class="need-l">You need</span> a project and at least one prompt. Google positions appear once Google has been checked.</p>
           </section>
 
-          <section id="plans">
-            <h2>Plans &amp; limits</h2>
-            <p class="kicker">What each tier includes.</p>
+          <section id="ask-ai">
+            <h2>Ask AI</h2>
+            <p class="kicker">The Ask AI widget on Analytics.</p>
+            <p>Type a question your buyers ask. Cansee asks each AI engine the same question several times (3 by default, up to 10), because answers vary from run to run, and shows how often you are named, at what rank, and the answers themselves. It shows what the run will use before it starts.</p>
+            <p>Ask AI answers are not added to your tracked numbers. Choose <em>Track</em> to add the question as a prompt and keep checking it.</p>
+            <p class="need"><span class="need-l">Free plan</span> every engine answer counts as one prompt run.</p>
+          </section>
+
+          <section id="prompt">
+            <h2>Prompt detail</h2>
+            <p class="kicker">Open any prompt from Prompts on Analytics. It opens in the side panel.</p>
+            <p>Everything Cansee knows about one prompt, from top to bottom:</p>
+            <ul>
+              <li><strong>The verdict.</strong> One line on how your AI score compares with your Google score.</li>
+              <li><strong>Where to change.</strong> Actions ranked by how big the gap is and how many engines it affects, each naming the pages to work on.</li>
+              <li><strong>Google next to every engine.</strong> Your Google position and the page-one results you are up against, then each engine's latest answer: whether it named you and at what rank, the brands it listed above you, and the pages it cited. Open an answer to read it in full, with its brand alignment score.</li>
+              <li><strong>What AI gets wrong.</strong> Claims in these answers that conflict with your brand facts.</li>
+            </ul>
+            <p><em>Check now</em> looks Google up again and asks any engine that hasn't answered yet. <em>Schedule</em> runs the prompt daily, weekly or monthly. <em>Archive</em> stops it running and removes it from Prompts.</p>
+            <p class="need"><span class="need-l">You need</span> answers from at least one engine. With Search Console connected, the Google column also shows real clicks, impressions and average position for the exact query.</p>
+          </section>
+
+          <section id="sources">
+            <h2>Citations</h2>
+            <p class="kicker">The Citations widget on Analytics.</p>
+            <p>Every web page the AI engines pulled up while answering your prompts.</p>
+            <ul>
+              <li><strong>At the top.</strong> How many pages were retrieved, and how many came from your site, from competitors and from third parties.</li>
+              <li><strong>What to do next.</strong> Your pages AI cites but Google buries, third-party pages that feed answers naming your competitors, and your pages that are working.</li>
+              <li><strong>Charts.</strong> Retrievals over time for the most-used domains, the pages gaining and losing ground, and the mix of page types.</li>
+              <li><strong>URLs.</strong> Every retrieved page with its type, the engines that used it, retrievals and citation rate. Filter by period and engine, switch between your pages, competitors and third parties, and open a page for its own history.</li>
+            </ul>
+            <p class="need"><span class="need-l">You need</span> prompts the engines have answered. Google clicks for your own pages, and some suggestions, need Search Console connected.</p>
+          </section>
+
+          <section id="agent">
+            <h2>The Agent</h2>
+            <p class="kicker">Agent in the header. A chat that researches your rankings and writes drafts.</p>
+            <p>The general agents (Gap Analyst, Landing page, AEO article and Ad campaign) start a chat. The specialists (Page Optimizer, Comparison page, Social posts, PR, llms.txt and Messaging brief) ask for their inputs first, then draft the task into a new chat for you to send.</p>
+            <ul>
+              <li><strong>Context.</strong> What the agents know about your project, with its sources, plus documents you add. <em>Build from my site</em> suggests entries for you to accept; the agents use active entries only.</li>
+              <li><strong>Reviews.</strong> Ask a teammate to review a draft. An approval records who approved which version and publishes nothing; a newer version needs a new approval.</li>
+            </ul>
+            <p>When the Agent cannot run, it says why: it is not set up on this workspace, messages are arriving faster than it can take them, or the allowance is used up.</p>
+          </section>
+
+          <section id="research">
+            <h2>Research agents</h2>
+            <p class="kicker">Research planned from a chat.</p>
+            <p>The Agent can plan research across five areas: Google (SEO), AI engines (GEO), competitor pages, your site and content gaps, and sources and citations. The results come back as a table you can re-run. Research runs are private to you.</p>
+            <p class="need"><span class="need-l">Free plan</span> each AI engine answer a research run asks for counts as one prompt run.</p>
+          </section>
+
+          <section id="findings">
+            <h2>Findings</h2>
+            <p class="kicker">Agent › Findings.</p>
+            <p>The issues and opportunities from research, shared with everyone on the project. Add them from a research table or by hand, then mark them done or dismissed. Viewers can read them but not change them.</p>
+          </section>
+
+          <section id="reports">
+            <h2>Reports</h2>
+            <p class="kicker">Agent › Reports, Documents and Sheets.</p>
+            <p>The Gap Analyst writes reports. Other drafts are under Documents (pages and documents) and Sheets (ad campaigns).</p>
+            <p>A report can follow one of seven templates: Executive summary, Google vs AI gap, Competitor comparison, Prompt deep dive, Sources and citations, Brand accuracy, and Change log since the last run. Pick one when you start a report, or for the next reply in a chat.</p>
+            <p>Use <em>Export</em> once a draft is finished: reports and documents as Markdown, HTML, or Print or save as PDF; sheets as CSV, TSV, or Copy as table.</p>
+          </section>
+
+          <section id="settings">
+            <h2>Settings</h2>
+            <p class="kicker">Settings in the header. Project pages apply to the project picked next to the logo.</p>
+
+            <div class="service" id="project">
+              <div class="svc-head"><h3>Project</h3><span class="svc-where">Settings › Project</span></div>
+              <p>The project's name, website, industry and a short description of what the business does. Below that are your competitors (up to 25, each a name and a domain): Cansee flags them when they outrank you on Google or are recommended ahead of you. You can also delete the project here.</p>
+            </div>
+
+            <div class="service" id="autopilot">
+              <div class="svc-head"><h3>Autopilot</h3><span class="svc-where">Settings › Autopilot</span></div>
+              <p>On the 100 and 200 prompt plans, Autopilot asks every tracked prompt once a day. It pauses after 3 failed runs in a row: check the last run here, then turn it back on.</p>
+            </div>
+
+            <div class="service" id="connections">
+              <div class="svc-head"><h3>Connections</h3><span class="svc-where">Settings › Connections</span></div>
+              <p><strong>Google Search Console</strong> adds your real Google clicks, impressions and average position to each prompt and to your own pages in Citations. You sign in with Google and pick the property for the project.</p>
+              <p><strong>Where reports go</strong> connects a Slack, Discord or Microsoft Teams channel through a webhook, so Cansee can post the daily report there.</p>
+            </div>
+
+            <div class="service" id="brand-facts">
+              <div class="svc-head"><h3>Brand facts</h3><span class="svc-where">Settings › Brand facts</span></div>
+              <p>What is true about your brand. Add a page URL (or crawl the whole site from it), paste content, write a quick note, or allow the Cansee agent to crawl your site on its own. Cansee checks the AI answers against these facts: they drive the brand alignment score on each answer and the <em>What AI gets wrong</em> list on each prompt.</p>
+              <div class="note">
+                <span class="note-label">Worth knowing</span>
+                <p>Adding facts here does not change what the AI engines say. Nobody can retrain them from the outside. It lets Cansee measure where the answers differ from your facts.</p>
+              </div>
+            </div>
+
+            <div class="service" id="team">
+              <div class="svc-head"><h3>Team</h3><span class="svc-where">Settings › Team</span></div>
+              <p>Organization accounts only. See who has access and their role. Admins invite people by email as Members or Viewers; only the owner can make someone an Admin. Under <em>Domains &amp; SSO</em>, admins can also verify your email domain and require Google sign-in for everyone.</p>
+            </div>
+
+            <div class="service" id="billing">
+              <div class="svc-head"><h3>Billing</h3><span class="svc-where">Settings › Subscription</span></div>
+              <p>The Free plan includes 20 prompt runs a month. One run is one prompt answered by one AI engine, so one prompt asked to all five engines uses 5 runs. The runs are shared by all your projects and reset at the start of each month.</p>
+              <p>Your current plan and when it renews. Upgrade through a secure checkout, and use <em>Manage billing</em> to change plans, update payment details or see invoices. You can cancel or resume a subscription here too. If your organization pays for your seat, its admins handle billing.</p>
+            </div>
+          </section>
+
+          <section id="scoring">
+            <h2>How the gap is scored</h2>
+            <p class="kicker">Two scores out of 100 for every prompt, and the difference between them.</p>
+            <h3>Search score</h3>
+            <p>From your Google position for the prompt.</p>
             <div class="table-wrap">
               <table>
-                <thead><tr><th>Plan</th><th>Projects</th><th>Prompts / run</th><th>Best for</th></tr></thead>
+                <thead><tr><th>Google position</th><th>Search score</th></tr></thead>
                 <tbody>
-                  <tr><td>Free trial</td><td>1</td><td>5</td><td>Seeing your first result</td></tr>
-                  <tr><td>Pro</td><td>5</td><td>15</td><td>Tracking a brand over time</td></tr>
-                  <tr><td>Business</td><td>Unlimited</td><td>50</td><td>Agencies &amp; multi-brand teams</td></tr>
+                  <tr><td>#1 to #3</td><td>100</td></tr>
+                  <tr><td>#4 to #10</td><td>80</td></tr>
+                  <tr><td>#11 to #20</td><td>55</td></tr>
+                  <tr><td>#21 to #50</td><td>30</td></tr>
+                  <tr><td>#51 to #100</td><td>15</td></tr>
+                  <tr><td>Not found</td><td>0</td></tr>
                 </tbody>
               </table>
             </div>
-            <p>A live trial runs the full product on one project, so you can judge it on your own brand before you pay.</p>
+            <h3>AI score</h3>
+            <p>Per engine, over its most recent answers (up to five): the share of answers that name you, multiplied by the average weight of those mentions. A prompt's AI score is the average over the engines that have answered.</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Where the answer names you</th><th>Weight</th></tr></thead>
+                <tbody>
+                  <tr><td>#1 to #3</td><td>100</td></tr>
+                  <tr><td>#4 to #5</td><td>80</td></tr>
+                  <tr><td>#6 to #10</td><td>55</td></tr>
+                  <tr><td>#11 or lower</td><td>30</td></tr>
+                  <tr><td>Named without a rank</td><td>55</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>The gap</h3>
+            <p>The gap is the AI score minus the search score.</p>
+            <ul>
+              <li><strong>AI ahead:</strong> the gap is 30 or more.</li>
+              <li><strong>Google ahead:</strong> the gap is -30 or less.</li>
+              <li><strong>Strong in both:</strong> otherwise, both scores are 55 or more.</li>
+              <li><strong>Invisible in both:</strong> otherwise, both scores are 15 or less.</li>
+              <li><strong>Even:</strong> anything else.</li>
+              <li><strong>Not checked:</strong> Google hasn't been checked yet, or no engine has answered.</li>
+            </ul>
           </section>
 
           <section id="glossary">
             <h2>Glossary</h2>
-            <p class="kicker">The words you’ll see around the app.</p>
+            <p class="kicker">The words you'll see around the app.</p>
             <dl class="metrics">
-              <div class="metric"><dt>Engine</dt><dd>One AI assistant Cansee asks: ChatGPT, Claude, Gemini, Perplexity, or Grok.</dd></div>
-              <div class="metric"><dt>Prompt</dt><dd>A buyer question you track, e.g. “best CRM for a small team.” Neutral by design, so it never names your brand.</dd></div>
-              <div class="metric"><dt>Scan / run</dt><dd>One measurement of your prompts across the engines at a point in time.</dd></div>
-              <div class="metric"><dt>GEO</dt><dd>Generative Engine Optimization: shaping what AI answers about you, the way SEO shapes what Google returns.</dd></div>
+              <div class="metric"><dt>Prompt</dt><dd>A question your buyers ask, tracked in a project. It never names your brand, so the results show whether Google and AI bring you up on their own.</dd></div>
+              <div class="metric"><dt>Engine</dt><dd>One AI assistant Cansee asks: ChatGPT, Claude, Gemini, Grok or Perplexity.</dd></div>
+              <div class="metric"><dt>AI visibility</dt><dd>The share of recent AI answers that name you.</dd></div>
+              <div class="metric"><dt>Gap</dt><dd>Your AI score minus your search score for a prompt.</dd></div>
+              <div class="metric"><dt>Retrieval</dt><dd>One time an AI engine pulled up a page while answering a prompt. One answer can retrieve many pages.</dd></div>
+              <div class="metric"><dt>Citation rate</dt><dd>Of the times a page was retrieved, how often the answer cited it.</dd></div>
+              <div class="metric"><dt>Brand alignment</dt><dd>How closely one answer reflects your brand facts, scored out of 100.</dd></div>
+              <div class="metric"><dt>SEO</dt><dd>Search engine optimization: work that improves where Google ranks your pages.</dd></div>
+              <div class="metric"><dt>GEO</dt><dd>Generative engine optimization: work that improves whether and how AI engines mention you.</dd></div>
             </dl>
           </section>
 
           <section id="contact">
-            <h2>Contact us</h2>
-            <p class="kicker">Real people, one business day.</p>
-            <p>Questions about your account, a scan that looks off, or anything the docs didn’t cover? Email us and a human replies.</p>
+            <h2>Contact</h2>
+            <p class="kicker">When the docs don't cover it.</p>
+            <p>Questions about your account, a prompt that looks wrong, or anything these docs don't answer: email us.</p>
             <div class="contact-card">
               <a class="email" :href="supportHref">{{ SUPPORT_EMAIL }}</a>
-              <p class="contact-sub">You can also reach us from the Help &amp; feedback button inside the app.</p>
+              <p class="contact-sub">Addresses for sales, privacy and security are on the <router-link to="/contact">contact page</router-link>.</p>
             </div>
           </section>
-
-          <footer class="docfoot">Cansee: brand intelligence for AI search. Every capability here is a real part of the product; where a limit matters, it’s stated plainly.</footer>
         </div>
       </main>
 
       <!-- FAQ rail -->
       <aside class="dx-rail">
-        <p class="dx-rail-t">Frequently asked</p>
-        <details v-for="f in faqs" :key="f.q" class="faq">
-          <summary>{{ f.q }}<svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6" /></svg></summary>
-          <p>{{ f.a }}</p>
+        <h2 class="dx-rail-t">Frequently asked</h2>
+        <details v-for="f in faqs" :key="f.id" class="faq">
+          <summary>{{ f.q }}<svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></summary>
+          <p v-for="(para, i) in f.a" :key="i">{{ para }}</p>
+          <ul v-if="f.list.length" class="faq-ul">
+            <li v-for="(line, i) in f.list" :key="i">{{ line }}</li>
+          </ul>
         </details>
+        <button type="button" class="dx-rail-all" aria-haspopup="dialog" @click="help.open()">All questions</button>
         <p class="dx-rail-help">Still stuck? Email <a :href="supportHref">{{ SUPPORT_EMAIL }}</a>.</p>
       </aside>
     </div>
+
+    <HelpDrawer />
   </div>
 </template>
 
@@ -434,7 +456,6 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
   line-height: 1.62;
 }
 .docs a { color: var(--foreground); text-decoration: none; }
-.docs .mono, .docs code { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 0.85em; background: var(--muted); padding: 1px 5px; border-radius: 4px; color: var(--foreground); }
 
 /* Top bar */
 .dx-top {
@@ -450,7 +471,9 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
 .dx-spacer { flex: 1; }
 .dx-link { font-size: 12.5px; color: var(--muted-foreground); padding: 6px 10px; border-radius: 7px; }
 .dx-link:hover { color: var(--foreground); background: var(--muted); }
-.dx-cta { font-size: 12.5px; font-weight: 600; color: var(--primary-foreground); background: var(--primary); padding: 6px 13px; border-radius: 8px; flex-shrink: 0; }
+/* Two classes: `.docs a` outranks one, and painted the label in
+   --foreground on the dark button. */
+.docs .dx-cta { font-size: 12.5px; font-weight: 600; color: var(--primary-foreground); background: var(--primary); padding: 6px 13px; border-radius: 8px; flex-shrink: 0; }
 .dx-cta:hover { opacity: .9; }
 
 .dx-search { position: relative; width: min(400px, 40vw); flex-shrink: 1; }
@@ -504,44 +527,14 @@ ol.steps > li:last-child::after { display: none; }
 .note-label { display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 4px; }
 .note p:last-child { margin-bottom: 0; }
 
-.service { border-top: 1px solid var(--border); padding: 20px 0 4px; }
+.service { border-top: 1px solid var(--border); padding: 20px 0 4px; scroll-margin-top: 66px; }
 .service:first-of-type { border-top: 0; }
 .svc-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 5px; }
 .svc-head h3 { margin: 0; font-size: 16px; }
 .svc-where { font-size: 11px; color: var(--muted-foreground); font-family: ui-monospace, monospace; }
 .service p { margin: 0 0 9px; max-width: 74ch; }
-.svc-how { font-size: 13px; color: var(--foreground); max-width: 74ch; margin: 0 0 9px; opacity: .92; }
-.svc-how b, .svc-how strong { color: var(--foreground); opacity: 1; }
 .need { display: flex; gap: 9px; align-items: baseline; font-size: 12.5px; color: var(--muted-foreground); margin: 6px 0 12px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; max-width: 74ch; }
 .need-l { font-size: 9.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--foreground); flex-shrink: 0; padding-top: 1px; }
-
-/* Worked measurement example */
-.measure-eg { border: 1px solid var(--border); background: var(--card); border-radius: 12px; padding: 16px 18px; margin: 18px 0 4px; }
-.me-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 13px; }
-.me-row { margin-bottom: 13px; }
-.me-tag { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted-foreground); margin-right: 8px; }
-.me-q { font-size: 14.5px; color: var(--foreground); font-weight: 500; }
-.me-list { list-style: decimal; padding-left: 28px; margin: 8px 0 0; font-size: 13.5px; }
-.me-list li { margin: 3px 0; color: var(--muted-foreground); }
-.me-you { color: var(--foreground); font-weight: 600; }
-.me-list mark { background: var(--foreground); color: var(--background); font-weight: 700; padding: 1px 6px; border-radius: 4px; box-decoration-break: clone; }
-.me-you-tag { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted-foreground); margin-left: 6px; }
-.me-out { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 11px; }
-.me-chip { font-size: 12px; color: var(--muted-foreground); background: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 3px 12px; font-variant-numeric: tabular-nums; }
-.me-chip b { color: var(--foreground); font-weight: 700; }
-.me-note { font-size: 12.5px; color: var(--muted-foreground); margin: 0; max-width: 74ch; line-height: 1.5; }
-
-.usecase { border-top: 1px solid var(--border); padding: 18px 0 4px; }
-.usecase:first-of-type { border-top: 0; }
-.usecase h3 { margin: 0 0 4px; font-size: 15px; }
-.uc-q { font-size: 12.5px; color: var(--muted-foreground); font-style: italic; margin: 0 0 8px; max-width: 74ch; }
-.usecase p { max-width: 74ch; margin: 0 0 9px; }
-
-.plat { border-top: 1px solid var(--border); padding: 18px 0 2px; }
-.plat:first-of-type { border-top: 0; }
-.plat-head { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
-.plat-head h3 { margin: 0; }
-.plat-badge { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px; }
 
 .table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--border); border-radius: 10px; }
 .docs table { border-collapse: collapse; width: 100%; font-size: 13px; }
@@ -560,18 +553,20 @@ ol.steps > li:last-child::after { display: none; }
 .contact-card .email { font-size: 16px; font-weight: 600; color: var(--foreground); }
 .contact-card .email:hover { text-decoration: underline; }
 .contact-sub { margin: 6px 0 0; color: var(--muted-foreground); font-size: 12.5px; }
-
-.docfoot { margin-top: 46px; padding-top: 18px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted-foreground); }
+.contact-sub a { text-decoration: underline; text-underline-offset: 2px; }
 
 /* FAQ rail */
 .dx-rail { position: sticky; top: 54px; align-self: start; height: calc(100vh - 54px); overflow-y: auto; padding: 26px 22px 60px; border-left: 1px solid var(--border); }
-.dx-rail-t { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 12px; }
+.docs .dx-rail-t { font-size: 10.5px; line-height: 1.4; letter-spacing: .12em; font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 12px; }
 details.faq { border-bottom: 1px solid var(--border); padding: 9px 0; }
 details.faq > summary { list-style: none; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--foreground); display: flex; gap: 8px; align-items: flex-start; }
 details.faq > summary::-webkit-details-marker { display: none; }
 details.faq > summary .chev { margin-left: auto; flex-shrink: 0; color: var(--muted-foreground); transition: transform .18s; margin-top: 3px; }
 details.faq[open] > summary .chev { transform: rotate(90deg); }
 details.faq p { margin: 7px 0 2px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+details.faq .faq-ul { margin: 4px 0 2px; padding-left: 16px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+.dx-rail-all { margin-top: 14px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: none; color: var(--foreground); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.dx-rail-all:hover { background: var(--muted); }
 .dx-rail-help { margin-top: 20px; font-size: 12px; color: var(--muted-foreground); }
 .dx-rail-help a { color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; }
 

@@ -37,6 +37,15 @@ export default [
         },
     },
     {
+        // Build scripts run under Node.
+        files: ['scripts/**/*.mjs'],
+        languageOptions: {
+            globals: {
+                ...globals.node,
+            },
+        },
+    },
+    {
         ignores: ['dist/', 'node_modules/', 'public/'],
     },
 ]

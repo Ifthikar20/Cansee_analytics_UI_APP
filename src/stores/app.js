@@ -2,17 +2,13 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 export const useAppStore = defineStore('app', () => {
-    const sidebarCollapsed = ref(false)
     const activeWebsite = ref(null)
     const websites = ref([])
-    const notifications = ref([])
-    const unreadCount = computed(() => notifications.value.filter(n => !n.read).length)
 
-    // Plan state — hydrated from the session payload's `limits` block
-    // (auth.fetchSession -> setPlanInfo). -1 means unlimited, and doubles
-    // as "not yet known" before the session loads; the backend enforces
-    // the real cap either way.
-    const userPlan = ref('free')
+    // Project allowance — hydrated from the session payload's `limits`
+    // block (auth.fetchSession -> setProjectLimit). -1 means unlimited, and
+    // doubles as "not yet known" before the session loads; the backend
+    // enforces the real cap either way.
     const projectLimit = ref(-1)
 
     const canCreateProject = computed(() => {
@@ -20,13 +16,7 @@ export const useAppStore = defineStore('app', () => {
         return websites.value.length < projectLimit.value
     })
 
-    const projectLimitLabel = computed(() => {
-        if (projectLimit.value === -1) return `${websites.value.length} projects`
-        return `${websites.value.length}/${projectLimit.value} projects`
-    })
-
-    function setPlanInfo(plan, limit) {
-        userPlan.value = plan
+    function setProjectLimit(limit) {
         projectLimit.value = limit
     }
 
@@ -79,19 +69,6 @@ export const useAppStore = defineStore('app', () => {
     // store in lockstep — e.g. when the key was edited in another tab).
     applyTheme()
 
-    function toggleSidebar() {
-        sidebarCollapsed.value = !sidebarCollapsed.value
-    }
-
-    // Last breadcrumb segment for detail pages. The header breadcrumb is
-    // derived from the nav tree, which only knows sections — a page showing
-    // one entity (a prompt, an audit) sets this so the trail names what is
-    // actually on screen. Pages must clear it on unmount.
-    const breadcrumbTail = ref('')
-    function setBreadcrumbTail(label) {
-        breadcrumbTail.value = String(label || '')
-    }
-
     function setActiveWebsite(website) {
         activeWebsite.value = website
     }
@@ -109,26 +86,26 @@ export const useAppStore = defineStore('app', () => {
         }
     }
 
+    /** Forget the signed-in user's projects (sign-out, expired session). */
+    function reset() {
+        websites.value = []
+        activeWebsite.value = null
+        projectLimit.value = -1
+    }
+
     return {
-        sidebarCollapsed,
         activeWebsite,
         websites,
-        notifications,
-        unreadCount,
         theme,
         resolvedTheme,
         isDark,
         setTheme,
-        userPlan,
         projectLimit,
         canCreateProject,
-        projectLimitLabel,
-        toggleSidebar,
         toggleTheme,
-        setPlanInfo,
+        setProjectLimit,
         setActiveWebsite,
         setWebsites,
-        breadcrumbTail,
-        setBreadcrumbTail,
+        reset,
     }
 })

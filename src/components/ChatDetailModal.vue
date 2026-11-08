@@ -1,9 +1,11 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { engineMeta } from '@/lib/engines'
+import { ref, computed, watch, useId } from 'vue'
 import { X, ExternalLink, ArrowLeft, ArrowRight, Loader2 } from '@lucide/vue'
-import citationsApi from '@/api/citations'
+import api from '@/api/client'
 import BrandLogo from '@/components/BrandLogo.vue'
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
+import { useDialogFocus } from '@/composables/useDialogFocus'
 import { safeHref } from '@/utils/safeHref'
 
 const props = defineProps({
@@ -15,19 +17,6 @@ const props = defineProps({
 })
 const emit = defineEmits(['close', 'prev', 'next'])
 
-const MODELS = {
-  chatgpt: { label: 'ChatGPT', abbr: 'GP', color: '#10a37f' },
-  perplexity: { label: 'Perplexity', abbr: 'Px', color: '#8b5cf6' },
-  gemini: { label: 'Gemini', abbr: 'Ge', color: '#5b8def' },
-  claude: { label: 'Claude', abbr: 'Cl', color: '#f97316' },
-  copilot: { label: 'Copilot', abbr: 'Co', color: '#06b6d4' },
-  grok: { label: 'Grok', abbr: 'Gk', color: '#0f172a' },
-  deepseek: { label: 'DeepSeek', abbr: 'Ds', color: '#2563eb' },
-  mistral: { label: 'Mistral', abbr: 'Mi', color: '#ef4444' },
-  cohere: { label: 'Cohere', abbr: 'Ch', color: '#d946ef' },
-  llama: { label: 'Llama', abbr: 'La', color: '#0ea5e9' },
-  nova: { label: 'Nova', abbr: 'No', color: '#64748b' },
-}
 // Alignment score band -> token-based pill styling (same bands as the
 // dashboard breakdown: aligned >= 70, partial 40-69, unaligned < 40).
 function alignmentBandClass(score) {
@@ -37,17 +26,15 @@ function alignmentBandClass(score) {
 }
 
 function modelStyle(key) {
-  return MODELS[key] || { label: key || 'Model', abbr: (key || 'M').slice(0, 2), color: '#94a3b8' }
+  if (!key) return { label: 'Model', abbr: '', color: '#8b8b93' }
+  const meta = engineMeta(key)
+  return { label: meta.label, abbr: meta.label.slice(0, 2), color: meta.color }
 }
 
 const loading = ref(false)
 const error = ref('')
 const detail = ref(null)
 
-function flag(code) {
-  if (!code || code.length !== 2) return '🌐'
-  return String.fromCodePoint(...[...code.toUpperCase()].map(c => 127397 + c.charCodeAt(0)))
-}
 function faviconFor(domain) {
   return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`
 }
@@ -155,10 +142,14 @@ async function load() {
   error.value = ''
   detail.value = null
   try {
-    const res = await citationsApi.chatDetail(props.websiteId, props.resultId)
+    // Silent: the failure renders inside the viewer.
+    const res = await api.get(
+      `/citations/websites/${props.websiteId}/chats/${props.resultId}/`,
+      { _silentError: true },
+    )
     detail.value = res.data || null
-  } catch (e) {
-    error.value = e?.displayMessage || 'Could not load this chat.'
+  } catch {
+    error.value = "We couldn't load this answer."
   } finally {
     loading.value = false
   }
@@ -168,11 +159,30 @@ watch(() => [props.open, props.resultId], load, { immediate: true })
 
 // Scrolling inside the viewer must never scroll the page behind it.
 useBodyScrollLock(computed(() => props.open))
+
+// A modal dialog: focus moves in and stays in, returns to the row that
+// opened it, and Escape closes only this viewer (not the board panel that
+// hosts the page underneath).
+const dialogRef = ref(null)
+const titleId = useId()
+const dialogTitle = computed(() => (detail.value?.model ? `${modelLabel.value} answer` : 'AI answer'))
+useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
 </script>
 
 <template>
+  <!-- Teleported: the board's side panel is a size container, which would
+       clip and place a fixed overlay inside it. -->
+  <Teleport to="body">
   <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" @click.self="emit('close')">
-    <div class="flex h-[85vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+    <div
+      ref="dialogRef"
+      role="dialog"
+      aria-modal="true"
+      :aria-labelledby="titleId"
+      tabindex="-1"
+      class="flex h-[85vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl outline-none"
+    >
+      <h2 :id="titleId" class="sr-only">{{ dialogTitle }}</h2>
       <!-- Conversation -->
       <div class="flex min-w-0 flex-1 flex-col">
         <header class="flex items-center justify-between border-b border-border px-5 py-3">
@@ -183,17 +193,19 @@ useBodyScrollLock(computed(() => props.open))
             <!-- The exact submodel that answered, when the row carries it
                  (per-prompt model selection). -->
             <span v-if="detail?.model_id" class="rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">{{ detail.model_id }}</span>
-            <span v-if="detail?.country" class="ml-1 text-base leading-none">{{ flag(detail.country) }}</span>
-            <span v-if="detail?.country" class="text-xs text-muted-foreground">{{ detail.country }}</span>
+            <span v-if="detail?.country" class="ml-1 text-xs text-muted-foreground">{{ detail.country.toUpperCase() }}</span>
           </div>
-          <button class="text-muted-foreground hover:text-foreground" @click="emit('close')"><X :size="18" /></button>
+          <button type="button" class="rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close" @click="emit('close')"><X :size="18" aria-hidden="true" /></button>
         </header>
 
         <div class="flex-1 overflow-y-auto overscroll-contain px-6 py-5">
           <div v-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 class="size-4 animate-spin" /> Loading chat…
           </div>
-          <div v-else-if="error" class="text-sm text-destructive">{{ error }}</div>
+          <div v-else-if="error" class="flex flex-wrap items-center gap-3 text-sm text-destructive">
+            {{ error }}
+            <button type="button" class="font-medium text-foreground underline underline-offset-2" @click="load">Try again</button>
+          </div>
           <template v-else-if="detail">
             <!-- user prompt bubble -->
             <div class="mb-5 flex justify-end">
@@ -218,11 +230,12 @@ useBodyScrollLock(computed(() => props.open))
           </template>
         </div>
 
-        <footer class="flex items-center justify-between border-t border-border px-5 py-3">
-          <button class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
-            :disabled="!hasPrev" @click="emit('prev')"><ArrowLeft :size="15" /> Previous</button>
-          <button class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
-            :disabled="!hasNext" @click="emit('next')">Next <ArrowRight :size="15" /></button>
+        <!-- Only callers that pass a list of answers can step through it. -->
+        <footer v-if="hasPrev || hasNext" class="flex items-center justify-between border-t border-border px-5 py-3">
+          <button type="button" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
+            :disabled="!hasPrev" @click="emit('prev')"><ArrowLeft :size="15" aria-hidden="true" /> Previous</button>
+          <button type="button" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground disabled:opacity-40"
+            :disabled="!hasNext" @click="emit('next')">Next <ArrowRight :size="15" aria-hidden="true" /></button>
         </footer>
       </div>
 
@@ -315,10 +328,9 @@ useBodyScrollLock(computed(() => props.open))
             </template>
             <p v-else-if="detail.alignment && detail.alignment.status === 'no_brand_input'"
               class="text-xs leading-relaxed text-muted-foreground">
-              Add brand knowledge on the
-              <router-link :to="`/llm-ranking/${websiteId}/brand-input`"
-                class="font-medium text-foreground hover:underline">Brand Ingestion</router-link>
-              page to benchmark this answer against your own material.
+              <router-link :to="{ name: 'settings-brand-facts' }"
+                class="font-medium text-foreground hover:underline">Add brand facts in Settings</router-link>
+              to compare this answer with your own material.
             </p>
             <p v-else-if="detail.alignment && detail.alignment.status === 'no_brand_claims'"
               class="text-xs leading-relaxed text-muted-foreground">
@@ -326,7 +338,7 @@ useBodyScrollLock(computed(() => props.open))
             </p>
             <p v-else-if="detail.alignment && detail.alignment.status === 'embeddings_unavailable'"
               class="text-xs leading-relaxed text-muted-foreground">
-              Semantic embeddings are not configured, so alignment could not be scored.
+              Alignment scoring isn't available yet.
             </p>
             <p v-else class="text-xs text-muted-foreground">Not analyzed yet.</p>
           </div>
@@ -334,6 +346,7 @@ useBodyScrollLock(computed(() => props.open))
       </aside>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <!-- Unscoped on purpose: the marks are injected via v-html, which scoped

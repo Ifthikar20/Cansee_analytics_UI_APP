@@ -1,7 +1,7 @@
 // Severity presentation for Brand Security — the single module every
 // brand-security surface imports. Colors flow through the --severity-*
 // tokens (defined for both themes in assets/tailwind.css), never raw hex.
-export const SEVERITY_META = {
+const SEVERITY_META = {
   high: {
     label: 'High',
     rank: 0,

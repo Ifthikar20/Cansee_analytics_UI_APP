@@ -1,50 +1,61 @@
 <script setup>
+// One AI answer source: how often answers retrieved and cited it, its
+// Google performance when it is your page, the prompts and brands around
+// it and the answers that used it. It is the board's Citations panel when
+// the panel's query names a `url`; there the breadcrumb becomes a link back
+// to the list, keeping the list's topic and engine.
+import { engineMeta } from '@/lib/engines'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Bar } from 'vue-chartjs'
 import {
-  Chart as ChartJS,
-  Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale,
-} from 'chart.js'
-import {
-  ChevronRight, Search, Loader2, ExternalLink, CircleX,
+  ArrowLeft, ChevronRight, Search, Loader2, ExternalLink, CircleX,
 } from '@lucide/vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import citationsApi from '@/api/citations'
+import api from '@/api/client'
+import { useBoard, useInPanel } from '@/lib/board/context'
+import { boardLocation } from '@/lib/board/links'
 import ChatDetailModal from '@/components/ChatDetailModal.vue'
-import { cssVar } from '@/lib/theme'
+import VizChart from '@/components/charts/VizChart.vue'
 import MetricInfo from '@/components/sources/MetricInfo.vue'
+import { urlModelsSpec, urlRetrievalsSpec } from '@/lib/analytics/polishSpecs'
 import {
   Card, CardHeader, CardTitle, CardContent,
 } from '@/components/ui/card'
-
-ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale)
 
 const route = useRoute()
 const router = useRouter()
 const websiteId = computed(() => route.params.websiteId)
 const targetUrl = computed(() => route.query.url || '')
 
+const inPanel = useInPanel()
+const board = inPanel ? useBoard() : null
+
+// The list's own filters, which the way back keeps.
+const listQuery = computed(() => {
+  const query = {}
+  for (const key of ['topic', 'provider']) {
+    const value = route.query[key]
+    if (typeof value === 'string' && value) query[key] = value
+  }
+  return query
+})
+const allCitationsTo = computed(() => boardLocation(websiteId.value, 'citations', listQuery.value))
+
+// A plain click stays in the panel; a modified click (new tab) keeps the link.
+function openList(event) {
+  if (!board || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+  event.preventDefault()
+  board.open('citations', listQuery.value)
+}
+
 const loading = ref(true)
 const error = ref('')
 const detail = ref(null)
 const promptSearch = ref('')
 
-const MODELS = {
-  chatgpt: { label: 'ChatGPT', color: '#10a37f', initial: 'C' },
-  perplexity: { label: 'Perplexity', color: '#8b5cf6', initial: 'P' },
-  gemini: { label: 'Gemini', color: '#5b8def', initial: 'G' },
-  claude: { label: 'Claude', color: '#f97316', initial: 'A' },
-  copilot: { label: 'Copilot', color: '#06b6d4', initial: 'M' },
-  grok: { label: 'Grok', color: '#0f172a', initial: 'X' },
-  deepseek: { label: 'DeepSeek', color: '#2563eb', initial: 'D' },
-  mistral: { label: 'Mistral', color: '#ef4444', initial: 'M' },
-  cohere: { label: 'Cohere', color: '#d946ef', initial: 'O' },
-  llama: { label: 'Llama', color: '#0ea5e9', initial: 'L' },
-  nova: { label: 'Nova', color: '#64748b', initial: 'N' },
-}
 function modelStyle(key) {
-  return MODELS[key] || { label: key, color: '#94a3b8', initial: (key || '?')[0].toUpperCase() }
+  const meta = engineMeta(key)
+  return { label: meta.label, color: meta.color, initial: meta.label.slice(0, 2) }
 }
 
 /* Domain-type badges, matching the list page: ownership classes carry
@@ -73,13 +84,14 @@ const HELP = {
   googleClicks: 'Clicks from Google Search for this page over this period, from Search Console (about a 3-day reporting delay).',
   googleImpressions: 'How often this page appeared in Google results over this period.',
   googlePosition: 'Impression-weighted average Google position. Lower is better; a negative change means the page moved up.',
-  aiVisits: 'Visits that arrived on this page from an AI assistant, measured by your tracking pixel.',
 }
 
 
 const metrics = computed(() => detail.value?.metrics || {})
 const title = computed(() => metrics.value.title || 'URL')
 const realTraffic = computed(() => detail.value?.real_traffic || null)
+const brandsMentioned = computed(() => detail.value?.brands_mentioned || [])
+const chats = computed(() => detail.value?.chats || [])
 
 function fmtDelta(d) {
   if (d == null) return ''
@@ -106,42 +118,21 @@ function fmtRateDelta(d) {
 }
 
 /* ── Retrievals over time (current vs previous) ── */
-const overTimeData = computed(() => {
-  const rot = detail.value?.retrievals_over_time || { labels: [], current: [], previous: [] }
-  return {
-    labels: rot.labels,
-    datasets: [
-      { label: 'Current Period', data: rot.current, backgroundColor: '#5b8def', borderRadius: 4 },
-      { label: 'Previous Period', data: rot.previous, backgroundColor: '#f9a8d4', borderRadius: 4 },
-    ],
-  }
-})
+function total(values) {
+  return (values || []).reduce((sum, v) => sum + (Number(v) || 0), 0)
+}
+
+const overTime = computed(() => detail.value?.retrievals_over_time || { labels: [], current: [], previous: [] })
+const hasOverTime = computed(() => total(overTime.value.current) + total(overTime.value.previous) > 0)
+const overTimeChart = computed(() => urlRetrievalsSpec(overTime.value))
 
 /* ── Retrievals by model ── */
-const byModelData = computed(() => {
-  const rows = detail.value?.retrievals_by_model || []
-  return {
-    labels: rows.map(r => modelStyle(r.model).label),
-    datasets: [
-      { label: 'Current Period', data: rows.map(r => r.current), backgroundColor: rows.map(r => modelStyle(r.model).color), borderRadius: 4 },
-      { label: 'Previous Period', data: rows.map(r => r.previous), backgroundColor: '#f9a8d4', borderRadius: 4 },
-    ],
-  }
-})
+const byModelRows = computed(() => detail.value?.retrievals_by_model || [])
+const hasByModel = computed(() =>
+  byModelRows.value.some(r => (Number(r.current) || 0) + (Number(r.previous) || 0) > 0))
+const byModelChart = computed(() => urlModelsSpec(byModelRows.value))
 
-const barOptions = computed(() => {
-  const grid = cssVar('--border', 'rgba(0,0,0,0.08)')
-  const text = cssVar('--muted-foreground', '#64748b')
-  return {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { grid: { display: false }, border: { display: false }, ticks: { color: text, font: { size: 12 } } },
-      y: { beginAtZero: true, grid: { color: grid }, border: { display: false }, ticks: { color: text, font: { size: 12 }, precision: 0 } },
-    },
-  }
-})
+const NO_RETRIEVALS = { title: 'No retrievals for this URL in this period.' }
 
 const filteredPrompts = computed(() => {
   const rows = detail.value?.prompts || []
@@ -159,13 +150,15 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const params = {}
+    const params = { url: targetUrl.value }
     if (route.query.topic) params.topic = route.query.topic
     if (route.query.provider) params.provider = route.query.provider
-    const res = await citationsApi.websiteUrlDetail(websiteId.value, targetUrl.value, params)
+    // Silent: the page shows the failure inline.
+    const res = await api.get(`/citations/websites/${websiteId.value}/urls/detail/`, { params, _silentError: true })
     detail.value = res.data || null
   } catch (e) {
-    error.value = e?.displayMessage || 'Failed to load URL details.'
+    detail.value = null
+    error.value = e?.displayMessage || "We couldn't load this URL."
   } finally {
     loading.value = false
   }
@@ -181,8 +174,7 @@ function backToList() {
 /* ── Chat detail modal ── */
 const chatOpen = ref(false)
 const chatIndex = ref(0)
-const chatList = computed(() => detail.value?.chats || [])
-const currentChatId = computed(() => chatList.value[chatIndex.value]?.result_id || '')
+const currentChatId = computed(() => chats.value[chatIndex.value]?.result_id || '')
 function openChat(i) {
   chatIndex.value = i
   chatOpen.value = true
@@ -191,7 +183,7 @@ function prevChat() {
   if (chatIndex.value > 0) chatIndex.value -= 1
 }
 function nextChat() {
-  if (chatIndex.value < chatList.value.length - 1) chatIndex.value += 1
+  if (chatIndex.value < chats.value.length - 1) chatIndex.value += 1
 }
 function fmtTime(iso) {
   if (!iso) return '—'
@@ -201,8 +193,20 @@ function fmtTime(iso) {
 
 <template>
   <div class="flex flex-col gap-6">
+    <!-- In the board's panel: back to the list (the panel's title names it) -->
+    <RouterLink v-if="inPanel" v-slot="{ href }" :to="allCitationsTo" custom>
+      <a
+        :href="href"
+        class="inline-flex items-center gap-1.5 self-start text-sm font-medium text-muted-foreground hover:text-foreground"
+        @click="openList"
+      >
+        <ArrowLeft class="size-4" aria-hidden="true" />
+        All citations
+      </a>
+    </RouterLink>
+
     <!-- breadcrumb -->
-    <div class="flex items-center gap-2 text-sm text-muted-foreground">
+    <div v-else class="flex items-center gap-2 text-sm text-muted-foreground">
       <span class="font-medium text-foreground">Sources</span>
       <ChevronRight class="size-3.5" />
       <button class="hover:text-foreground" @click="backToList">URLs</button>
@@ -212,10 +216,18 @@ function fmtTime(iso) {
 
     <Alert v-if="error" variant="destructive">
       <CircleX />
-      <AlertTitle>Could not load this URL</AlertTitle>
-      <AlertDescription>{{ error }}</AlertDescription>
+      <AlertTitle>We couldn't load this URL.</AlertTitle>
+      <AlertDescription>
+        <p>{{ error }}</p>
+        <button
+          v-if="targetUrl"
+          type="button"
+          class="mt-1 font-semibold text-foreground underline underline-offset-2"
+          @click="load"
+        >Try again</button>
+      </AlertDescription>
     </Alert>
-    <div v-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
+    <div v-else-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
       <Loader2 class="size-4 animate-spin" /> Loading URL details…
     </div>
 
@@ -227,7 +239,7 @@ function fmtTime(iso) {
       </a>
 
       <!-- metrics bar -->
-      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+      <div class="grid grid-cols-2 gap-3 @md:grid-cols-3 @3xl:grid-cols-7">
         <Card><CardContent class="pt-5">
           <div class="flex items-center gap-1 text-xs text-muted-foreground">URL type <MetricInfo :text="HELP.urlType" /></div>
           <div class="mt-1 text-sm font-semibold text-foreground">{{ metrics.url_type }}</div>
@@ -268,13 +280,13 @@ function fmtTime(iso) {
         </CardContent></Card>
       </div>
 
-      <!-- real traffic (your pages only) -->
+      <!-- Google performance (your pages only) -->
       <div v-if="realTraffic">
-        <h2 class="text-base font-bold text-foreground">Real traffic for this page</h2>
+        <h2 class="text-base font-bold text-foreground">Google performance for this page</h2>
         <p class="mb-3 text-sm text-muted-foreground">
-          What this page earns outside AI answers, over the same period.
+          What this page earns on Google, over the same period.
         </p>
-        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 @3xl:grid-cols-3">
           <template v-if="realTraffic.gsc">
             <Card><CardContent class="pt-5">
               <div class="flex items-center gap-1 text-xs text-muted-foreground">Google clicks <MetricInfo :text="HELP.googleClicks" /></div>
@@ -295,55 +307,28 @@ function fmtTime(iso) {
               </div>
             </CardContent></Card>
           </template>
-          <Card v-else-if="!realTraffic.gsc_connected" class="lg:col-span-3"><CardContent class="pt-5 text-sm text-muted-foreground">
+          <Card v-else-if="!realTraffic.gsc_connected" class="col-span-2 @3xl:col-span-3"><CardContent class="pt-5 text-sm text-muted-foreground">
             Connect Search Console to see this page's Google clicks, impressions and position.
-            <router-link to="/app/integrations" class="font-medium text-foreground hover:underline">Open integrations</router-link>
+            <router-link to="/settings/connections" class="font-medium text-foreground hover:underline">Open Connections</router-link>
           </CardContent></Card>
-          <Card v-else class="lg:col-span-3"><CardContent class="pt-5 text-sm text-muted-foreground">
+          <Card v-else class="col-span-2 @3xl:col-span-3"><CardContent class="pt-5 text-sm text-muted-foreground">
             No Google Search data recorded for this page in this period.
-          </CardContent></Card>
-
-          <Card v-if="realTraffic.ai_visits"><CardContent class="pt-5">
-            <div class="flex items-center gap-1 text-xs text-muted-foreground">AI visits <MetricInfo :text="HELP.aiVisits" /></div>
-            <div class="mt-1 text-lg font-bold text-foreground">
-              {{ realTraffic.ai_visits.value }}
-              <span class="text-xs font-medium" :class="deltaClass(realTraffic.ai_visits.delta)">{{ fmtDelta(realTraffic.ai_visits.delta) }}</span>
-            </div>
-          </CardContent></Card>
-          <Card v-else><CardContent class="pt-5 text-sm text-muted-foreground">
-            <template v-if="realTraffic.pixel_active">No AI-referred visits to this page in this period.</template>
-            <template v-else>
-              Install the tracking pixel to count visits arriving from AI assistants.
-              <router-link to="/app/integrations" class="font-medium text-foreground hover:underline">Open integrations</router-link>
-            </template>
           </CardContent></Card>
         </div>
       </div>
 
       <!-- charts -->
-      <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader class="space-y-0">
-            <CardTitle class="text-base">Retrievals</CardTitle>
-            <p class="text-sm text-muted-foreground">No. of times AI uses this URL as a source</p>
-          </CardHeader>
-          <CardContent>
-            <div class="h-56"><Bar :data="overTimeData" :options="barOptions" /></div>
-            <div class="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
-              <span class="inline-flex items-center gap-1.5"><span class="size-2 rounded-full bg-[#5b8def]" /> Current Period</span>
-              <span class="inline-flex items-center gap-1.5"><span class="size-2 rounded-full bg-[#f9a8d4]" /> Previous Period</span>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader class="space-y-0">
-            <CardTitle class="text-base">Retrievals by model</CardTitle>
-            <p class="text-sm text-muted-foreground">No. of times this URL is retrieved in chats</p>
-          </CardHeader>
-          <CardContent>
-            <div class="h-56"><Bar :data="byModelData" :options="barOptions" /></div>
-          </CardContent>
-        </Card>
+      <div class="grid grid-cols-1 gap-4 @3xl:grid-cols-2">
+        <VizChart
+          :spec="overTimeChart"
+          :empty="hasOverTime ? null : NO_RETRIEVALS"
+          :height="224"
+        />
+        <VizChart
+          :spec="byModelChart"
+          :empty="hasByModel ? null : NO_RETRIEVALS"
+          :height="224"
+        />
       </div>
 
       <!-- prompts -->
@@ -401,12 +386,12 @@ function fmtTime(iso) {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(b, i) in detail.brands_mentioned" :key="i" class="border-b border-border/60">
+                <tr v-for="(b, i) in brandsMentioned" :key="i" class="border-b border-border/60">
                   <td class="py-3 pr-3 font-medium text-foreground">{{ b.brand }}</td>
                   <td class="py-3 pr-3 text-right tabular-nums text-foreground">{{ b.position ?? '—' }}</td>
                   <td class="py-3 pr-3 text-right tabular-nums text-foreground">{{ b.frequency }}</td>
                 </tr>
-                <tr v-if="!detail.brands_mentioned.length"><td colspan="3" class="py-6 text-center text-sm text-muted-foreground">No brands detected.</td></tr>
+                <tr v-if="!brandsMentioned.length"><td colspan="3" class="py-6 text-center text-sm text-muted-foreground">No brands detected.</td></tr>
               </tbody>
             </table>
           </div>
@@ -433,11 +418,20 @@ function fmtTime(iso) {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(c, ci) in detail.chats" :key="c.result_id"
+                <!-- A click anywhere on the row opens the answer; the chat
+                     cell is a button so the keyboard reaches it too. -->
+                <tr v-for="(c, ci) in chats" :key="c.result_id"
                   class="cursor-pointer border-b border-border/60 hover:bg-muted/50" @click="openChat(ci)">
                   <td class="py-3 pr-3">
-                    <div class="font-medium text-foreground line-clamp-1">{{ c.prompt }}</div>
-                    <div class="text-xs text-muted-foreground line-clamp-1">{{ c.response_preview }}</div>
+                    <button
+                      type="button"
+                      class="block w-full rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      data-open-chat
+                      @click.stop="openChat(ci)"
+                    >
+                      <span class="block font-medium text-foreground line-clamp-1">{{ c.prompt }}</span>
+                      <span class="block text-xs text-muted-foreground line-clamp-1">{{ c.response_preview }}</span>
+                    </button>
                   </td>
                   <td class="py-3 pr-3">
                     <span :class="c.brand_mentioned ? 'text-[color:var(--chart-2)]' : 'text-destructive'" class="text-xs font-semibold">
@@ -458,7 +452,7 @@ function fmtTime(iso) {
                   <td class="py-3 pr-3 text-right tabular-nums text-foreground">{{ c.position ?? '—' }}</td>
                   <td class="py-3 pr-3 text-right text-xs text-muted-foreground">{{ fmtTime(c.created_at) }}</td>
                 </tr>
-                <tr v-if="!detail.chats.length"><td colspan="6" class="py-6 text-center text-sm text-muted-foreground">No chats yet.</td></tr>
+                <tr v-if="!chats.length"><td colspan="6" class="py-6 text-center text-sm text-muted-foreground">No chats yet.</td></tr>
               </tbody>
             </table>
           </div>
@@ -471,7 +465,7 @@ function fmtTime(iso) {
       :website-id="websiteId"
       :result-id="currentChatId"
       :has-prev="chatIndex > 0"
-      :has-next="chatIndex < chatList.length - 1"
+      :has-next="chatIndex < chats.length - 1"
       @close="chatOpen = false"
       @prev="prevChat"
       @next="nextChat"

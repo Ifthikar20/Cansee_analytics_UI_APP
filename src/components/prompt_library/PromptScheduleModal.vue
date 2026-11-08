@@ -1,8 +1,7 @@
 <script setup>
-// Per-prompt run schedule. The per-prompt analogue of the audit-level
-// AuditSchedule.vue — schedules a single prompt (not the whole-website
-// audit) on a daily/weekly/monthly cadence. "Run now" is delegated to
-// the parent's existing scan flow so scan state stays in one place.
+// Per-prompt run schedule: runs one prompt on a daily/weekly/monthly
+// cadence. "Run now" is delegated to the parent's existing scan flow so
+// scan state stays in one place.
 import { ref, computed, watch } from 'vue'
 import { Play } from '@lucide/vue'
 import { Button } from '@/components/ui/button'
@@ -62,8 +61,8 @@ async function save() {
     emit('changed', schedule.value)
     toast.success('Schedule saved. This prompt will run automatically.')
     open.value = false
-  } catch (e) {
-    toast.error(e?.displayMessage || 'Could not save the schedule.')
+  } catch {
+    /* the client interceptor toasts */
   } finally {
     saving.value = false
   }
@@ -77,8 +76,8 @@ async function remove() {
     emit('changed', null)
     toast.success('Schedule removed.')
     open.value = false
-  } catch (e) {
-    toast.error(e?.displayMessage || 'Could not remove the schedule.')
+  } catch {
+    /* the client interceptor toasts */
   } finally {
     removing.value = false
   }
@@ -93,9 +92,7 @@ function runNow() {
 <template>
   <BaseModal v-model="open" title="Schedule this prompt">
     <p class="mb-3 text-sm text-muted-foreground">
-      Run this one prompt automatically on a cadence. Each run queries every
-      configured model and adds a point to this prompt's history, so you can
-      track how its visibility changes over time.
+      Run this prompt automatically on a schedule.
     </p>
 
     <div class="space-y-3">

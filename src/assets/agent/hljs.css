@@ -1,0 +1,102 @@
+/* highlight.js token colours for agent code blocks, light and dark.
+   Scoped to .ag-code so nothing else in the app picks them up. */
+
+.ag-code {
+  --ag-hl-text: var(--ag-fg-1);
+  --ag-hl-comment: #6e7781;
+  --ag-hl-keyword: #cf222e;
+  --ag-hl-string: #0a3069;
+  --ag-hl-number: #0550ae;
+  --ag-hl-title: #8250df;
+  --ag-hl-name: #116329;
+  --ag-hl-meta: #953800;
+  --ag-hl-del-fg: #82071e;
+  --ag-hl-del-bg: #ffebe9;
+  --ag-hl-add-fg: #116329;
+  --ag-hl-add-bg: #dafbe1;
+}
+
+[data-theme='dark'] .ag-code {
+  --ag-hl-comment: #8b949e;
+  --ag-hl-keyword: #ff7b72;
+  --ag-hl-string: #a5d6ff;
+  --ag-hl-number: #79c0ff;
+  --ag-hl-title: #d2a8ff;
+  --ag-hl-name: #7ee787;
+  --ag-hl-meta: #ffa657;
+  --ag-hl-del-fg: #ffdcd7;
+  --ag-hl-del-bg: rgba(248, 81, 73, 0.15);
+  --ag-hl-add-fg: #aff5b4;
+  --ag-hl-add-bg: rgba(46, 160, 67, 0.15);
+}
+
+.ag-code .hljs {
+  color: var(--ag-hl-text);
+  background: transparent;
+}
+
+.ag-code :is(.hljs-comment, .hljs-quote) {
+  color: var(--ag-hl-comment);
+  font-style: italic;
+}
+
+.ag-code :is(.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-type, .hljs-doctag, .hljs-template-tag) {
+  color: var(--ag-hl-keyword);
+}
+
+.ag-code :is(.hljs-string, .hljs-regexp, .hljs-char.escape_, .hljs-meta .hljs-string) {
+  color: var(--ag-hl-string);
+}
+
+.ag-code
+  :is(
+    .hljs-number,
+    .hljs-symbol,
+    .hljs-bullet,
+    .hljs-variable,
+    .hljs-template-variable,
+    .hljs-attr,
+    .hljs-attribute,
+    .hljs-selector-attr,
+    .hljs-selector-class,
+    .hljs-selector-id,
+    .hljs-selector-pseudo,
+    .hljs-property,
+    .hljs-operator
+  ) {
+  color: var(--ag-hl-number);
+}
+
+.ag-code :is(.hljs-title, .hljs-title.function_, .hljs-title.class_, .hljs-section) {
+  color: var(--ag-hl-title);
+}
+
+.ag-code :is(.hljs-built_in, .hljs-name, .hljs-tag, .hljs-link) {
+  color: var(--ag-hl-name);
+}
+
+.ag-code :is(.hljs-meta, .hljs-meta .hljs-keyword) {
+  color: var(--ag-hl-meta);
+}
+
+.ag-code .hljs-params {
+  color: inherit;
+}
+
+.ag-code .hljs-deletion {
+  background: var(--ag-hl-del-bg);
+  color: var(--ag-hl-del-fg);
+}
+
+.ag-code .hljs-addition {
+  background: var(--ag-hl-add-bg);
+  color: var(--ag-hl-add-fg);
+}
+
+.ag-code .hljs-emphasis {
+  font-style: italic;
+}
+
+.ag-code .hljs-strong {
+  font-weight: 600;
+}

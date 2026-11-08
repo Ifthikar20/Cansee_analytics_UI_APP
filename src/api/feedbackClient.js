@@ -6,26 +6,49 @@
  * feedback vendor must never receive our JWTs. Plain fetch, absolute
  * URL, zero coupling.
  */
-const BASE = import.meta.env.VITE_FEEDBACK_API_URL || 'http://localhost:8900'
+import { readJSON, storageKeys, writeJSON } from '@/lib/agent/storage'
 
-const TOKENS_KEY = 'cs-feedback-tokens'
+const BASE = (import.meta.env.VITE_FEEDBACK_API_URL || '').replace(/\/$/, '')
 
-export function loadTokens() {
-    try {
-        const raw = JSON.parse(localStorage.getItem(TOKENS_KEY) || '[]')
-        return Array.isArray(raw) ? raw.filter(t => typeof t === 'string') : []
-    } catch { return [] }
+/** False when the build has no feedback service; the widget is not mounted. */
+export const FEEDBACK_ENABLED = Boolean(BASE)
+
+// Ticket tokens and the messages seen per ticket are kept per user
+// (lib/agent/storage.js, removed on logout): a token opens its ticket, and
+// the service appends a new request to an open ticket whose token is sent,
+// so one account's tokens must never be read or sent for another.
+const MAX_TOKENS = 50
+const present = (uid) => uid !== null && uid !== undefined && uid !== ''
+
+/** The ticket tokens of this user on this browser ([] without a user). */
+export function loadTokens(uid) {
+    if (!present(uid)) return []
+    const raw = readJSON(storageKeys.feedbackTokens(uid), [])
+    return Array.isArray(raw) ? raw.filter((t) => typeof t === 'string' && t) : []
 }
 
-export function rememberToken(token) {
-    try {
-        const tokens = loadTokens()
-        if (!tokens.includes(token)) tokens.unshift(token)
-        localStorage.setItem(TOKENS_KEY, JSON.stringify(tokens.slice(0, 50)))
-    } catch { /* private mode etc. — the thread just won't persist */ }
+/** Keep a new ticket's token for this user; nothing is kept without a user. */
+export function rememberToken(uid, token) {
+    if (!present(uid) || typeof token !== 'string' || !token) return false
+    const tokens = loadTokens(uid).filter((t) => t !== token)
+    tokens.unshift(token)
+    return writeJSON(storageKeys.feedbackTokens(uid), tokens.slice(0, MAX_TOKENS))
+}
+
+/** {ticketId: messages seen} for this user ({} without a user). */
+export function loadSeen(uid) {
+    if (!present(uid)) return {}
+    const raw = readJSON(storageKeys.feedbackSeen(uid), {})
+    return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}
+}
+
+export function saveSeen(uid, seen) {
+    if (!present(uid)) return false
+    return writeJSON(storageKeys.feedbackSeen(uid), seen || {})
 }
 
 async function request(path, options = {}) {
+    if (!FEEDBACK_ENABLED) throw new Error('Feedback is not available.')
     const res = await fetch(`${BASE}${path}`, {
         headers: { 'Content-Type': 'application/json' },
         ...options,

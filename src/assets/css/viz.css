@@ -1,0 +1,61 @@
+/* ══════════════════════════════════════
+   Cansee — Chart tokens
+   One palette for every chart (src/lib/charts, src/components/charts).
+   Validated against the app's surfaces (light #ffffff, dark #000000,
+   agent dark #0e0e10): the categorical slots pass the colour-vision
+   checks in both modes; slots 3-5 are low-contrast on white, so every
+   chart keeps a legend with words and a table view.
+
+   Categorical = identity (fixed order, never cycled), sequential =
+   magnitude (one blue ramp; low -> high is light -> dark in light mode
+   and dark -> light in dark mode), diverging = polarity, status = state
+   (always with an icon and a word). Text never wears a series colour.
+   ══════════════════════════════════════ */
+
+:root {
+  --viz-surface: var(--card);
+  --viz-ink-1: var(--foreground);
+  --viz-ink-2: var(--muted-foreground);
+  --viz-grid: #e1e0d9;        /* hairline gridlines, solid */
+  --viz-axis: #c3c2b7;        /* baseline */
+  --viz-cat-1: #2a78d6; --viz-cat-2: #eb6834; --viz-cat-3: #1baf7a; --viz-cat-4: #eda100;
+  --viz-cat-5: #e87ba4; --viz-cat-6: #008300; --viz-cat-7: #6250d6; --viz-cat-8: #e34948;
+  --viz-other: #a5a5a0;       /* de-emphasis, "Other", comparison periods */
+  --viz-seq-1: #86b6ef; --viz-seq-2: #5598e7; --viz-seq-3: #2a78d6; --viz-seq-4: #1c5cab; --viz-seq-5: #104281;
+  --viz-seq-ink-1: #0b0b0b; --viz-seq-ink-2: #ffffff; --viz-seq-ink-3: #ffffff; --viz-seq-ink-4: #ffffff; --viz-seq-ink-5: #ffffff;
+  --viz-nodata: #f0efec; --viz-nodata-ring: rgba(11, 11, 11, 0.10);
+  --viz-div-pos: #2a78d6; --viz-div-mid: #a5a5a0; --viz-div-neg: #e34948;
+  --viz-good: #0ca30c; --viz-warning: #fab219; --viz-serious: #ec835a; --viz-critical: #d03b3b;
+}
+
+[data-theme='dark'] {
+  --viz-grid: #2c2c2a; --viz-axis: #383835;
+  --viz-cat-1: #3987e5; --viz-cat-2: #d95926; --viz-cat-3: #199e70; --viz-cat-4: #c98500;
+  --viz-cat-5: #d55181; --viz-cat-6: #008300; --viz-cat-7: #9085e9; --viz-cat-8: #e66767;
+  --viz-other: #7a7a75;
+  --viz-seq-1: #184f95; --viz-seq-2: #256abf; --viz-seq-3: #3987e5; --viz-seq-4: #6da7ec; --viz-seq-5: #9ec5f4;
+  --viz-seq-ink-1: #ffffff; --viz-seq-ink-2: #ffffff; --viz-seq-ink-3: #ffffff; --viz-seq-ink-4: #0b0b0b; --viz-seq-ink-5: #0b0b0b;
+  --viz-nodata: #1c1c1b; --viz-nodata-ring: rgba(255, 255, 255, 0.10);
+  --viz-div-pos: #3987e5; --viz-div-mid: #7a7a75; --viz-div-neg: #e66767;
+}
+
+/* Screen-reader-only copy of a chart (the hidden table, live regions). */
+.viz-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Forced colours: fills keep their data colour; text and rings use the
+   system colours. */
+@media (forced-colors: active) {
+  .viz-fill {
+    forced-color-adjust: none;
+  }
+}

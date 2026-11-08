@@ -17,6 +17,12 @@
         <router-link to="/login" class="mt-2 text-sm font-medium underline">Go to sign in</router-link>
       </div>
 
+      <!-- The preview request failed for a reason other than a bad token -->
+      <div v-else-if="state === 'load_failed'" class="flex flex-col items-center gap-3 py-12 text-center">
+        <h2 class="text-xl font-semibold text-foreground">We couldn't load this invitation</h2>
+        <Button variant="outline" class="mt-2" @click="loadInvite">Try again</Button>
+      </div>
+
       <template v-else>
         <!-- Org card: who is inviting you, into what, as which role -->
         <div class="flex items-center gap-4 rounded-xl border border-input bg-muted/30 p-5">
@@ -89,7 +95,7 @@
           <form v-if="!invite.sso_enforced" class="flex flex-col gap-6" @submit.prevent="registerNew">
             <div>
               <label class="mb-2.5 block text-base font-semibold text-foreground">Full name</label>
-              <input v-model="fullName" type="text" required class="h-14 w-full rounded-xl border border-input bg-background px-4 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Jane Smith" />
+              <input v-model="fullName" type="text" required class="h-14 w-full rounded-xl border border-input bg-background px-4 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Full name" />
             </div>
             <div>
               <label class="mb-2.5 block text-base font-semibold text-foreground">Password</label>
@@ -126,7 +132,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-// loading | invalid | accept | wrong_account | sign_in | register
+// loading | invalid | load_failed | accept | wrong_account | sign_in | register
 const state = ref('loading')
 const invite = ref(null)
 const error = ref('')
@@ -153,8 +159,11 @@ async function loadInvite() {
     } else {
       state.value = data.user_exists ? 'sign_in' : 'register'
     }
-  } catch {
-    state.value = 'invalid'
+  } catch (e) {
+    // A bad, expired or revoked token answers 404; anything else (network,
+    // server error) says nothing about the invitation itself.
+    const status = e?.response?.status
+    state.value = status === 404 || status === 410 ? 'invalid' : 'load_failed'
   }
 }
 
@@ -218,7 +227,7 @@ async function registerNew() {
 function googleFromInvite() {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
   if (!clientId) {
-    error.value = 'Google sign-in is not configured on this deployment.'
+    error.value = "Google sign-in isn't available yet."
     return
   }
   const state_ = crypto.randomUUID()

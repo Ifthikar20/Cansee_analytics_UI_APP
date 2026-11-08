@@ -30,7 +30,7 @@
     <p>
       Current sub-processors include AWS (hosting), Anthropic, OpenAI, Google, and Perplexity
       (LLM probing), and SES / SendGrid (transactional email). A complete list is available on
-      request via <a href="mailto:privacy@cansee.ai">privacy@cansee.ai</a>.
+      request via <a :href="`mailto:${PRIVACY_EMAIL}`">{{ PRIVACY_EMAIL }}</a>.
     </p>
 
     <h2>6. Security measures</h2>
@@ -49,11 +49,12 @@
     <h2>8. Contact</h2>
     <p>
       To execute a counter-signed copy of this DPA, email
-      <a href="mailto:privacy@cansee.ai">privacy@cansee.ai</a>.
+      <a :href="`mailto:${PRIVACY_EMAIL}`">{{ PRIVACY_EMAIL }}</a>.
     </p>
   </InfoPage>
 </template>
 
 <script setup>
 import InfoPage from './InfoPage.vue'
+import { PRIVACY_EMAIL } from '@/constants/support'
 </script>

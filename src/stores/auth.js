@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import api from '@/api/client'
 import { describeSubscription } from '@/lib/plan'
+import { clearUserData as clearAgentUserData } from '@/lib/agent/storage'
 import { useAppStore } from '@/stores/app'
 
 // localStorage key for the access token. We persist it here so a
@@ -17,7 +18,6 @@ export const useAuthStore = defineStore('auth', () => {
     // first request after a reload already has Authorization set.
     const accessToken = ref(localStorage.getItem(ACCESS_TOKEN_KEY) || null)
     const user = ref(null)
-    const loading = ref(false)
     const session = ref(null)
 
     // Keep localStorage in sync with the in-memory token.
@@ -27,7 +27,7 @@ export const useAuthStore = defineStore('auth', () => {
     })
 
     const isAuthenticated = computed(() => !!accessToken.value)
-    // Plan words for every surface (sidebar badge, dropdown, Settings).
+    // Plan words for every surface (Settings, Add project, Billing).
     // Derived from the session's subscription block — never from
     // user.plan, which is denormalized and defaults to a paid tier.
     const planState = computed(() => describeSubscription(session.value?.subscription))
@@ -59,62 +59,32 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     async function login(email, password) {
-        loading.value = true
-        try {
-            // _silentError: the login page renders errors inline (incl. the
-            // structured sso_required panel) — a global toast would double up.
-            const { data: result } = await api.post('/auth/login/', { email, password }, { _silentError: true })
-            return adoptTokens(result)
-        } finally {
-            loading.value = false
-        }
+        // _silentError: the login page renders errors inline (incl. the
+        // structured sso_required panel) — a global toast would double up.
+        const { data: result } = await api.post('/auth/login/', { email, password }, { _silentError: true })
+        return adoptTokens(result)
     }
 
     async function googleLogin(code, redirectUri, inviteToken = '') {
-        loading.value = true
-        try {
-            const payload = { code, redirect_uri: redirectUri }
-            if (inviteToken) payload.invite_token = inviteToken
-            const { data: result } = await api.post('/auth/google/', payload, { _silentError: true })
-            return adoptTokens(result)
-        } finally {
-            loading.value = false
-        }
+        const payload = { code, redirect_uri: redirectUri }
+        if (inviteToken) payload.invite_token = inviteToken
+        const { data: result } = await api.post('/auth/google/', payload, { _silentError: true })
+        return adoptTokens(result)
     }
 
     async function microsoftLogin(code, redirectUri, inviteToken = '') {
-        loading.value = true
-        try {
-            const payload = { code, redirect_uri: redirectUri }
-            if (inviteToken) payload.invite_token = inviteToken
-            const { data: result } = await api.post('/auth/microsoft/', payload, { _silentError: true })
-            return adoptTokens(result)
-        } finally {
-            loading.value = false
-        }
+        const payload = { code, redirect_uri: redirectUri }
+        if (inviteToken) payload.invite_token = inviteToken
+        const { data: result } = await api.post('/auth/microsoft/', payload, { _silentError: true })
+        return adoptTokens(result)
     }
 
     // SAML lane: the backend finishes the IdP round trip itself and hands
     // the browser a one-time code on /auth/sso/complete. Exchanging it
     // answers login-shaped, so it adopts the session like every other lane.
     async function exchangeSsoCode(code) {
-        loading.value = true
-        try {
-            const { data: result } = await api.post('/auth/token-exchange/', { code }, { _silentError: true })
-            return adoptTokens(result)
-        } finally {
-            loading.value = false
-        }
-    }
-
-    async function register(payload) {
-        loading.value = true
-        try {
-            const { data } = await api.post('/auth/register/', payload)
-            return data
-        } finally {
-            loading.value = false
-        }
+        const { data: result } = await api.post('/auth/token-exchange/', { code }, { _silentError: true })
+        return adoptTokens(result)
     }
 
     async function logout() {
@@ -151,10 +121,7 @@ export const useAuthStore = defineStore('auth', () => {
             // them into the app store so gates like canCreateProject use
             // the real allowance instead of a hardcoded default.
             if (session.value?.limits) {
-                useAppStore().setPlanInfo(
-                    session.value.subscription?.plan || 'free',
-                    session.value.limits.projects ?? -1,
-                )
+                useAppStore().setProjectLimit(session.value.limits.projects ?? -1)
             }
             return session.value
         } catch {
@@ -187,19 +154,37 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
+    // Run after clearAuth (logout, expired session) so stores holding
+    // per-user data can drop it. Returns an unsubscribe function.
+    const clearAuthHooks = new Set()
+    function onClearAuth(fn) {
+        clearAuthHooks.add(fn)
+        return () => clearAuthHooks.delete(fn)
+    }
+
     function clearAuth() {
+        const uid = user.value?.id ?? null
         accessToken.value = null  // watcher above clears the localStorage copy
         user.value = null
         session.value = null
         localStorage.removeItem('cs-session')
         localStorage.removeItem(ACCESS_TOKEN_KEY)
+        // Agent workspace keys (last chat, drafts, pane tabs) of every user
+        // of this browser; the signed-in user may be unknown by now.
+        clearAgentUserData()
+        // The project list belongs to the user who just left. Without this
+        // the next sign-in in the same tab is routed to their projects
+        // (ensureWebsites and the route guard skip loading a non-empty list).
+        useAppStore().reset()
+        clearAuthHooks.forEach((fn) => {
+            try { fn(uid) } catch { /* a hook must not block sign-out */ }
+        })
     }
 
     return {
         accessToken,
         user,
         session,
-        loading,
         isAuthenticated,
         userInitials,
         planState,
@@ -212,11 +197,11 @@ export const useAuthStore = defineStore('auth', () => {
         googleLogin,
         microsoftLogin,
         exchangeSsoCode,
-        register,
         logout,
         fetchMe,
         fetchSession,
         refreshToken,
         clearAuth,
+        onClearAuth,
     }
 })

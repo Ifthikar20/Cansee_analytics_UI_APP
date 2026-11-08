@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Brand Ingestion page.
+ * Brand facts (Settings > Brand facts).
  *
  * The single place to feed the platform's understanding of the brand.
  * URLs, pasted markdown, and quick notes all become chunks in the RAG
@@ -11,12 +11,13 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import {
-  Bot, ChevronRight, Link2, FileText, Loader2, RefreshCw, StickyNote,
+  Bot, Link2, FileText, Loader2, RefreshCw, StickyNote,
   Globe, BookOpen, Package, FileCode, ShieldCheck,
 } from '@lucide/vue'
 
 import { useAppStore } from '@/stores/app'
 import { useToast } from '@/composables/useToast'
+import api from '@/api/client'
 import ragApi from '@/api/rag'
 
 import { Button } from '@/components/ui/button'
@@ -40,22 +41,42 @@ const inputTab = ref('url')
 
 // ── Cansee agent crawl consent ─────────────────────────────────────────
 const agentCrawl = ref({ enabled: false, enabled_at: null, last_seeded_at: null })
+// loading | ready | failed. The switch only works once the real value is
+// known, so a failed load never reads as "off".
+const agentCrawlState = ref('loading')
 const agentCrawlSaving = ref(false)
+
+// Each load gets a ticket; an answer whose ticket is no longer the latest
+// (the project switched, or a newer load started) is dropped, so another
+// project's state never lands under this one's name.
+let crawlTicket = 0
 
 async function loadAgentCrawl() {
   if (!websiteId.value) return
+  const ticket = ++crawlTicket
+  const id = websiteId.value
+  agentCrawlState.value = 'loading'
   try {
-    const res = await ragApi.getAgentCrawl(websiteId.value)
+    // Silent: a failure renders next to the switch.
+    const res = await api.get(`/rag/${id}/agent-crawl/`, { _silentError: true })
+    if (ticket !== crawlTicket || id !== websiteId.value) return
     if (res.data) agentCrawl.value = res.data
-  } catch { /* the section just shows its default off state */ }
+    agentCrawlState.value = 'ready'
+  } catch {
+    if (ticket !== crawlTicket || id !== websiteId.value) return
+    agentCrawlState.value = 'failed'
+  }
 }
 
 async function toggleAgentCrawl() {
-  if (agentCrawlSaving.value || !websiteId.value) return
+  if (agentCrawlSaving.value || !websiteId.value || agentCrawlState.value !== 'ready') return
   agentCrawlSaving.value = true
+  const id = websiteId.value
   const next = !agentCrawl.value.enabled
   try {
-    const res = await ragApi.setAgentCrawl(websiteId.value, next)
+    const res = await ragApi.setAgentCrawl(id, next)
+    // Switched projects while saving: the answer is the old project's.
+    if (id !== websiteId.value) return
     if (res.data) agentCrawl.value = res.data
     if (next && res.data?.seeded) {
       toast.success('Agent enabled — first crawl queued. New sources will appear below as pages are read.')
@@ -66,8 +87,8 @@ async function toggleAgentCrawl() {
     } else {
       toast.success('Agent crawling disabled')
     }
-  } catch (err) {
-    toast.error(err.displayMessage || 'Could not update the agent setting')
+  } catch {
+    /* the client interceptor toasts */
   } finally {
     agentCrawlSaving.value = false
   }
@@ -83,7 +104,10 @@ function fmtWhen(d) {
 const sources = ref([])
 const stats = ref({ total: 0, ready: 0, ingesting: 0, pending: 0, failed: 0 })
 const pageMeta = ref({ count: 0, next: null, previous: null })
-const listLoading = ref(false)
+// Starts true so the first paint is "Loading", not an empty list.
+const listLoading = ref(true)
+const listLoaded = ref(false)
+const listFailed = ref(false)
 
 const filters = ref({
   status: '',
@@ -110,8 +134,13 @@ watch([
 ], () => { page.value = 1; loadSources() })
 watch(page, () => loadSources())
 
+let listTicket = 0
+
 async function loadSources() {
   if (!websiteId.value) return
+  const ticket = ++listTicket
+  const id = websiteId.value
+  const current = () => ticket === listTicket && id === websiteId.value
   listLoading.value = true
   try {
     const params = { page: page.value, page_size: pageSize }
@@ -120,7 +149,9 @@ async function loadSources() {
     if (filters.value.domain) params.domain = filters.value.domain
     if (filters.value.search) params.search = filters.value.search
 
-    const res = await ragApi.listSources(websiteId.value, params)
+    // Silent: the list shows the failure inline.
+    const res = await api.get(`/rag/${id}/sources/`, { params, _silentError: true })
+    if (!current()) return
     sources.value = res.data || []
     const meta = res.meta || {}
     pageMeta.value = {
@@ -129,11 +160,13 @@ async function loadSources() {
       previous: meta.previous,
     }
     if (meta.stats) stats.value = meta.stats
+    listLoaded.value = true
+    listFailed.value = false
     syncIngestPolling()
   } catch {
-    toast.error('Failed to load brand sources')
+    if (current()) listFailed.value = true
   } finally {
-    listLoading.value = false
+    if (current()) listLoading.value = false
   }
 }
 
@@ -360,6 +393,15 @@ onMounted(async () => {
   }
 })
 watch(websiteId, async (v) => {
+  stopIngestPolling()
+  // Another project's list must never stand in for this one's.
+  sources.value = []
+  stats.value = { total: 0, ready: 0, ingesting: 0, pending: 0, failed: 0 }
+  listLoaded.value = false
+  listFailed.value = false
+  selectedSource.value = null
+  agentCrawl.value = { enabled: false, enabled_at: null, last_seeded_at: null }
+  agentCrawlState.value = 'loading'
   if (v) {
     page.value = 1
     loadAgentCrawl()
@@ -369,14 +411,16 @@ watch(websiteId, async (v) => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
+  <p v-if="!websiteId" class="text-sm text-muted-foreground">
+    Pick a project in the header to add brand facts.
+  </p>
+
+  <div v-else class="flex flex-col gap-6">
     <!-- ── Header / breadcrumb ── -->
     <div class="flex flex-wrap items-center justify-between gap-2">
-      <div class="flex items-center gap-2 text-sm text-muted-foreground">
-        <span class="font-medium text-foreground">AI Visibility</span>
-        <ChevronRight class="size-3.5" />
-        <span class="font-semibold text-foreground">Brand Ingestion</span>
-      </div>
+      <p class="max-w-xl text-sm text-muted-foreground">
+        What's true about your brand. Cansee checks every AI answer against these facts.
+      </p>
       <Button variant="ghost" @click="loadSources">
         <RefreshCw class="size-3.5" :class="{ 'animate-spin': listLoading }" />
         Refresh
@@ -400,7 +444,7 @@ watch(websiteId, async (v) => {
             type="button"
             role="switch"
             :aria-checked="agentCrawl.enabled"
-            :disabled="agentCrawlSaving"
+            :disabled="agentCrawlSaving || agentCrawlState !== 'ready'"
             class="mt-0.5 relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-60"
             :class="agentCrawl.enabled ? 'bg-[color:var(--chart-2)]' : 'bg-input'"
             @click="toggleAgentCrawl"
@@ -421,7 +465,11 @@ watch(websiteId, async (v) => {
               and Brand Security checks. Turning it off stops future agent crawls; nothing
               already ingested is removed.
             </p>
-            <p v-if="agentCrawl.enabled && agentCrawl.last_seeded_at" class="mt-1.5 text-xs text-muted-foreground">
+            <p v-if="agentCrawlState === 'failed'" class="mt-1.5 text-xs text-destructive">
+              Couldn't load this setting.
+              <button type="button" class="font-medium text-foreground underline underline-offset-2" @click="loadAgentCrawl">Try again</button>
+            </p>
+            <p v-else-if="agentCrawl.enabled && agentCrawl.last_seeded_at" class="mt-1.5 text-xs text-muted-foreground">
               <span class="font-medium text-foreground">Last agent crawl queued:</span>
               {{ fmtWhen(agentCrawl.last_seeded_at) }}
             </p>
@@ -646,8 +694,7 @@ watch(websiteId, async (v) => {
     >
       <Loader2 class="size-4 animate-spin text-muted-foreground" />
       <div class="text-sm text-foreground">
-        {{ activeIngestCount }} source{{ activeIngestCount === 1 ? '' : 's' }} being ingested —
-        chunked, embedded and added to your brand knowledge.
+        {{ activeIngestCount }} source{{ activeIngestCount === 1 ? '' : 's' }} being read and added to your brand knowledge.
         <span class="text-muted-foreground">Statuses below refresh automatically.</span>
       </div>
     </div>
@@ -658,7 +705,7 @@ watch(websiteId, async (v) => {
         <div class="mb-4">
           <h2 class="text-base font-bold text-foreground">Your brand knowledge</h2>
           <p class="text-sm text-muted-foreground">
-            {{ stats.total }} source{{ stats.total === 1 ? '' : 's' }} indexed.
+            <template v-if="listLoaded">{{ stats.total }} source{{ stats.total === 1 ? '' : 's' }} indexed.</template>
             Click a row to inspect its content or test a query against it.
           </p>
         </div>
@@ -678,6 +725,11 @@ watch(websiteId, async (v) => {
             <Loader2 class="size-4 animate-spin" /> Loading sources…
           </div>
 
+          <div v-else-if="listFailed && !sources.length" class="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+            We couldn't load your brand facts.
+            <Button variant="outline" size="sm" @click="loadSources">Try again</Button>
+          </div>
+
           <div v-else-if="!sources.length" class="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
             <template v-if="stats.total === 0">
               Nothing here yet. Add a URL, paste content, or save a note above — it becomes
@@ -689,6 +741,10 @@ watch(websiteId, async (v) => {
           </div>
 
           <div v-else class="flex flex-col gap-3">
+            <p v-if="listFailed" class="text-sm text-destructive">
+              We couldn't refresh your brand facts.
+              <button type="button" class="font-medium text-foreground underline underline-offset-2" @click="loadSources">Try again</button>
+            </p>
             <SourceGroup
               v-for="group in groupedSources"
               :key="group.host"

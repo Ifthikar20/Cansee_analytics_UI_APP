@@ -1,5 +1,7 @@
 # ── Stage 1: Build Vue app ──
-FROM node:20-alpine AS build
+# npm run build runs scripts/prerender-blog.mjs, which uses jsdom; jsdom
+# needs Node ^22.22.2 (it calls Promise.withResolvers, absent on Node 20).
+FROM node:22.23-alpine AS build
 
 WORKDIR /app
 

@@ -1,54 +1,101 @@
 <script setup>
+// The sheet's panel and overlay, teleported to <body>. side: 'right' (the
+// default) or 'left'. Full height; min(420px, 100vw - 48px) wide, the full
+// width at 640px and below. It sits over the board panel and the agent
+// drawer (z 90/91) and under toasts and the feedback dialog.
 import { computed } from 'vue'
-import {
-  DialogContent, DialogOverlay, DialogPortal, DialogClose,
-  useForwardPropsEmits,
-} from 'reka-ui'
-import { X } from '@lucide/vue'
+import { DialogContent, DialogOverlay, DialogPortal, useForwardPropsEmits } from 'reka-ui'
 import { cn } from '@/lib/utils'
 
 const props = defineProps({
-  side: { type: String, default: 'right' },
+  side: { type: String, default: 'right', validator: (v) => v === 'right' || v === 'left' },
   class: { type: null, default: '' },
+  forceMount: { type: Boolean, default: undefined },
+  trapFocus: { type: Boolean, default: undefined },
+  disableOutsidePointerEvents: { type: Boolean, default: undefined },
 })
 const emits = defineEmits([
-  'escapeKeyDown', 'pointerDownOutside', 'focusOutside', 'interactOutside', 'closeAutoFocus', 'openAutoFocus',
+  'escapeKeyDown',
+  'pointerDownOutside',
+  'focusOutside',
+  'interactOutside',
+  'openAutoFocus',
+  'closeAutoFocus',
 ])
 
-const delegated = computed(() => {
-  const { class: _, side: __, ...rest } = props
+const contentProps = computed(() => {
+  // eslint-disable-next-line no-unused-vars
+  const { side, class: _class, ...rest } = props
   return rest
 })
-const forwarded = useForwardPropsEmits(delegated, emits)
-
-const sideClasses = {
-  top: 'inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
-  bottom: 'inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
-  left: 'inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm',
-  right: 'inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm',
-}
+const forwarded = useForwardPropsEmits(contentProps, emits)
 </script>
 
 <template>
   <DialogPortal>
-    <DialogOverlay
-      class="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-    />
+    <DialogOverlay class="sheet-overlay fixed inset-0 z-[95] bg-black/40" />
     <DialogContent
       v-bind="forwarded"
-      :class="cn(
-        'fixed z-50 flex flex-col gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out',
-        sideClasses[side],
-        props.class,
-      )"
+      :data-side="side"
+      :class="
+        cn(
+          'sheet-content fixed top-0 bottom-0 z-[96] flex h-dvh flex-col border-border bg-card text-card-foreground shadow-2xl outline-none',
+          side === 'left' ? 'left-0 border-r' : 'right-0 border-l',
+          props.class,
+        )
+      "
     >
       <slot />
-      <DialogClose
-        class="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring"
-      >
-        <X class="size-4" />
-        <span class="sr-only">Close</span>
-      </DialogClose>
     </DialogContent>
   </DialogPortal>
 </template>
+
+<style>
+/* Unscoped: the panel is teleported, and these are its only rules. */
+.sheet-content {
+  width: min(420px, calc(100vw - 48px));
+}
+
+@media (max-width: 640px) {
+  .sheet-content {
+    width: 100vw;
+  }
+}
+
+.sheet-content[data-state='open'][data-side='right'] {
+  animation: sheet-in-right 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sheet-content[data-state='open'][data-side='left'] {
+  animation: sheet-in-left 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sheet-overlay[data-state='open'] {
+  animation: sheet-fade 180ms ease-out;
+}
+
+@keyframes sheet-in-right {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes sheet-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-content[data-state='open'],
+  .sheet-overlay[data-state='open'] {
+    animation: none;
+  }
+}
+</style>

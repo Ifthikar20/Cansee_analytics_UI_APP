@@ -13,16 +13,21 @@
       <aside class="ss-nav" aria-label="Settings sections">
         <template v-for="group in NAV" :key="group.label">
           <p class="ss-nav-group">{{ group.label }}</p>
-          <router-link
+          <AgTooltip
             v-for="item in visibleItems(group)" :key="item.key"
-            :to="item.to"
-            class="ss-nav-item"
-            :class="{ 'is-active': active === item.key }"
-            :aria-current="active === item.key ? 'page' : null"
+            :text="TIPS.settings.nav[item.key] || ''"
+            side="right"
           >
-            <NavIcon :paths="item.icon" :size="16" class="ss-nav-icon" />
-            <span>{{ item.label }}</span>
-          </router-link>
+            <router-link
+              :to="item.to"
+              class="ss-nav-item"
+              :class="{ 'is-active': active === item.key }"
+              :aria-current="active === item.key ? 'page' : null"
+            >
+              <NavIcon :paths="item.icon" :size="16" class="ss-nav-icon" />
+              <span>{{ item.label }}</span>
+            </router-link>
+          </AgTooltip>
         </template>
       </aside>
 
@@ -76,9 +81,11 @@
 import { computed, h, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import AgTooltip from '@/components/agent/common/AgTooltip.vue'
+import { TIPS } from '@/lib/help/tips'
 
 const props = defineProps({
-  /** Key of the active nav item: account | subscription | notifications | usage | appearance | contact | team | domains */
+  /** Key of the active nav item: account | subscription | notifications | project | autopilot | connections | brand-facts | usage | command-center | appearance | contact | team | domains */
   active: { type: String, required: true },
 })
 
@@ -129,12 +136,51 @@ const NAV_BASE = [
     ],
   },
   {
+    // The active project's own settings. These pages read the project
+    // from the header switcher (appStore.activeWebsite).
+    label: 'Project',
+    items: [
+      {
+        key: 'project', label: 'Project',
+        to: { path: '/settings/project' },
+        icon: [
+          'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z',
+          'M2 12h20',
+          'M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z',
+        ],
+      },
+      {
+        key: 'autopilot', label: 'Autopilot',
+        to: { path: '/settings/autopilot' },
+        icon: ['M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z', 'M12 6v6l4 2'],
+      },
+      {
+        key: 'connections', label: 'Connections',
+        to: { path: '/settings/connections' },
+        icon: ['M9 2v6', 'M15 2v6', 'M6 8h12v4a6 6 0 0 1-12 0z', 'M12 18v4'],
+      },
+      {
+        key: 'brand-facts', label: 'Brand facts',
+        to: { path: '/settings/brand-facts' },
+        icon: [
+          'M4 19.5A2.5 2.5 0 0 1 6.5 17H20',
+          'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z',
+        ],
+      },
+    ],
+  },
+  {
     label: 'Application',
     items: [
       {
         key: 'usage', label: 'AI Usage',
         to: { path: '/settings', query: { section: 'usage' } },
         icon: ['M22 12h-4l-3 9L9 3l-3 9H2'],
+      },
+      {
+        key: 'command-center', label: 'Usage dashboard',
+        to: { name: 'settings-command-center' },
+        icon: ['m12 14 4-4', 'M3.34 19a10 10 0 1 1 17.32 0'],
       },
       {
         key: 'appearance', label: 'Appearance',

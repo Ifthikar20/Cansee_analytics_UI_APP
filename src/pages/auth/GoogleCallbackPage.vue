@@ -32,9 +32,9 @@
           workspace account, but {{ domain }} isn't set up on Cansee yet.
         </p>
         <div class="mt-2 flex flex-wrap items-center justify-center gap-3">
-          <router-link :to="`/contact?domain=${domain}`" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+          <a :href="teamHref" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
             Talk to us about your team
-          </router-link>
+          </a>
           <router-link to="/login" class="text-sm font-medium underline">Back to sign in</router-link>
         </div>
       </template>
@@ -44,13 +44,12 @@
         <h2 class="text-xl font-semibold text-foreground">You need a Cansee account first</h2>
         <p class="max-w-md text-base text-muted-foreground">{{ message }}</p>
         <p class="max-w-md text-sm text-muted-foreground">
-          Account creation is currently invite-only. Reach out through the contact page
-          to request access and we will set you up.
+          To request access, email us at {{ SALES_EMAIL }}.
         </p>
         <div class="mt-2 flex flex-wrap items-center justify-center gap-3">
-          <router-link to="/contact" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+          <a :href="accessHref" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
             Request access
-          </router-link>
+          </a>
           <router-link to="/login" class="text-sm font-medium underline">Back to sign in</router-link>
         </div>
       </template>
@@ -65,10 +64,11 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AuthLayout from '@/layouts/AuthLayout.vue'
 import { useAuthStore } from '@/stores/auth'
+import { SALES_EMAIL } from '@/constants/support'
 
 const route = useRoute()
 const router = useRouter()
@@ -79,6 +79,11 @@ const state = ref('working')
 const message = ref('')
 const orgName = ref('')
 const domain = ref('')
+
+const accessHref = `mailto:${SALES_EMAIL}?subject=${encodeURIComponent('Cansee access request')}`
+const teamHref = computed(() =>
+  `mailto:${SALES_EMAIL}?subject=${encodeURIComponent(`Cansee for ${domain.value || 'our team'}`)}`,
+)
 
 function fail(text) {
   state.value = 'failed'

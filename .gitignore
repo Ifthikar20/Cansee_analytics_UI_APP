@@ -22,15 +22,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.pem
-*.pem
 
+# Per-machine Claude Code settings
+.claude/settings.local.json
 
-.env
-*.env
 # Environment and secrets
 .env
+*.env
 .env.*
 !.env.example
 *.pem
 *.key
+
+# Tests live in https://github.com/Ifthikar20/CanSee_analytics_Test under ui/.
+# Its scripts/sync-ui-tests.sh copies them in; ignore the copies here.
+__tests__/
+*.spec.js
+/src/test/

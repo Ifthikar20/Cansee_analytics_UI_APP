@@ -2,14 +2,8 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 import websitesApi from '@/api/websites'
-
-/* ── Helper: wrap a protected route in AppLayout ── */
-const protect = (path, name, component, props = false) => ({
-    path,
-    component: () => import('@/layouts/AppLayout.vue'),
-    meta: { requiresAuth: true },
-    children: [{ path: '', name, component, props }]
-})
+import { agentRoutes } from './agentRoutes'
+import { analyticsRoutes, settingsRoutes } from './analyticsRoutes'
 
 const routes = [
     /* ── Public Landing Page ── */
@@ -78,39 +72,43 @@ const routes = [
         meta: { public: true }
     },
     {
-        path: '/contact',
-        name: 'contact',
-        component: () => import('@/pages/info/ContactPage.vue'),
-        meta: { public: true }
-    },
-    {
         path: '/demo',
         name: 'demo',
         component: () => import('@/pages/info/BookDemoPage.vue'),
         meta: { public: true }
     },
     {
-        path: '/blog',
-        name: 'blog',
-        component: () => import('@/pages/info/BlogPage.vue'),
-        meta: { public: true }
-    },
-    {
-        path: '/changelog',
-        name: 'changelog',
-        component: () => import('@/pages/info/ChangelogPage.vue'),
-        meta: { public: true }
-    },
-    {
-        path: '/status',
-        name: 'status',
-        component: () => import('@/pages/info/StatusPage.vue'),
+        path: '/contact',
+        name: 'contact',
+        component: () => import('@/pages/info/ContactPage.vue'),
         meta: { public: true }
     },
     {
         path: '/docs',
         name: 'docs',
         component: () => import('@/pages/DocsPage.vue'),
+        meta: { public: true }
+    },
+    /* ── Blog (public). Posts are src/content/blog/*.md; the build also
+       writes static HTML for these addresses (scripts/prerender-blog.mjs). ── */
+    {
+        path: '/blog',
+        name: 'blog',
+        component: () => import('@/pages/blog/BlogIndexPage.vue'),
+        meta: { public: true }
+    },
+    {
+        path: '/blog/:slug',
+        name: 'blog-post',
+        component: () => import('@/pages/blog/BlogPostPage.vue'),
+        props: true,
+        meta: { public: true }
+    },
+    /* ── The pricing window (public: the two plans, signed out too) ── */
+    {
+        path: '/pricing',
+        name: 'pricing',
+        component: () => import('@/pages/PricingPage.vue'),
         meta: { public: true }
     },
 
@@ -190,78 +188,70 @@ const routes = [
         component: () => import('@/pages/auth/InviteAcceptPage.vue'),
         meta: { layout: 'auth', public: true }
     },
-    {
-        path: '/verify-email',
-        name: 'verify-email',
-        component: () => import('@/pages/auth/VerifyEmailPage.vue'),
-        meta: { layout: 'auth', guest: true }
-    },
 
-    /* ── App (protected — each uses AppLayout) ── */
-    protect('/dashboard', 'dashboard', () => import('@/pages/DashboardPage.vue')),
-    protect('/websites', 'websites', () => import('@/pages/WebsitesListPage.vue')),
-    protect('/websites/:id', 'website-detail', () => import('@/pages/WebsiteDetailPage.vue'), true),
-    protect('/analytics/:websiteId', 'analytics', () => import('@/pages/AnalyticsPage.vue'), true),
-    // The LLM Dashboard page was removed — its Overview block duplicated the
-    // main Dashboard, and scheduling moved there. Bare /llm-ranking/:id now
-    // redirects to Prompts, the most useful surviving child page.
-    {
-      path: '/llm-ranking/:websiteId',
-      redirect: to => ({ path: `/llm-ranking/${to.params.websiteId}/prompts` }),
-    },
-    protect('/llm-ranking/:websiteId/prompts', 'prompt-library', () => import('@/pages/PromptLibraryPage.vue'), true),
-    protect('/llm-ranking/:websiteId/prompts/:promptId/detail', 'prompt-detail', () => import('@/pages/PromptDetailPage.vue'), true),
-    // /saved-prompts is preserved as a redirect to the Prompt Library 'Saved' tab
-    {
-        path: '/llm-ranking/:websiteId/saved-prompts',
-        redirect: to => ({ path: `/llm-ranking/${to.params.websiteId}/prompts`, query: { tab: 'saved' } }),
-    },
-    protect('/llm-ranking/:websiteId/urls', 'sources-urls', () => import('@/pages/SourcesUrlsPage.vue'), true),
-    protect('/llm-ranking/:websiteId/urls/detail', 'sources-url-detail', () => import('@/pages/SourcesUrlDetailPage.vue'), true),
-    protect('/llm-ranking/:websiteId/brand-research', 'brand-research', () => import('@/pages/BrandResearchPage.vue'), true),
-    // Ask Cansee. The conversation id is optional: /ask is a new thread,
-    // /ask/<id> reopens a stored one, so a thread survives reload and is
-    // linkable.
-    protect('/ask/:conversationId?', 'ask-cansee', () => import('@/pages/AskCanseePage.vue'), true),
-    // Two generations of old paths kept as redirects (bookmarks, stale OAuth
-    // returns). search-performance was the GSC-era name, search-insights the
-    // one before the Brand Research rename. Both point at the live path
-    // directly rather than chaining, so neither costs an extra hop.
-    {
-        path: '/llm-ranking/:websiteId/search-insights',
-        redirect: to => ({ path: `/llm-ranking/${to.params.websiteId}/brand-research`, query: to.query }),
-    },
-    {
-        path: '/llm-ranking/:websiteId/search-performance',
-        redirect: to => ({ path: `/llm-ranking/${to.params.websiteId}/brand-research`, query: to.query }),
-    },
-    protect('/llm-ranking/:websiteId/brand-security', 'brand-security', () => import('@/pages/BrandSecurityPage.vue'), true),
-    // Benchmarks was absorbed into Brand Input (its URL/markdown intake now
-    // feeds the RAG knowledge base there); keep the path as a redirect.
-    {
-        path: '/llm-ranking/:websiteId/benchmarks',
-        redirect: to => ({ path: `/llm-ranking/${to.params.websiteId}/brand-input` }),
-    },
-    protect('/llm-ranking/:websiteId/brand-input', 'brand-input', () => import('@/pages/BrandInputPage.vue'), true),
-    // Old brand-vault path redirects so bookmarks keep working.
-    {
-        path: '/llm-ranking/:websiteId/brand-vault',
-        redirect: to => ({ path: `/llm-ranking/${to.params.websiteId}/brand-security`, query: to.query }),
-    },
-    // Legacy /app-onboarding redirects to the dashboard. The
-    // onboarding flow is now a modal overlay rendered by
-    // DashboardPage when the session marks the user as needing
-    // onboarding.
-    { path: '/app-onboarding', redirect: { name: 'dashboard' } },
+    /* ── App (signed in; every page renders in AppShell, under the header) ──
+       Analytics (the board, its /dashboard entry and the redirects of the
+       old analytics tabs) and Settings, in analyticsRoutes.js. */
+    ...analyticsRoutes,
+    ...settingsRoutes,
     {
         path: '/paywall',
         name: 'paywall',
         component: () => import('@/pages/PaywallPage.vue'),
         meta: { requiresAuth: true, layout: 'auth' }
     },
-    protect('/app/integrations', 'integrations', () => import('@/pages/IntegrationsPage.vue')),
-    protect('/billing', 'billing', () => import('@/pages/BillingPage.vue')),
-    protect('/settings', 'settings', () => import('@/pages/SettingsPage.vue')),
+    /* ── The daily text's link: {FRONTEND_URL}/r/{code} opens the project's
+       Prompt ranking. Signed out, it goes through login and back. ── */
+    {
+        path: '/r/:code',
+        name: 'run-link',
+        component: () => import('@/pages/RunLinkPage.vue'),
+        meta: { requiresAuth: true }
+    },
+
+    /* ── Agent workspace (the same AppShell; see agentRoutes.js) ── */
+    ...agentRoutes,
+
+    /* ── Old addresses (bookmarks, emails, OAuth returns) ──
+       Every page the redesign removed lands somewhere sensible. */
+    { path: '/websites', redirect: { name: 'dashboard' } },
+    // Google Analytics' OAuth return used to land here (?ga4=...); links
+    // issued before it moved to Connections still arrive this way.
+    {
+        path: '/websites/:id',
+        redirect: (to) =>
+            to.query.ga4
+                ? { name: 'settings-connections', query: { ...to.query, website: to.params.id } }
+                : { name: 'settings-project' },
+    },
+    { path: '/analytics/:websiteId', redirect: (to) => ({ name: 'analytics', params: { websiteId: to.params.websiteId } }) },
+    // The old Ask Cansee chat is now the agent workspace.
+    { path: '/ask/:conversationId?', redirect: { name: 'agent', params: {} } },
+    { path: '/app-onboarding', redirect: { name: 'dashboard' } },
+    // Search Console's OAuth return used to land here; keep its ?gsc= query.
+    { path: '/app/integrations', redirect: to => ({ name: 'settings-connections', query: to.query }) },
+    {
+        path: '/llm-ranking/:websiteId/prompts/:promptId/detail',
+        redirect: to => ({ name: 'prompt', params: { websiteId: to.params.websiteId, promptId: to.params.promptId } }),
+    },
+    {
+        path: '/llm-ranking/:websiteId/urls',
+        redirect: to => ({ name: 'sources-urls', params: { websiteId: to.params.websiteId }, query: to.query }),
+    },
+    {
+        path: '/llm-ranking/:websiteId/urls/detail',
+        redirect: to => ({ name: 'sources-url-detail', params: { websiteId: to.params.websiteId }, query: to.query }),
+    },
+    { path: '/llm-ranking/:websiteId/brand-input', redirect: { name: 'settings-brand-facts' } },
+    { path: '/llm-ranking/:websiteId/benchmarks', redirect: { name: 'settings-brand-facts' } },
+    // Prompt library, brand research, brand security and the rest of the
+    // old AI Visibility section all fold into the project's board. Only
+    // websiteId is passed on: to.params also holds `rest`, which the board
+    // route has no place for (vue-router would drop it with a warning).
+    {
+        path: '/llm-ranking/:websiteId/:rest(.*)*',
+        redirect: (to) => ({ name: 'analytics', params: { websiteId: to.params.websiteId } }),
+    },
 
     /* ── 404 ── */
     {
@@ -280,7 +270,12 @@ const router = createRouter({
         // them. vue-router ignores scroll-margin-top, so read it off the
         // target and pass it as the offset — that keeps the clearance
         // owned by the page's CSS rather than hard-coded here.
-        const target = to.hash && document.querySelector(to.hash)
+        let target = null
+        try {
+            target = to.hash ? document.querySelector(to.hash) : null
+        } catch {
+            // Not a valid selector (say, an id starting with a digit): no anchor.
+        }
         if (target) {
             const offset = parseFloat(getComputedStyle(target).scrollMarginTop) || 0
             return { el: to.hash, top: offset, behavior: 'smooth' }
@@ -300,8 +295,8 @@ let sessionRestored = false
 // about the new subscription — bouncing that load to /paywall would
 // drop the checkout_id and strand the activation.
 const GATE_EXEMPT = new Set([
-    'login', 'register', 'forgot-password', 'verify-email',
-    'landing', 'terms', 'privacy', 'support',
+    'login', 'register', 'forgot-password',
+    'landing', 'terms', 'privacy', 'support', 'pricing',
     'dashboard', 'paywall', 'billing', 'not-found',
 ])
 
@@ -382,39 +377,37 @@ router.beforeEach(async (to, from, next) => {
         }
     }
 
-    // Guard: project-specific pages require an active project. On a cold
-    // load (hard refresh, shared deep link) the store starts empty, so
-    // load the website list here and derive the active website from the
-    // URL instead of bouncing every deep link to /websites. The URL wins
-    // over a stale store selection so a link to website B behaves the
-    // same whether or not website A was active.
-    const projectPages = ['analytics', 'llm-ranking', 'website-detail', 'brand-research', 'sources-urls', 'prompt-library', 'brand-security', 'brand-input']
-    const needsProject = projectPages.includes(to.name) || !!to.params.websiteId
-    if (needsProject && auth.isAuthenticated) {
+    // Guard: a page addressed by :websiteId follows the URL, not a stale
+    // store selection, so a shared link to project B behaves the same
+    // whether or not project A was active. On a cold load (hard refresh,
+    // deep link) the store is empty, so load the list first. The project
+    // becomes active in afterEach, once the navigation is confirmed.
+    if (to.params.websiteId && auth.isAuthenticated) {
         const app = useAppStore()
         if (!app.websites.length) {
             try {
                 const { data } = await websitesApi.list({ _silentError: true })
                 app.setWebsites(data || [])
-            } catch { /* fall through to the empty-store bounce below */ }
+            } catch { /* fall through to the bounce below */ }
         }
-        // website-detail names its param `id`, not `websiteId` — without
-        // this the sidebar switcher never follows /websites/<id> pages.
-        const wid = to.params.websiteId
-            || (to.name === 'website-detail' ? to.params.id : null)
-        if (wid) {
-            const target = app.websites.find(w => String(w.id) === String(wid))
-            if (!target) {
-                return next({ name: 'websites' })
-            }
-            app.setActiveWebsite(target)
-        }
-        if (!app.activeWebsite) {
-            return next({ name: 'websites' })
+        const target = app.websites.find(w => String(w.id) === String(to.params.websiteId))
+        if (!target) {
+            return next({ name: 'dashboard' })
         }
     }
 
     next()
+})
+
+// Make the URL's project active only after the navigation went through.
+// Guards that run after beforeEach (a page's beforeRouteUpdate with
+// unsaved edits) can still cancel it, and a cancelled switch must leave
+// the page's own project active.
+router.afterEach((to, from, failure) => {
+    if (failure || !to.params.websiteId) return
+    const app = useAppStore()
+    const target = app.websites.find(w => String(w.id) === String(to.params.websiteId))
+    if (target) app.setActiveWebsite(target)
 })
 
 export default router

@@ -48,9 +48,8 @@ const tooltip = computed(() => {
   const s = props.source
   const status = String(s.status || '').toLowerCase()
   if (status === 'ready') {
-    const parts = [`${s.chunk_count || 0} chunks embedded`]
+    const parts = [`${s.chunk_count || 0} passages`]
     if (s.last_ingested_at) parts.push(`updated ${timeAgo(s.last_ingested_at)}`)
-    parts.push('Brand Security agents can now reference this source.')
     return parts.join(' · ')
   }
   if (status === 'ingesting') return 'Fetching page, chunking text, generating embeddings.'

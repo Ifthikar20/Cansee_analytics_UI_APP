@@ -21,43 +21,39 @@
           <h1 class="sp-title">How can we help?</h1>
           <p class="sp-sub">
             Stuck during setup, a billing question, or something that just
-            looks wrong — write to us and a human will get back to you,
-            usually within one business day.
+            looks wrong? Search the help center, or write to us.
           </p>
 
-          <a class="sp-cta" :href="`mailto:${SUPPORT_EMAIL}`">
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="1.5" y="3" width="13" height="10" rx="1.8"/>
-              <path d="M2 4l6 5 6-5"/>
-            </svg>
-            <span>{{ SUPPORT_EMAIL }}</span>
-          </a>
+          <div class="sp-actions">
+            <a class="sp-cta" :href="mailHref">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="1.5" y="3" width="13" height="10" rx="1.8"/>
+                <path d="M2 4l6 5 6-5"/>
+              </svg>
+              <span>{{ SUPPORT_EMAIL }}</span>
+            </a>
+            <button type="button" class="sp-secondary" aria-haspopup="dialog" @click="help.open()">
+              Open help center
+            </button>
+          </div>
 
-          <dl class="sp-faq">
-            <div class="sp-faq-item">
-              <dt>I paid, but I still see the plans screen.</dt>
-              <dd>
-                Press the trial button once more — we check your payment
-                provider record and restore an already-active subscription
-                automatically.
-              </dd>
-            </div>
-            <div class="sp-faq-item">
-              <dt>I want to change or cancel my plan.</dt>
-              <dd>
-                Go to Billing and open Manage billing — the secure customer
-                portal handles plan changes, cancellation, and invoices.
-              </dd>
-            </div>
-            <div class="sp-faq-item">
-              <dt>The setup scan got my business details wrong.</dt>
-              <dd>
-                Everything from onboarding is editable afterwards — your
-                description in Settings, and the measured prompts in the
-                Prompt Library.
-              </dd>
-            </div>
-          </dl>
+          <section class="sp-faq" aria-labelledby="sp-faq-title">
+            <h2 id="sp-faq-title" class="sp-faq-title">Common questions</h2>
+            <dl class="sp-faq-list">
+              <div v-for="faq in faqs" :key="faq.id" class="sp-faq-item">
+                <dt>{{ faq.q }}</dt>
+                <dd>
+                  <p v-for="(para, i) in faq.a" :key="i">{{ para }}</p>
+                  <ul v-if="faq.list.length">
+                    <li v-for="(line, i) in faq.list" :key="i">{{ line }}</li>
+                  </ul>
+                </dd>
+              </div>
+            </dl>
+            <button type="button" class="sp-more" aria-haspopup="dialog" @click="help.open()">
+              See all questions
+            </button>
+          </section>
         </div>
       </div>
     </main>
@@ -69,32 +65,58 @@
         <a href="/privacy" target="_blank" rel="noopener">Privacy</a>
       </nav>
     </footer>
+
+    <HelpDrawer />
   </div>
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
-import { SUPPORT_EMAIL } from '@/constants/support'
-
+// The public Support page (the login, onboarding and paywall funnel links
+// here, and so does the help drawer): email, the help center, and the
+// questions people ask most. It sits outside AppShell, so it mounts its own
+// help drawer. ?faq=<id> opens the drawer at that question.
+import { onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { SUPPORT_EMAIL, SUPPORT_SUBJECT } from '@/constants/support'
+import { faqById, featuredFaqs } from '@/lib/help/faq'
+import { useAuthStore } from '@/stores/auth'
+import { useHelpStore } from '@/stores/help'
+import { useHelpShortcut } from '@/composables/useHelpShortcut'
+import HelpDrawer from '@/components/help/HelpDrawer.vue'
 import WatercolorBackdrop from '@/components/onboarding/WatercolorBackdrop.vue'
 
+const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
+const help = useHelpStore()
 
+useHelpShortcut()
+
+const faqs = featuredFaqs('support')
+const mailHref = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(SUPPORT_SUBJECT)}`
+
+onMounted(() => {
+  const id = Array.isArray(route.query.faq) ? route.query.faq[0] : route.query.faq
+  if (id && faqById(id)) help.open({ faqId: id })
+})
+
+// The router records the in-app page before this one. Without one (a new
+// tab from the app's help, a link from elsewhere) a signed-in user goes to
+// the app and anyone else to the home page.
 function goBack() {
-  // Came from somewhere in the app (funnel footer, auth page) — return
-  // there; a cold direct visit falls back to the landing page.
-  if (window.history.length > 1) router.back()
-  else router.push('/')
+  if (window.history.state?.back) router.back()
+  else router.push(auth.isAuthenticated ? '/dashboard' : '/')
 }
 </script>
 
 <style scoped>
 .sp {
-  --sp-bg: #ffffff;
-  --sp-fg: #0a0a0a;
-  --sp-muted: #5d5d5d;
-  --sp-border: rgba(10, 10, 10, 0.10);
-  --sp-surface: #fafafa;
+  /* The app's tokens, so the card follows the light and dark theme. */
+  --sp-bg: var(--card);
+  --sp-fg: var(--foreground);
+  --sp-muted: var(--muted-foreground);
+  --sp-border: var(--border);
+  --sp-surface: var(--muted);
   --sp-accent: #ff6a2c;
   --sp-accent-soft: rgba(255, 106, 44, 0.10);
   --sp-spring: cubic-bezier(0.22, 1, 0.36, 1);
@@ -172,6 +194,8 @@ function goBack() {
 .sp-card {
   width: min(560px, 100%);
   background: var(--sp-bg);
+  color: var(--sp-fg);
+  border: 1px solid var(--sp-border);
   border-radius: 24px;
   box-shadow:
     0 30px 80px rgba(0, 0, 0, 0.35),
@@ -241,8 +265,49 @@ function goBack() {
   box-shadow: 0 10px 24px rgba(255, 106, 44, 0.35);
 }
 
+.sp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.sp-secondary,
+.sp-more {
+  display: inline-flex;
+  align-items: center;
+  padding: 11px 18px;
+  border: 1px solid var(--sp-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sp-fg);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.sp-secondary:hover,
+.sp-more:hover { background: var(--sp-surface); }
+.sp-more {
+  margin-top: 16px;
+  padding: 8px 14px;
+  font-size: 13px;
+}
 .sp-faq {
   margin: 26px 0 0;
+  padding: 0;
+}
+.sp-faq-title {
+  margin: 0 0 8px;
+  font-family: var(--sp-label-font);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sp-muted);
+}
+.sp-faq-list {
+  margin: 0;
   padding: 0;
 }
 .sp-faq-item {
@@ -261,6 +326,14 @@ function goBack() {
   color: var(--sp-muted);
   margin: 0;
 }
+.sp-faq-item dd p { margin: 0 0 6px; }
+.sp-faq-item dd p:last-child { margin-bottom: 0; }
+.sp-faq-item dd ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+.sp-faq-item dd li { margin: 0 0 3px; }
 
 .sp-footer {
   position: relative;

@@ -24,6 +24,10 @@
     <div v-if="orgStore.domainsLoading && !orgStore.domains.length" class="od-loading">
       Loading domains…
     </div>
+    <div v-else-if="domainsFailed && !orgStore.domains.length" class="od-failed">
+      <p class="od-empty">We couldn't load your domains.</p>
+      <Button variant="outline" size="sm" class="od-btn" @click="loadDomainList">Try again</Button>
+    </div>
     <p v-else-if="!orgStore.domains.length" class="od-empty">
       No domains yet. Claim the domain your team's email addresses use.
     </p>
@@ -416,9 +420,19 @@ async function copyText(text) {
   }
 }
 
-onMounted(() => {
-  orgStore.loadDomains()
-})
+// ── Loading ──
+const domainsFailed = ref(false)
+
+async function loadDomainList() {
+  domainsFailed.value = false
+  try {
+    await orgStore.loadDomains()
+  } catch {
+    domainsFailed.value = true
+  }
+}
+
+onMounted(loadDomainList)
 </script>
 
 <style scoped>
@@ -462,6 +476,12 @@ onMounted(() => {
   margin: 16px 0 0;
   font-size: 13px;
   color: var(--muted-foreground);
+}
+.od-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 /* ── Domain rows ── */
