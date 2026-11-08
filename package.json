@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-blog.mjs",
+    "prerender": "node scripts/prerender-blog.mjs",
     "preview": "vite preview",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
+    "lint": "eslint src scripts",
+    "lint:fix": "eslint src scripts --fix",
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write src/"

@@ -34,9 +34,10 @@ Public sign-up is closed, so local accounts are created from the API repository
 | Command | What it does |
 |---|---|
 | `npm run dev` | Dev server with hot reload on port 5173 |
-| `npm run build` | Production build into `dist/` |
+| `npm run build` | Production build into `dist/`, then `npm run prerender` |
+| `npm run prerender` | Writes the static blog pages, `sitemap.xml` and `robots.txt` into `dist/` (see Blog) |
 | `npm run preview` | Serve the `dist/` build locally |
-| `npm run lint` | ESLint over `src/` (CI runs this) |
+| `npm run lint` | ESLint over `src/` and `scripts/` (CI runs this) |
 | `npm run lint:fix` | ESLint with automatic fixes |
 | `npm run format` | Prettier over `src/` |
 
@@ -55,9 +56,25 @@ it. `.env.example` lists them with a comment each.
 | `VITE_COOKIEBOT_CBID` | Cookiebot domain group ID: the consent banner and the cookie declaration | No consent banner |
 | `VITE_FEEDBACK_API_URL` | Origin of the feedback service behind the in-app Help and feedback button | The button is hidden |
 | `VITE_ASSET_CDN` | Base URL that large static assets (the onboarding videos) load from | Assets load from the site's own origin |
+| `VITE_SITE_URL` | Public origin in the blog's canonical URLs, structured data, `sitemap.xml` and `robots.txt` | `https://cansee.ai` |
 
 The Google and Microsoft OAuth clients need `<origin>/auth/google/callback` and
 `<origin>/auth/microsoft/callback` registered as redirect URIs.
+
+## Blog
+
+Posts are Markdown files in `src/content/blog/<slug>.md`, with frontmatter (`title`,
+`description`, `slug`, `date`, `updated`, `author`, `tags`, `keywords`, `readingMinutes`, `faq`).
+`src/lib/blog/validate.js` holds the rules. They are bundled at build time and served at `/blog`
+and `/blog/<slug>`; zero posts is fine.
+
+- `vite build` stops with a message naming the file and field when a post breaks a rule
+  (`scripts/blog-content.mjs`). Advice, such as the suggested length, is printed as a warning.
+- `npm run prerender` (part of `npm run build`) writes `dist/blog/index.html` and
+  `dist/blog/<slug>/index.html`: the built `index.html` with the page's markup, head tags and
+  JSON-LD baked in, so crawlers that run no JavaScript see the article and the app still starts
+  on top of it. It also writes `dist/sitemap.xml` and `dist/robots.txt`. nginx (in the API
+  repository) serves these files before falling back to the app.
 
 ## Deploy
 

@@ -83,6 +83,21 @@ const routes = [
         component: () => import('@/pages/DocsPage.vue'),
         meta: { public: true }
     },
+    /* ── Blog (public). Posts are src/content/blog/*.md; the build also
+       writes static HTML for these addresses (scripts/prerender-blog.mjs). ── */
+    {
+        path: '/blog',
+        name: 'blog',
+        component: () => import('@/pages/blog/BlogIndexPage.vue'),
+        meta: { public: true }
+    },
+    {
+        path: '/blog/:slug',
+        name: 'blog-post',
+        component: () => import('@/pages/blog/BlogPostPage.vue'),
+        props: true,
+        meta: { public: true }
+    },
     /* ── The pricing window (public: the two plans, signed out too) ── */
     {
         path: '/pricing',

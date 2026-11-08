@@ -185,6 +185,7 @@ const menus = [
     key: 'resources',
     label: 'Resources',
     items: [
+      { label: 'Blog', blurb: 'Guides on AI search visibility and GEO.', to: '/blog' },
       { label: 'About', blurb: 'What Cansee does and who runs it.', to: '/about' },
       { label: 'Contact', blurb: 'The right address for your question.', to: '/contact' },
     ],
@@ -202,6 +203,7 @@ const steps = [
 
 const footerLinks = [
   { label: 'Pricing', to: '/pricing' },
+  { label: 'Blog', to: '/blog' },
   { label: 'Privacy', to: '/privacy' },
   { label: 'Terms', to: '/terms' },
   { label: 'Cookies', to: '/cookies' },
