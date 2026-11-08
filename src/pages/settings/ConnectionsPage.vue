@@ -89,12 +89,13 @@ const router = useRouter()
 const appStore = useAppStore()
 const toast = useToast()
 
-// Back from Google's consent screen for Analytics:
-// ?ga4=<connected|select_property|error>&website=<id>[&reason=<code>]. The
+// Back from Google's consent screen for Analytics
+// (?ga4=<connected|select_property|error>&website=<id>[&reason=<code>]) or
+// Search Console (?gsc=<outcome>&website_id=<id>[&reason=<code>]). The
 // project it names becomes active first (when it is one of the user's), so
 // every status on this page is read for it; until the project list has
 // loaded, nothing is read.
-const returnWebsite = String(route.query.website || '')
+const returnWebsite = String(route.query.website || route.query.website_id || '')
 const ga4Return = route.query.ga4 ? { outcome: String(route.query.ga4), reason: String(route.query.reason || '') } : null
 const adopting = ref(false)
 
@@ -202,8 +203,8 @@ onMounted(() => {
   const outcome = route.query.gsc
   if (outcome === 'connected') toast.success('Search Console connected.')
   else if (outcome === 'error') toast.error("Search Console wasn't connected. Please try again.")
-  const { gsc, ga4, reason, website, ...rest } = route.query
-  if (gsc || ga4 || reason || website) router.replace({ query: rest })
+  const { gsc, ga4, reason, website, website_id: websiteIdParam, ...rest } = route.query
+  if (gsc || ga4 || reason || website || websiteIdParam) router.replace({ query: rest })
 })
 
 watch(websiteId, loadStatus, { immediate: true })
