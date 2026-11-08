@@ -10,6 +10,11 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { SUPPORT_EMAIL } from '@/constants/support'
 import { ENGINES } from '@/lib/engines'
+import { featuredFaqs } from '@/lib/help/faq'
+import { useAuthStore } from '@/stores/auth'
+import { useHelpStore } from '@/stores/help'
+import { useHelpShortcut } from '@/composables/useHelpShortcut'
+import HelpDrawer from '@/components/help/HelpDrawer.vue'
 
 const navGroups = [
   { title: 'Get started', items: [
@@ -20,11 +25,19 @@ const navGroups = [
   { title: 'The app', items: [
     // Section ids stay as they were, so older /docs#overview links still land.
     { id: 'overview', label: 'Analytics' },
+    { id: 'ask-ai', label: 'Ask AI' },
     { id: 'prompt', label: 'Prompt detail' },
     { id: 'sources', label: 'Citations' },
   ] },
+  { title: 'Agent', items: [
+    { id: 'agent', label: 'The Agent' },
+    { id: 'research', label: 'Research agents' },
+    { id: 'findings', label: 'Findings' },
+    { id: 'reports', label: 'Reports' },
+  ] },
   { title: 'Settings', items: [
     { id: 'project', label: 'Project' },
+    { id: 'autopilot', label: 'Autopilot' },
     { id: 'connections', label: 'Connections' },
     { id: 'brand-facts', label: 'Brand facts' },
     { id: 'team', label: 'Team' },
@@ -37,17 +50,14 @@ const navGroups = [
   ] },
 ]
 
-const faqs = [
-  { q: 'Which AI engines does Cansee check?', a: 'ChatGPT, Claude, Gemini, Grok and Perplexity. The Google check also shows whether Google displayed an AI Overview for the prompt and whether it mentions you.' },
-  { q: 'Does my site need traffic?', a: 'No. Cansee checks Google rankings and AI answers for your prompts, not your site analytics.' },
-  { q: 'Should a prompt include my brand name?', a: 'No. A prompt is a buyer question. Cansee measures whether Google and the AI engines bring you up on their own.' },
-  { q: 'How often are prompts checked?', a: 'Whenever you choose Check now on a prompt, and on the daily, weekly or monthly schedule you set for it.' },
-  { q: 'Why does a prompt say Not checked?', a: 'Google has not been checked for it yet, or no engine has answered. Use Check Google in Prompts on Analytics, or Check now on the prompt.' },
-  { q: 'Who counts as a competitor?', a: 'The brands you list in Settings › Project. The Who AI recommends widget on Analytics shows every brand the answers name.' },
-  { q: 'Can Cansee change what an AI engine says about me?', a: 'No tool can retrain the public models from the outside. Cansee shows where the answers and Google disagree about you, and which pages to work on.' },
-]
+// The rail's questions come from the help center's one list (lib/help/faq.js).
+const faqs = featuredFaqs('docs')
 
 const supportHref = `mailto:${SUPPORT_EMAIL}`
+
+const auth = useAuthStore()
+const help = useHelpStore()
+useHelpShortcut()
 
 // ── Section navigation state ───────────────────────────────────────────
 const activeId = ref('welcome')
@@ -107,6 +117,7 @@ onMounted(() => {
   }
 
   const onSlash = (e) => {
+    if (help.isOpen) return
     if (e.key === '/' && !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)) {
       e.preventDefault()
       scope.querySelector('.dx-search-input')?.focus()
@@ -159,7 +170,8 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
       <div class="dx-spacer"></div>
       <a class="dx-link hide-sm" :href="supportHref">Contact</a>
       <router-link to="/" class="dx-link hide-sm">Home</router-link>
-      <router-link to="/login" class="dx-cta">Sign in</router-link>
+      <router-link v-if="auth.isAuthenticated" to="/dashboard" class="dx-cta">Open app</router-link>
+      <router-link v-else to="/login" class="dx-cta">Sign in</router-link>
     </header>
 
     <div class="dx-shell">
@@ -236,6 +248,14 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
             <p class="need"><span class="need-l">You need</span> a project and at least one prompt. Google positions appear once Google has been checked.</p>
           </section>
 
+          <section id="ask-ai">
+            <h2>Ask AI</h2>
+            <p class="kicker">The Ask AI widget on Analytics.</p>
+            <p>Type a question your buyers ask. Cansee asks each AI engine the same question several times (3 by default, up to 10), because answers vary from run to run, and shows how often you are named, at what rank, and the answers themselves. It shows what the run will use before it starts.</p>
+            <p>Ask AI answers are not added to your tracked numbers. Choose <em>Track</em> to add the question as a prompt and keep checking it.</p>
+            <p class="need"><span class="need-l">Free plan</span> every engine answer counts as one prompt run.</p>
+          </section>
+
           <section id="prompt">
             <h2>Prompt detail</h2>
             <p class="kicker">Open any prompt from Prompts on Analytics. It opens in the side panel.</p>
@@ -263,6 +283,38 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
             <p class="need"><span class="need-l">You need</span> prompts the engines have answered. Google clicks for your own pages, and some suggestions, need Search Console connected.</p>
           </section>
 
+          <section id="agent">
+            <h2>The Agent</h2>
+            <p class="kicker">Agent in the header. A chat that researches your rankings and writes drafts.</p>
+            <p>The general agents (Gap Analyst, Landing page, AEO article and Ad campaign) start a chat. The specialists (Page Optimizer, Comparison page, Social posts, PR, llms.txt and Messaging brief) ask for their inputs first, then draft the task into a new chat for you to send.</p>
+            <ul>
+              <li><strong>Context.</strong> What the agents know about your project, with its sources, plus documents you add. <em>Build from my site</em> suggests entries for you to accept; the agents use active entries only.</li>
+              <li><strong>Reviews.</strong> Ask a teammate to review a draft. An approval records who approved which version and publishes nothing; a newer version needs a new approval.</li>
+            </ul>
+            <p>When the Agent cannot run, it says why: it is not set up on this workspace, messages are arriving faster than it can take them, or the allowance is used up.</p>
+          </section>
+
+          <section id="research">
+            <h2>Research agents</h2>
+            <p class="kicker">Research planned from a chat.</p>
+            <p>The Agent can plan research across five areas: Google (SEO), AI engines (GEO), competitor pages, your site and content gaps, and sources and citations. The results come back as a table you can re-run. Research runs are private to you.</p>
+            <p class="need"><span class="need-l">Free plan</span> each AI engine answer a research run asks for counts as one prompt run.</p>
+          </section>
+
+          <section id="findings">
+            <h2>Findings</h2>
+            <p class="kicker">Agent › Findings.</p>
+            <p>The issues and opportunities from research, shared with everyone on the project. Add them from a research table or by hand, then mark them done or dismissed. Viewers can read them but not change them.</p>
+          </section>
+
+          <section id="reports">
+            <h2>Reports</h2>
+            <p class="kicker">Agent › Reports, Documents and Sheets.</p>
+            <p>The Gap Analyst writes reports. Other drafts are under Documents (pages and documents) and Sheets (ad campaigns).</p>
+            <p>A report can follow one of seven templates: Executive summary, Google vs AI gap, Competitor comparison, Prompt deep dive, Sources and citations, Brand accuracy, and Change log since the last run. Pick one when you start a report, or for the next reply in a chat.</p>
+            <p>Use <em>Export</em> once a draft is finished: reports and documents as Markdown, HTML, or Print or save as PDF; sheets as CSV, TSV, or Copy as table.</p>
+          </section>
+
           <section id="settings">
             <h2>Settings</h2>
             <p class="kicker">Settings in the header. Project pages apply to the project picked next to the logo.</p>
@@ -270,6 +322,11 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
             <div class="service" id="project">
               <div class="svc-head"><h3>Project</h3><span class="svc-where">Settings › Project</span></div>
               <p>The project's name, website, industry and a short description of what the business does. Below that are your competitors (up to 25, each a name and a domain): Cansee flags them when they outrank you on Google or are recommended ahead of you. You can also delete the project here.</p>
+            </div>
+
+            <div class="service" id="autopilot">
+              <div class="svc-head"><h3>Autopilot</h3><span class="svc-where">Settings › Autopilot</span></div>
+              <p>On the 100 and 200 prompt plans, Autopilot asks every tracked prompt once a day. It pauses after 3 failed runs in a row: check the last run here, then turn it back on.</p>
             </div>
 
             <div class="service" id="connections">
@@ -294,6 +351,7 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
 
             <div class="service" id="billing">
               <div class="svc-head"><h3>Billing</h3><span class="svc-where">Settings › Subscription</span></div>
+              <p>The Free plan includes 20 prompt runs a month. One run is one prompt answered by one AI engine, so one prompt asked to all five engines uses 5 runs. The runs are shared by all your projects and reset at the start of each month.</p>
               <p>Your current plan and when it renews. Upgrade through a secure checkout, and use <em>Manage billing</em> to change plans, update payment details or see invoices. You can cancel or resume a subscription here too. If your organization pays for your seat, its admins handle billing.</p>
             </div>
           </section>
@@ -372,14 +430,20 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
 
       <!-- FAQ rail -->
       <aside class="dx-rail">
-        <p class="dx-rail-t">Frequently asked</p>
-        <details v-for="f in faqs" :key="f.q" class="faq">
-          <summary>{{ f.q }}<svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6" /></svg></summary>
-          <p>{{ f.a }}</p>
+        <h2 class="dx-rail-t">Frequently asked</h2>
+        <details v-for="f in faqs" :key="f.id" class="faq">
+          <summary>{{ f.q }}<svg class="chev" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></summary>
+          <p v-for="(para, i) in f.a" :key="i">{{ para }}</p>
+          <ul v-if="f.list.length" class="faq-ul">
+            <li v-for="(line, i) in f.list" :key="i">{{ line }}</li>
+          </ul>
         </details>
+        <button type="button" class="dx-rail-all" aria-haspopup="dialog" @click="help.open()">All questions</button>
         <p class="dx-rail-help">Still stuck? Email <a :href="supportHref">{{ SUPPORT_EMAIL }}</a>.</p>
       </aside>
     </div>
+
+    <HelpDrawer />
   </div>
 </template>
 
@@ -493,13 +557,16 @@ ol.steps > li:last-child::after { display: none; }
 
 /* FAQ rail */
 .dx-rail { position: sticky; top: 54px; align-self: start; height: calc(100vh - 54px); overflow-y: auto; padding: 26px 22px 60px; border-left: 1px solid var(--border); }
-.dx-rail-t { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 12px; }
+.docs .dx-rail-t { font-size: 10.5px; line-height: 1.4; letter-spacing: .12em; font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 12px; }
 details.faq { border-bottom: 1px solid var(--border); padding: 9px 0; }
 details.faq > summary { list-style: none; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--foreground); display: flex; gap: 8px; align-items: flex-start; }
 details.faq > summary::-webkit-details-marker { display: none; }
 details.faq > summary .chev { margin-left: auto; flex-shrink: 0; color: var(--muted-foreground); transition: transform .18s; margin-top: 3px; }
 details.faq[open] > summary .chev { transform: rotate(90deg); }
 details.faq p { margin: 7px 0 2px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+details.faq .faq-ul { margin: 4px 0 2px; padding-left: 16px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+.dx-rail-all { margin-top: 14px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: none; color: var(--foreground); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.dx-rail-all:hover { background: var(--muted); }
 .dx-rail-help { margin-top: 20px; font-size: 12px; color: var(--muted-foreground); }
 .dx-rail-help a { color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; }
 

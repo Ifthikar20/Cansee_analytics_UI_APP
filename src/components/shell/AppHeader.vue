@@ -14,6 +14,7 @@ import { Menu, Moon, Sun, X } from '@lucide/vue'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { useAgentUiStore } from '@/stores/agentUi'
+import { useHelpStore } from '@/stores/help'
 import { HELP_LINKS, navItems } from '@/lib/shell/nav'
 import { FEEDBACK_ENABLED } from '@/api/feedbackClient'
 import FeedbackWidget from '@/components/feedback/FeedbackWidget.vue'
@@ -33,6 +34,7 @@ const router = useRouter()
 const app = useAppStore()
 const auth = useAuthStore()
 const ui = useAgentUiStore()
+const help = useHelpStore()
 
 const barEl = ref(null)
 const sheetEl = ref(null)
@@ -71,6 +73,11 @@ function leaveSheet() {
 function openShortcuts() {
   leaveSheet()
   ui.openShortcuts()
+}
+
+function openHelp() {
+  leaveSheet()
+  help.open()
 }
 
 // The widget has no API, and one is enough (it polls for replies): the row
@@ -181,6 +188,9 @@ useEventListener(document, 'keydown', (event) => {
         @click="leaveSheet"
       >{{ item.label }}</router-link>
       <div class="shell-sheet-sep" aria-hidden="true" />
+      <button type="button" class="shell-sheet-link is-quiet" aria-haspopup="dialog" @click="openHelp">
+        Help center
+      </button>
       <a
         v-for="link in helpLinks"
         :key="link.key"
