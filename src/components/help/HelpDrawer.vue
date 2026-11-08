@@ -22,7 +22,7 @@ import HelpFaqList from './HelpFaqList.vue'
 const props = defineProps({
   // Opens the keyboard shortcuts dialog (AppShell only); hidden when null.
   openShortcuts: { type: Function, default: null },
-  // Shows the first-visit tips again (resetHints from lib/help/hints.js,
+  // Shows the first-visit tips again (resetHints from stores/hints.js,
   // passed by AppShell); hidden when null.
   resetTips: { type: Function, default: null },
 })

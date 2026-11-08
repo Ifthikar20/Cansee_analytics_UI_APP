@@ -57,7 +57,7 @@
 
       <AgentAnnouncer />
       <ShortcutsDialog :open="ui.shortcutsOpen" @update:open="ui.setShortcutsOpen($event)" />
-      <HelpDrawer :open-shortcuts="ui.openShortcuts" />
+      <HelpDrawer :open-shortcuts="ui.openShortcuts" :reset-tips="resetHints" />
       <ToastContainer />
       <AddProjectDialog :open="ui.addProjectOpen" @update:open="ui.setAddProjectOpen($event)" />
     </div>
@@ -94,6 +94,7 @@ import { useShellBootstrap } from '@/composables/useShellBootstrap'
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
 import { useAgentHotkeys } from '@/composables/agent/useAgentHotkeys'
 import { useHelpShortcut } from '@/composables/useHelpShortcut'
+import { resetHints } from '@/stores/hints'
 import { useVisualViewportInset } from '@/composables/agent/useVisualViewportInset'
 import { ensureAgentFont } from '@/lib/agent/font'
 import { sectionOf } from '@/lib/shell/nav'
