@@ -11,8 +11,9 @@ export default {
     // Post-redirect verification of a completed Polar checkout.
     confirm: (checkoutId) => api.post('/billing/confirm/', { checkout_id: checkoutId }),
     // "Continue with the free plan" on the paywall — persists the
-    // dismissal so next_route stops returning 'paywall'.
-    dismissPaywall: () => api.post('/billing/paywall/dismiss/'),
+    // dismissal so next_route stops returning 'paywall'. Silent: the
+    // paywall has no toast container and shows the failure inline.
+    dismissPaywall: () => api.post('/billing/paywall/dismiss/', {}, { _silentError: true }),
     cancel: () => api.post('/billing/cancel/'),
     resume: () => api.post('/billing/resume/'),
     // End the free trial immediately: card charged now, Pro unlocked now.

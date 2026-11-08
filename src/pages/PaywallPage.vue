@@ -188,6 +188,7 @@ async function startCheckout(planId) {
 async function continueFree() {
   if (dismissing.value) return
   dismissing.value = true
+  error.value = ''
   try {
     await billingApi.dismissPaywall()
     // The router guard keeps bouncing to /paywall until the refreshed
@@ -195,8 +196,10 @@ async function continueFree() {
     // fetch must complete before navigating.
     await authStore.fetchSession()
     router.replace('/dashboard')
-  } catch {
-    // The client interceptor toasts the reason.
+  } catch (e) {
+    // The paywall sits outside AppShell, where no toast container is
+    // mounted, so the failure is shown inline.
+    error.value = e?.displayMessage || "We couldn't switch you to the free plan. Please try again."
     dismissing.value = false
   }
 }
