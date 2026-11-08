@@ -5,12 +5,20 @@
       <h1 class="ob-title" tabindex="-1">What would a buyer ask?</h1>
       <p class="ob-sub">
         We'll track these questions on Google and in each AI engine your account
-        has connected. Choose up to 5.
+        has connected. Choose up to {{ MAX_PROMPTS }}.
         <HelpTip :text="TIPS.onboarding.prompts" label="What is a prompt?" />
       </p>
 
       <div class="ob-card">
-        <p v-if="noDrafts" class="ob-label-hint ob-empty-note">{{ noDraftsCopy }}</p>
+        <p v-if="noDrafts" class="ob-label-hint ob-empty-note">{{ note ? note.text : noDraftsFallback }}</p>
+        <div v-else-if="note" class="ob-source-note" role="note">
+          <p class="ob-note">{{ note.text }}</p>
+          <p v-if="noteSettings" class="ob-note ob-note--muted">{{ noteSettings }}</p>
+        </div>
+        <p v-if="noDrafts && noteSettings" class="ob-note ob-note--muted">{{ noteSettings }}</p>
+        <p v-if="suggested > 1" class="ob-label-hint">
+          {{ suggested }} suggested questions. The first {{ Math.min(suggested, DEFAULT_PROMPTS) }} are picked to start.
+        </p>
         <p v-if="showCapNote" id="ob-prompt-cap" class="ob-note">Unselect one to add another.</p>
 
         <TransitionGroup v-if="form.prompts.length" name="ob-list" tag="ul" class="ob-prompts" aria-label="Prompts">
@@ -29,7 +37,13 @@
                 :aria-describedby="locked(p) ? 'ob-prompt-cap' : undefined"
                 @change="onToggle(i, $event)"
               />
-              <span class="ob-prompt-text">{{ p.text }}</span>
+              <span class="ob-prompt-body">
+                <span class="ob-prompt-text">{{ p.text }}</span>
+                <span v-if="source(p).badge" class="ob-prompt-source">
+                  <span class="ob-badge" :class="`is-${p.source}`">{{ source(p).badge }}</span>
+                  <span v-if="source(p).detail">{{ source(p).detail }}</span>
+                </span>
+              </span>
             </label>
             <button
               v-if="p.custom"
@@ -94,7 +108,7 @@ import HelpTip from '@/components/ui/help/HelpTip.vue'
 import { TIPS } from '@/lib/help/tips'
 
 import { COUNTRIES } from '@/lib/countries'
-import { LIMITS, useOnboardingFlow } from '../useOnboardingFlow'
+import { DEFAULT_PROMPTS, LIMITS, MAX_PROMPTS, promptNote, promptSource, useOnboardingFlow } from '../useOnboardingFlow'
 
 const {
   form,
@@ -106,16 +120,18 @@ const {
   canContinue,
   next,
   back,
+  settingNames,
 } = useOnboardingFlow()
 
-// No drafted prompt (the scan found none, or the user filled in by hand):
-// say why, and that the user writes them.
+// No suggested question (the scan found none, or the user filled in by
+// hand): say why, and that the user writes them. With suggestions, say
+// where they came from when Google or the AI service could not help.
 const noDrafts = computed(() => !form.value.prompts.some((p) => !p.custom))
-const noDraftsCopy = computed(() =>
-  form.value.scan?.topics_source === 'unavailable'
-    ? "Drafting prompts needs the AI service, which isn't configured here. Write 1 to 5 questions your buyers ask."
-    : "We couldn't draft prompts from your homepage. Write 1 to 5 questions your buyers ask.",
-)
+const suggested = computed(() => form.value.prompts.filter((p) => !p.custom).length)
+const note = computed(() => promptNote(form.value.scan))
+const noteSettings = computed(() => (note.value ? settingNames(note.value.settings) : ''))
+const noDraftsFallback = `Write 1 to ${MAX_PROMPTS} questions your buyers ask.`
+const source = promptSource
 
 const showCapNote = computed(() => promptCapReached.value && form.value.prompts.some((p) => !p.selected))
 

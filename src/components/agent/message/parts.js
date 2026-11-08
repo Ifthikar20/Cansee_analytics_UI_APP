@@ -202,6 +202,9 @@ const ERROR_COPY = {
     retry: false,
     billing: true,
   },
+  // Free prompt runs; the server's message names the numbers and the renewal day.
+  prompt_runs_exhausted: { title: "This month's free prompt runs are used up.", body: '', useMessage: true, retry: false, billing: true },
+  insufficient_prompt_runs: { title: 'Not enough free prompt runs are left.', body: '', useMessage: true, retry: false },
   agent_disabled: { title: 'The agent is switched off on this server.', body: '', retry: false },
   agent_not_configured: {
     title: "The AI agent isn't set up on this workspace.",
@@ -271,7 +274,11 @@ const ERROR_COPY = {
 export function errorCopy(code, message, status) {
   const key = code || (status === 'interrupted' ? 'interrupted' : '')
   const known = Object.prototype.hasOwnProperty.call(ERROR_COPY, key) ? ERROR_COPY[key] : null
-  if (known) return { ...known, code: key, body: known.body || '' }
+  if (known) {
+    const { useMessage, ...copy } = known
+    const server = useMessage && typeof message === 'string' ? message.trim() : ''
+    return { ...copy, code: key, body: copy.body || server }
+  }
   return {
     code: key,
     title: status === 'interrupted' ? 'The reply was interrupted before it finished.' : 'The agent ran into a problem.',

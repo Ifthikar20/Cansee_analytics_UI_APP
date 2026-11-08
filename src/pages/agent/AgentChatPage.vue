@@ -295,7 +295,13 @@ async function sendFirstResearch(entry) {
   firstResearchSending = true
   const wid = String(props.websiteId)
   try {
-    const cid = await store.send({ chatId: null, text: entry.text, agent: FIRST_RESEARCH_AGENT })
+    // The engines chosen at onboarding limit this first research only.
+    const cid = await store.send({
+      chatId: null,
+      text: entry.text,
+      agent: FIRST_RESEARCH_AGENT,
+      ...(entry.engines ? { engines: entry.engines } : {}),
+    })
     if (String(props.websiteId) === wid && cid) {
       router.replace({ name: 'agent-chat', params: { websiteId: wid, chatId: String(cid) } })
     }

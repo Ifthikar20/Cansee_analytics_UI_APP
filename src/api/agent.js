@@ -138,7 +138,7 @@ export default {
 
     /* ── agent process ── */
 
-    // {text, parent_id?, agent?}; 202 {user_message, assistant_message, run}
+    // {text, parent_id?, agent?, engines?}; 202 {user_message, assistant_message, run}
     sendMessage: (wid, cid, data, { idempotencyKey, ...config } = {}) =>
         api.post(
             `${live(wid)}/chats/${encodeURIComponent(cid)}/messages/`,

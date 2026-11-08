@@ -1032,7 +1032,12 @@ export const useAgentStore = defineStore('agent', () => {
             .sendMessage(
                 wid,
                 chatId,
-                { text: meta.text, parent_id: meta.parentId || undefined, agent: meta.agent || undefined },
+                {
+                    text: meta.text,
+                    parent_id: meta.parentId || undefined,
+                    agent: meta.agent || undefined,
+                    engines: meta.engines?.length ? [...meta.engines] : undefined,
+                },
                 { idempotencyKey: meta.idempotencyKey }
             )
             .then(({ data }) => {
@@ -1286,7 +1291,7 @@ export const useAgentStore = defineStore('agent', () => {
      * POST continues in the background (see the header for how its failure
      * surfaces).
      */
-    async function send({ chatId = null, text, agent = null } = {}) {
+    async function send({ chatId = null, text, agent = null, engines = null } = {}) {
         const body = typeof text === 'string' ? text.trim() : ''
         if (!body) throw new AgentError({ status: 400, code: ERROR_CODE.INVALID, message: 'Write a message first.' })
         const wid = ensureProject()
@@ -1306,7 +1311,7 @@ export const useAgentStore = defineStore('agent', () => {
             fresh.pending = true
             fresh.cancelOnStart = false
             // On screen while the chat is created; it then moves to that chat.
-            const tempId = addOptimistic(NEW_CHAT_KEY, null, body, agent)
+            const tempId = addOptimistic(NEW_CHAT_KEY, null, body, agent, engines)
             fresh.leafId = tempId
             try {
                 const { data } = await agentApi.createChat(wid, agent ? { entry_agent: agent } : {}, { ...SILENT })
@@ -1347,7 +1352,7 @@ export const useAgentStore = defineStore('agent', () => {
 
         const st = ensureChatState(cid)
         dropFailedSends(cid)
-        const tempId = addOptimistic(cid, lastPersistedLeaf(cid), body, agent)
+        const tempId = addOptimistic(cid, lastPersistedLeaf(cid), body, agent, engines)
         st.leafId = tempId
         st.pending = true
         st.cancelOnStart = false
@@ -1357,7 +1362,7 @@ export const useAgentStore = defineStore('agent', () => {
     }
 
     /** An optimistic user message under `chatKey`, waiting for its POST. */
-    function addOptimistic(chatKey, parentId, body, agent) {
+    function addOptimistic(chatKey, parentId, body, agent, engines = null) {
         const tempId = `tmp-${newId()}`
         const temp = {
             id: tempId,
@@ -1377,7 +1382,16 @@ export const useAgentStore = defineStore('agent', () => {
             error_message: '',
             local: true,
             client_id: tempId,
-            send: { idempotencyKey: newId(), text: body, agent: agent || null, parentId, error: null },
+            // engines: the AI engines this reply's research may ask (public
+            // keys), or null for every configured one.
+            send: {
+                idempotencyKey: newId(),
+                text: body,
+                agent: agent || null,
+                parentId,
+                engines: Array.isArray(engines) && engines.length ? [...engines] : null,
+                error: null,
+            },
         }
         messages.value[tempId] = temp
         addChild(childrenOf.value, parentKeyOf(temp), tempId)

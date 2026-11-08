@@ -532,6 +532,17 @@ onBeforeUnmount(() => {
   color: var(--ob-fg);
 }
 .ob-empty-note { margin: 0; font-size: 14px; }
+/* Where the suggestions came from when Google or the AI service could not help. */
+.ob-source-note {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--ob-border);
+  border-radius: 10px;
+  background: var(--ob-surface);
+}
+.ob-note--muted { color: var(--ob-muted); font-size: 12.5px; }
 .ob-field-error { margin: 0; font-size: 12.5px; color: var(--ob-accent); }
 .ob-text-input {
   border: 1px solid var(--ob-border);
@@ -695,7 +706,29 @@ onBeforeUnmount(() => {
   font-size: 12px; color: var(--ob-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.ob-competitor-source {
+  margin-top: 2px;
+  font-size: 11.5px; color: var(--ob-muted);
+  overflow-wrap: anywhere;
+}
 .ob-prompt-text { font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.ob-prompt-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ob-prompt-source { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 11.5px; color: var(--ob-muted); }
+/* A small label pill: which suggestions are Google's own. */
+.ob-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--ob-border);
+  background: var(--ob-bg);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ob-fg);
+  white-space: nowrap;
+}
+.ob-badge.is-search,
+.ob-badge.is-both { border-color: rgba(255, 106, 44, 0.45); }
 .ob-row-remove {
   flex-shrink: 0;
   background: transparent;
@@ -772,6 +805,14 @@ onBeforeUnmount(() => {
 .ob-summary-muted { color: var(--ob-muted); }
 .ob-summary-list { margin: 0; padding-left: 18px; }
 .ob-summary-list li + li { margin-top: 4px; }
+.ob-summary-plain { margin: 0; padding: 0; list-style: none; }
+.ob-summary-plain li + li { margin-top: 2px; }
+.ob-engines { margin: 0; padding: 0; border: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.ob-engine { display: flex; flex-direction: column; gap: 1px; }
+.ob-engine-label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.ob-engine.is-off .ob-engine-label { cursor: not-allowed; color: var(--ob-muted); }
+.ob-engine-why { margin-left: 24px; font-size: 12.5px; color: var(--ob-muted); }
+.ob-engines-note { margin-top: 6px; font-size: 12.5px; }
 .ob-notice {
   display: flex;
   flex-wrap: wrap;

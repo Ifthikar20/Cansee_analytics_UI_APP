@@ -4,11 +4,27 @@
 // paywall). sessionStorage keeps it in the tab that finished onboarding, and
 // every access is guarded: storage can be full, blocked or disabled, and a
 // lost entry only means the user starts the research by hand.
+//
+// The entry also carries the AI engines chosen on the last onboarding step
+// (public keys, or null when none were chosen): the chat sends them with
+// the first message, so the research asks only those engines.
+
+import { ENGINES } from '@/lib/engines'
 
 export const FIRST_RESEARCH_KEY = 'cs-agent-first-research-v1'
 export const FIRST_RESEARCH_MAX_AGE_MS = 86_400_000
 
 const idOf = (v) => (v === null || v === undefined ? '' : String(v))
+
+const ENGINE_KEYS = ENGINES.map((e) => e.key)
+
+/** Known engine keys, deduped, in the given order; null for anything else or none. */
+function enginesOf(value) {
+  if (!Array.isArray(value)) return null
+  const out = []
+  for (const key of value) if (ENGINE_KEYS.includes(key) && !out.includes(key)) out.push(key)
+  return out.length ? out : null
+}
 
 function storage() {
   try {
@@ -31,7 +47,7 @@ function read() {
     const text = typeof entry.text === 'string' ? entry.text : ''
     const createdAt = Number(entry.createdAt)
     if (!websiteId || !text.trim() || !Number.isFinite(createdAt)) return null
-    return { websiteId, text, createdAt }
+    return { websiteId, text, createdAt, engines: enginesOf(entry.engines) }
   } catch {
     return null
   }
@@ -51,14 +67,17 @@ function isFresh(entry, maxAgeMs) {
 }
 
 export function useFirstResearch() {
-  /** Keep the first message for this project. Returns false when it could not be stored. */
-  function stash({ websiteId, text } = {}) {
+  /** Keep the first message (and its engines) for this project. Returns false when it could not be stored. */
+  function stash({ websiteId, text, engines = null } = {}) {
     const id = idOf(websiteId)
     const body = typeof text === 'string' ? text.trim() : ''
     const store = storage()
     if (!id || !body || !store) return false
     try {
-      store.setItem(FIRST_RESEARCH_KEY, JSON.stringify({ websiteId: id, text: body, createdAt: Date.now() }))
+      store.setItem(
+        FIRST_RESEARCH_KEY,
+        JSON.stringify({ websiteId: id, text: body, createdAt: Date.now(), engines: enginesOf(engines) }),
+      )
       return true
     } catch {
       return false

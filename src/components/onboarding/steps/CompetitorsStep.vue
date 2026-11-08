@@ -8,6 +8,10 @@
       </p>
 
       <div class="ob-card">
+        <div v-if="note" class="ob-source-note" role="note">
+          <p class="ob-note">{{ note.text }}</p>
+          <p v-if="noteSettings" class="ob-note ob-note--muted">{{ noteSettings }}</p>
+        </div>
         <p v-if="showCapNote" id="ob-competitor-cap" class="ob-note">Unselect one to add another.</p>
 
         <!-- Rows are keyed by domain-or-name, which the add path dedupes on.
@@ -38,6 +42,9 @@
               <span class="ob-competitor-body">
                 <span class="ob-competitor-name">{{ c.name }}</span>
                 <span v-if="c.domain" class="ob-competitor-domain">{{ c.domain }}</span>
+                <span v-if="sourceText(c)" class="ob-competitor-source" :class="`is-${c.custom ? 'custom' : c.source}`">
+                  {{ sourceText(c) }}
+                </span>
               </span>
             </label>
             <button
@@ -50,7 +57,7 @@
           </li>
         </TransitionGroup>
         <p v-else class="ob-label-hint ob-empty-note">
-          We couldn't find competitors automatically. Add the companies you lose deals to.
+          {{ note ? 'Add the companies you lose deals to.' : "We couldn't find competitors automatically. Add the companies you lose deals to." }}
         </p>
 
         <div class="ob-field">
@@ -109,7 +116,7 @@ import { computed } from 'vue'
 import HelpTip from '@/components/ui/help/HelpTip.vue'
 import { TIPS } from '@/lib/help/tips'
 
-import { LIMITS, useOnboardingFlow } from '../useOnboardingFlow'
+import { competitorNote, competitorSourceText, LIMITS, useOnboardingFlow } from '../useOnboardingFlow'
 
 const {
   form,
@@ -122,7 +129,14 @@ const {
   removeCompetitor,
   next,
   back,
+  settingNames,
 } = useOnboardingFlow()
+
+// Why the list is AI-only, Google-only or empty, when Google or the AI
+// service could not help. Setting names are for staff and DEBUG only.
+const note = computed(() => competitorNote(form.value.scan))
+const noteSettings = computed(() => (note.value ? settingNames(note.value.settings) : ''))
+const sourceText = competitorSourceText
 
 const showCapNote = computed(
   () => competitorCapReached.value && form.value.competitors.some((c) => !c.selected),

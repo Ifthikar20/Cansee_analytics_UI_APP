@@ -13,7 +13,9 @@ export const TIPS = Object.freeze({
             'Add the companies you lose deals to. Cansee checks whether Google and the AI engines put them above you. Keep up to 5; you can change them later in Settings, Project.',
         location: 'The country Google results are checked from for these prompts. Pick where most of your buyers are.',
         engines:
-            'Engines listed as not configured have no access set up on this workspace yet, so research skips them.',
+            'Pick the AI engines your first research asks. An engine that is not set up on this workspace cannot be picked. Later checks ask every engine that is set up.',
+        promptRuns:
+            'One prompt run is one prompt answered by one AI engine. Free prompt runs are shared by all your projects and engines, and renew each month.',
         allowance:
             "What is left of your plan's AI allowance this month. Research, Ask AI and the agent draw from it, and it renews each billing period.",
     }),

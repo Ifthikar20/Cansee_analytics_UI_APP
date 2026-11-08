@@ -20,7 +20,15 @@
         </div>
         <div class="ob-summary-row">
           <dt>Competitors</dt>
-          <dd>{{ competitorNames || 'None' }}</dd>
+          <dd>
+            <ul v-if="selectedCompetitors.length" class="ob-summary-plain">
+              <li v-for="c in selectedCompetitors" :key="c.domain || c.name">
+                <span>{{ c.name }}</span>
+                <span v-if="sourceShort(c)" class="ob-summary-muted"> &middot; {{ sourceShort(c) }}</span>
+              </li>
+            </ul>
+            <span v-else>None</span>
+          </dd>
         </div>
         <div class="ob-summary-row">
           <dt>Prompts</dt>
@@ -33,21 +41,52 @@
         <template v-if="status">
           <div class="ob-summary-row">
             <dt>Google results</dt>
-            <dd>{{ status.serp_configured ? 'Available' : 'Not configured' }}</dd>
+            <dd>
+              <span>{{ google.text }}</span>
+              <span v-if="google.staff" class="ob-summary-muted">{{ google.staff }}</span>
+            </dd>
           </div>
-          <div v-if="engines.configured.length || engines.missing.length" class="ob-summary-row">
+          <div v-if="engineRows.length" class="ob-summary-row">
             <dt>
               AI engines
-              <HelpTip v-if="engines.missing.length" :text="TIPS.onboarding.engines" label="About engines that are not configured" />
+              <HelpTip :text="TIPS.onboarding.engines" label="About choosing AI engines" />
             </dt>
             <dd>
-              <span v-if="engines.configured.length">{{ engines.configured.join(', ') }}</span>
-              <span v-if="engines.missing.length" class="ob-summary-muted">
-                Not configured: {{ engines.missing.join(', ') }}
+              <fieldset class="ob-engines">
+                <legend class="ob-sr-only">AI engines for the first research</legend>
+                <div v-for="e in engineRows" :key="e.key" class="ob-engine" :class="{ 'is-off': !e.configured }">
+                  <label class="ob-engine-label">
+                    <input
+                      type="checkbox"
+                      class="ob-check"
+                      :checked="e.configured && form.engines.includes(e.key)"
+                      :disabled="!e.configured || saving"
+                      :aria-describedby="e.configured ? undefined : `ob-engine-why-${e.key}`"
+                      @change="onEngine(e.key, $event)"
+                    />
+                    <span>{{ e.label }}</span>
+                  </label>
+                  <span v-if="!e.configured" :id="`ob-engine-why-${e.key}`" class="ob-engine-why">
+                    {{ e.label }} isn't set up on this workspace.<template v-if="e.setting"> Setting: {{ e.setting }}.</template>
+                  </span>
+                </div>
+              </fieldset>
+              <span v-if="configuredEngines.length" class="ob-summary-muted ob-engines-note">
+                Your choice applies to this first research only.
               </span>
             </dd>
           </div>
-          <div v-if="allowanceText" class="ob-summary-row">
+          <div v-if="promptRuns" class="ob-summary-row">
+            <dt>
+              Prompt runs
+              <HelpTip :text="TIPS.onboarding.promptRuns" label="About free prompt runs" />
+            </dt>
+            <dd class="ob-tnum">
+              <span>{{ runsLeft }}</span>
+              <span v-if="runsUseText" class="ob-summary-muted">{{ runsUseText }}</span>
+            </dd>
+          </div>
+          <div v-else-if="allowanceText" class="ob-summary-row">
             <dt>
               AI allowance
               <HelpTip :text="TIPS.onboarding.allowance" label="About the AI allowance" />
@@ -61,7 +100,10 @@
         The research agent isn't available on this workspace yet. Your project will still be set up.
       </p>
       <p v-else-if="availability === 'allowance'" class="ob-notice" role="status">
-        You've used this month's AI allowance, so research can't start now.
+        {{ hideUsd ? "You've used this month's free AI allowance, so research can't start now." : "You've used this month's AI allowance, so research can't start now." }}
+      </p>
+      <p v-else-if="availability === 'no_engines'" class="ob-notice" role="status">
+        No AI engine is set up on this workspace, so research can't run. Your project will still be set up.
       </p>
       <p v-else-if="availability === 'unknown'" class="ob-notice" role="status">
         <span>We couldn't check whether the research agent is available.</span>
@@ -69,6 +111,7 @@
           Try again
         </button>
       </p>
+      <p v-else-if="blockText" id="ob-run-block" class="ob-notice" role="status">{{ blockText }}</p>
 
       <div class="ob-step-actions">
         <button type="button" class="ob-link-btn" :disabled="saving" @click="back">
@@ -87,8 +130,9 @@
             <button
               type="button"
               class="ob-cta"
-              :disabled="saving || availability === 'checking'"
+              :disabled="saving || availability === 'checking' || Boolean(researchBlock)"
               :aria-busy="availability === 'checking' || finishing === 'research' ? 'true' : undefined"
+              :aria-describedby="researchBlock ? 'ob-run-block' : undefined"
               @click="startResearch"
             >
               <span v-if="finishing === 'research'" class="ob-spinner" aria-hidden="true"></span>
@@ -111,8 +155,9 @@
 import { computed } from 'vue'
 import HelpTip from '@/components/ui/help/HelpTip.vue'
 import { TIPS } from '@/lib/help/tips'
+import { runsLeftText } from '@/lib/promptRuns'
 
-import { useOnboardingFlow } from '../useOnboardingFlow'
+import { SOURCE, useOnboardingFlow } from '../useOnboardingFlow'
 
 const {
   form,
@@ -127,6 +172,16 @@ const {
   startResearch,
   skipResearch,
   back,
+  showSettings,
+  engineRows,
+  configuredEngines,
+  chosenEngines,
+  setEngineSelected,
+  promptRuns,
+  hideUsd,
+  runsNeeded,
+  runsCheck,
+  researchBlock,
 } = useOnboardingFlow()
 
 const status = computed(() => agentStatus.value || null)
@@ -135,22 +190,60 @@ const status = computed(() => agentStatus.value || null)
 // not be read (the agent chat then reports any failure itself).
 const canResearch = computed(() => ['available', 'checking', 'unknown'].includes(availability.value))
 
-const competitorNames = computed(() => selectedCompetitors.value.map((c) => c.name).join(', '))
+function sourceShort(c) {
+  if (c.custom) return 'added by you'
+  if (c.source === SOURCE.search) return 'from Google'
+  if (c.source === SOURCE.both) return 'from Google and AI'
+  if (c.source === SOURCE.ai) return 'AI suggestion'
+  return ''
+}
 
-const engines = computed(() => {
-  const list = Array.isArray(status.value?.engines) ? status.value.engines : []
-  const label = (e) => String(e?.label || e?.key || '').trim()
-  return {
-    configured: list.filter((e) => e?.configured).map(label).filter(Boolean),
-    missing: list.filter((e) => e && !e.configured).map(label).filter(Boolean),
+// GET status/ google, or the older serp_configured flag.
+const google = computed(() => {
+  const g = status.value?.google
+  const configured = g && typeof g === 'object' ? g.configured === true : Boolean(status.value?.serp_configured)
+  if (configured) {
+    const pageOne = g?.reliable_pages === 1
+    return { text: pageOne ? 'Available (page one of Google only)' : 'Available', staff: '' }
   }
+  const keys = showSettings.value && Array.isArray(g?.key_settings) ? g.key_settings : []
+  return {
+    text: "Google results aren't set up on this workspace, so rankings on Google are skipped.",
+    staff: keys.length ? `Setting to add: ${keys.join(' or ')}.` : '',
+  }
+})
+
+function onEngine(key, event) {
+  const ok = setEngineSelected(key, event.target.checked)
+  if (!ok) event.target.checked = form.value.engines.includes(key)
+}
+
+const runsLeft = computed(() => runsLeftText(promptRuns.value))
+
+// "Your first research uses 6 (3 prompts x 2 engines)." while it fits.
+const runsUseText = computed(() => {
+  if (!promptRuns.value || !runsNeeded.value || availability.value !== 'available') return ''
+  if (runsCheck.value && !runsCheck.value.enough) return ''
+  const p = selectedPrompts.value.length
+  const e = chosenEngines.value.length
+  const n = runsNeeded.value
+  return `Your first research uses ${n} ${n === 1 ? 'run' : 'runs'} (${p} ${p === 1 ? 'prompt' : 'prompts'} × ${e} ${e === 1 ? 'engine' : 'engines'}).`
+})
+
+// Why Start research is off while the agent is there.
+const blockText = computed(() => {
+  if (researchBlock.value === 'no_engine') return 'Pick at least one AI engine to run research.'
+  if (researchBlock.value === 'runs') return runsCheck.value?.text || ''
+  return ''
 })
 
 function usd(value) {
   return `$${value.toFixed(2)}`
 }
 
+// Paid plans keep their dollar allowance; free accounts never see dollars.
 const allowanceText = computed(() => {
+  if (hideUsd.value) return ''
   const a = status.value?.allowance
   if (!a || typeof a !== 'object') return ''
   const cap = Number(a.cap_usd)
