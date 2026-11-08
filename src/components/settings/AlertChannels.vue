@@ -243,17 +243,68 @@
       </div>
 
       <!-- In-channel bot (Slack/Discord only; Teams has no two-way bot yet) -->
-      <div v-if="activeIntegration && activeIntegration.id !== 'teams'" class="bot-link">
+      <!-- The workspace id can't be typed in: running /cansee link <code>
+           in the workspace (a request Slack or Discord signs) is what links
+           it, so this needs a saved connection to mint a code for. -->
+      <div v-if="activeIntegration && isLinkable(activeIntegration)" class="bot-link" data-test="bot-link">
         <h4 class="prefs-title">In-channel bot (optional)</h4>
-        <template v-if="activeIntegration?.id === 'slack'">
-          <p class="bot-link-desc">Add your Slack Team ID to link @Cansee mentions and the /cansee command in your workspace to this Cansee account.</p>
-          <input v-model="externalTeamId" class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Team ID, e.g. T0123ABCD" />
-          <p class="bot-link-hint">Your Team ID starts with T. Find it in your workspace settings, or in the browser address bar when you open Slack on the web.</p>
-        </template>
-        <template v-else-if="activeIntegration?.id === 'discord'">
-          <p class="bot-link-desc">Add your Discord Server ID to link the /cansee command (report, security, ask, scan) in your server to this Cansee account.</p>
-          <input v-model="externalTeamId" class="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Server ID, e.g. 123456789012345678" />
-          <p class="bot-link-hint">The Server ID is numeric. Enable Developer Mode under App Settings &gt; Advanced, then right-click your server name and choose Copy Server ID.</p>
+        <p class="bot-link-desc">{{ botLinkDescription(activeIntegration) }}</p>
+
+        <p v-if="!activeIntegration.connectionId" class="bot-link-hint" data-test="bot-link-after-connect">
+          Connect first, then open Settings to link your {{ placeName(activeIntegration) }}.
+        </p>
+
+        <template v-else>
+          <p class="bot-link-state" data-test="bot-link-state">
+            <span :class="activeIntegration.externalTeamLinked ? 'text-success' : 'text-muted'">
+              {{ activeIntegration.externalTeamLinked
+                ? `Linked to your ${placeName(activeIntegration)}`
+                : `Not linked to a ${placeName(activeIntegration)}` }}
+            </span>
+          </p>
+
+          <div v-if="linkCode && !linkCodeExpired" class="link-code" data-test="link-code">
+            <p class="bot-link-hint">Run this command in any channel of the {{ placeName(activeIntegration) }} you want to link:</p>
+            <div class="link-code-row">
+              <code class="link-code-command">{{ linkCode.command }}</code>
+              <Button variant="secondary" size="sm" data-test="copy-link-command" @click="copyLinkCommand">
+                {{ linkCopied ? 'Copied' : 'Copy' }}
+              </Button>
+            </div>
+            <p class="bot-link-hint">The code works once and expires in {{ linkCodeMinutesLeft }} {{ linkCodeMinutesLeft === 1 ? 'minute' : 'minutes' }}.</p>
+          </div>
+          <p v-else-if="linkCode && linkCodeExpired" class="bot-link-hint" data-test="link-code-expired">
+            That code expired. Get a new one to link your {{ placeName(activeIntegration) }}.
+          </p>
+
+          <p v-if="linkError" class="sms-error" role="alert">{{ linkError }}</p>
+
+          <div class="bot-link-actions">
+            <Button variant="secondary" size="sm" :disabled="linkBusy" data-test="get-link-code" @click="requestLinkCode">
+              {{ linkCode && !linkCodeExpired ? 'Get a new code' : 'Get link code' }}
+            </Button>
+            <Button
+              v-if="linkCode && !activeIntegration.externalTeamLinked"
+              variant="ghost"
+              size="sm"
+              :disabled="linkBusy"
+              data-test="refresh-link-state"
+              @click="refreshLinkState"
+            >
+              Check link status
+            </Button>
+            <Button
+              v-if="activeIntegration.externalTeamLinked"
+              variant="ghost"
+              size="sm"
+              class="text-muted-foreground hover:text-destructive"
+              :disabled="linkBusy"
+              data-test="unlink-workspace"
+              @click="unlinkWorkspace"
+            >
+              Unlink
+            </Button>
+          </div>
         </template>
       </div>
 
@@ -271,7 +322,7 @@
 
       <template #footer>
         <Button variant="secondary" @click="showConnectModal = false">Cancel</Button>
-        <Button :disabled="!webhookUrl.trim() || connecting" @click="confirmConnect">
+        <Button :disabled="!canSave || connecting" @click="confirmConnect">
           <span v-if="connecting" class="btn-spinner"></span>
           {{ connecting ? 'Connecting...' : 'Connect & Save' }}
         </Button>
@@ -293,14 +344,12 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import { Button } from '@/components/ui/button'
-import api from '@/api/client'
 import integrationsApi from '@/api/integrations'
 
 const showConnectModal = ref(false)
 const activeIntegration = ref(null)
 const webhookUrl = ref('')
 const channelName = ref('')
-const externalTeamId = ref('')
 const connecting = ref(false)
 const showSuccessToast = ref(false)
 const successMessage = ref('')
@@ -339,7 +388,7 @@ const integrations = reactive([
     connectionId: null,
     webhookUrl: '',
     channelName: '',
-    externalTeamId: '',
+    externalTeamLinked: false,
     scheduleTime: '',
     notifPrefs: null,
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M14.5 2a2.5 2.5 0 0 0 0 5H17V4.5A2.5 2.5 0 0 0 14.5 2z" fill="#E01E5A"/><path d="M2 14.5a2.5 2.5 0 0 0 5 0V12H4.5A2.5 2.5 0 0 0 2 14.5z" fill="#36C5F0"/><path d="M9.5 22a2.5 2.5 0 0 0 0-5H7v2.5A2.5 2.5 0 0 0 9.5 22z" fill="#2EB67D"/><path d="M22 9.5a2.5 2.5 0 0 0-5 0V12h2.5A2.5 2.5 0 0 0 22 9.5z" fill="#ECB22E"/></svg>',
@@ -353,7 +402,7 @@ const integrations = reactive([
     connectionId: null,
     webhookUrl: '',
     channelName: '',
-    externalTeamId: '',
+    externalTeamLinked: false,
     scheduleTime: '',
     notifPrefs: null,
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="#5865F2"><path d="M20.3 4.1a19.4 19.4 0 0 0-4.8-1.5 14.5 14.5 0 0 0-.6 1.3 18 18 0 0 0-5.4 0c-.2-.5-.4-.9-.6-1.3A19.3 19.3 0 0 0 4 4.1 20 20 0 0 0 .5 17.7a19.5 19.5 0 0 0 6 3 14.6 14.6 0 0 0 1.3-2 12.6 12.6 0 0 1-2-.9l.5-.4c3.8 1.8 8 1.8 11.8 0 .2.1.3.3.5.4-.6.4-1.3.7-2 .9.4.7.8 1.4 1.3 2a19.5 19.5 0 0 0 6-3A20 20 0 0 0 20.3 4.1zM8 14.8c-1.2 0-2.2-1.1-2.2-2.4S6.8 10 8 10s2.2 1.1 2.2 2.4S9.2 14.8 8 14.8zm8 0c-1.2 0-2.2-1.1-2.2-2.4S14.8 10 16 10s2.2 1.1 2.2 2.4S17.2 14.8 16 14.8z"/></svg>',
@@ -367,7 +416,7 @@ const integrations = reactive([
     connectionId: null,
     webhookUrl: '',
     channelName: '',
-    externalTeamId: '',
+    externalTeamLinked: false,
     scheduleTime: '',
     notifPrefs: null,
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="6" cy="7.5" r="3" fill="#7B83EB"/><rect x="8" y="6" width="13" height="13" rx="2.5" fill="#5B5FC7"/><path d="M11 9.3h7M14.5 9.3V16" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/></svg>',
@@ -383,7 +432,7 @@ const sentItems = [
 // ── Load saved connections from the API ──
 async function loadConnections() {
   // Silent: a failure renders inline (see loadAll).
-  const res = await api.get('/notifications/integrations/', { _silentError: true })
+  const res = await integrationsApi.list()
   // Notifications endpoints double-wrap: the unwrapped payload is
   // itself {data: [...]}, so res.data?.data is the connection list.
   const saved = res.data?.data || []
@@ -398,7 +447,7 @@ async function loadConnections() {
     intg.webhookConfigured = !!conn.webhook_configured
     intg.webhookUrl = ''
     intg.channelName = conn.channel_name || ''
-    intg.externalTeamId = conn.external_team_id || ''
+    intg.externalTeamLinked = !!conn.external_team_linked
     // TimeFields may serialize as HH:MM:SS; the API expects HH:MM back.
     intg.scheduleTime = (conn.schedule_time || '').slice(0, 5)
     intg.notifPrefs = {
@@ -624,13 +673,148 @@ onBeforeUnmount(() => {
     sentObserver.disconnect()
     sentObserver = null
   }
+  clearLinkCode()
 })
+
+// ── In-channel bot linking (Slack / Discord) ──
+// A workspace is linked by running `/cansee link <code>` inside it; the
+// API never accepts a typed workspace id, so none is ever sent.
+const LINKABLE = { slack: 'workspace', discord: 'server' }
+
+function isLinkable(intg) {
+  return Object.hasOwn(LINKABLE, intg?.id)
+}
+
+function placeName(intg) {
+  return LINKABLE[intg?.id] || 'workspace'
+}
+
+function botLinkDescription(intg) {
+  return intg?.id === 'slack'
+    ? 'Link your Slack workspace to use @Cansee mentions and the /cansee command with this Cansee account.'
+    : 'Link your Discord server to use the /cansee command (report, security, ask, scan) with this Cansee account.'
+}
+
+const linkCode = ref(null)      // {code, command, expiresAt}
+const linkBusy = ref(false)
+const linkError = ref('')
+const linkCopied = ref(false)
+const linkNow = ref(Date.now())
+let linkTimer = null
+
+const linkCodeExpired = computed(() => !!linkCode.value && linkNow.value >= linkCode.value.expiresAt)
+const linkCodeMinutesLeft = computed(() => {
+  if (!linkCode.value) return 0
+  return Math.max(1, Math.ceil((linkCode.value.expiresAt - linkNow.value) / 60000))
+})
+
+function clearLinkCode() {
+  if (linkTimer) {
+    clearInterval(linkTimer)
+    linkTimer = null
+  }
+  linkCode.value = null
+  linkError.value = ''
+  linkCopied.value = false
+}
+
+// The notifications endpoints return {"error": "..."} for their own
+// checks and {"error": {code, message}} for serializer validation.
+function apiErrorMessage(err, fallback) {
+  const e = err?.response?.data?.error
+  if (typeof e === 'string' && e) return e
+  return e?.message || fallback
+}
+
+async function requestLinkCode() {
+  const intg = activeIntegration.value
+  if (!intg?.connectionId || linkBusy.value) return
+  linkBusy.value = true
+  linkError.value = ''
+  try {
+    const res = await integrationsApi.linkCode(intg.connectionId)
+    const payload = res?.data || {}
+    const seconds = Number(payload.expires_in) > 0 ? Number(payload.expires_in) : 15 * 60
+    clearLinkCode()
+    linkNow.value = Date.now()
+    linkCode.value = {
+      code: payload.code,
+      command: payload.command || `/cansee link ${payload.code}`,
+      expiresAt: linkNow.value + seconds * 1000,
+    }
+    linkTimer = setInterval(() => {
+      linkNow.value = Date.now()
+      if (linkCodeExpired.value) {
+        clearInterval(linkTimer)
+        linkTimer = null
+      }
+    }, 15000)
+  } catch (err) {
+    linkError.value = apiErrorMessage(err, 'Could not create a link code. Try again.')
+  } finally {
+    linkBusy.value = false
+  }
+}
+
+async function copyLinkCommand() {
+  if (!linkCode.value) return
+  try {
+    await navigator.clipboard.writeText(linkCode.value.command)
+    linkCopied.value = true
+    setTimeout(() => { linkCopied.value = false }, 2000)
+  } catch {
+    linkError.value = 'Could not copy. Select the command and copy it manually.'
+  }
+}
+
+async function refreshLinkState() {
+  if (linkBusy.value) return
+  linkBusy.value = true
+  linkError.value = ''
+  try {
+    await loadConnections()
+    if (activeIntegration.value?.externalTeamLinked) {
+      clearLinkCode()
+      showToast(`${activeIntegration.value.name} ${placeName(activeIntegration.value)} linked`)
+    } else {
+      linkError.value = `Not linked yet. Run the command in your ${placeName(activeIntegration.value)}, then check again.`
+    }
+  } catch (err) {
+    linkError.value = apiErrorMessage(err, 'Could not check the link status. Try again.')
+  } finally {
+    linkBusy.value = false
+  }
+}
+
+async function unlinkWorkspace() {
+  const intg = activeIntegration.value
+  if (!intg?.connectionId || linkBusy.value) return
+  const place = placeName(intg)
+  if (!window.confirm(`Unlink this ${place}? The /cansee command there will stop working for your account until you link it again.`)) return
+  linkBusy.value = true
+  linkError.value = ''
+  try {
+    const res = await integrationsApi.unlinkWorkspace(intg.connectionId)
+    const saved = res?.data?.data
+    intg.externalTeamLinked = typeof saved?.external_team_linked === 'boolean' ? saved.external_team_linked : false
+    clearLinkCode()
+    showToast(`${intg.name} ${place} unlinked`)
+  } catch (err) {
+    linkError.value = apiErrorMessage(err, `Could not unlink the ${place}. Try again.`)
+  } finally {
+    linkBusy.value = false
+  }
+}
+
+// An existing connection keeps its stored webhook when the field is left
+// blank (the URL is write-only, so it can't be shown back).
+const canSave = computed(() => !!webhookUrl.value.trim() || !!activeIntegration.value?.webhookConfigured)
 
 function openConnect(intg) {
   activeIntegration.value = intg
   webhookUrl.value = ''
   channelName.value = ''
-  externalTeamId.value = ''
+  clearLinkCode()
   setPrefs(null)
   showConnectModal.value = true
 }
@@ -639,7 +823,7 @@ function openSettings(intg) {
   activeIntegration.value = intg
   webhookUrl.value = intg.webhookUrl || ''
   channelName.value = intg.channelName || ''
-  externalTeamId.value = intg.externalTeamId || ''
+  clearLinkCode()
   setPrefs(intg.notifPrefs)
   showConnectModal.value = true
 }
@@ -657,14 +841,15 @@ async function disconnect(intg) {
   intg.connectionId = null
   intg.webhookUrl = ''
   intg.channelName = ''
-  intg.externalTeamId = ''
+  intg.externalTeamLinked = false
+  intg.webhookConfigured = false
   intg.scheduleTime = ''
   intg.notifPrefs = null
   showToast(`${intg.name} disconnected`)
 }
 
 async function confirmConnect() {
-  if (!webhookUrl.value.trim()) return
+  if (!canSave.value) return
   connecting.value = true
 
   const intg = integrations.find(i => i.id === activeIntegration.value.id)
@@ -685,21 +870,23 @@ async function confirmConnect() {
 
     // Save to backend (upsert). Backend sends a test message server-side.
     // Silent: the specific reason is shown in this component's own toast.
-    const res = await api.post('/notifications/integrations/', {
+    // external_team_id is left out on purpose: linking happens through
+    // the /cansee link command (see requestLinkCode).
+    const res = await integrationsApi.save({
       platform: intg.id,
       webhook_url: webhookUrl.value.trim(),
       channel_name: channelName.value.trim(),
-      external_team_id: externalTeamId.value.trim(),
       schedule_time: scheduleTime,
       ...notifData,
-    }, { _silentError: true })
+    })
 
     const saved = res.data?.data
     intg.connected = true
     intg.connectionId = saved?.id || intg.connectionId || null
-    intg.webhookUrl = webhookUrl.value.trim()
+    intg.webhookUrl = ''
+    intg.webhookConfigured = saved ? !!saved.webhook_configured : true
     intg.channelName = channelName.value.trim()
-    intg.externalTeamId = externalTeamId.value.trim()
+    intg.externalTeamLinked = !!saved?.external_team_linked
     intg.scheduleTime = scheduleTime
     intg.notifPrefs = snapshotPrefs()
 
@@ -710,10 +897,7 @@ async function confirmConnect() {
     connecting.value = false
     // The notifications endpoints return {"error": "..."} with the
     // specific reason (invalid platform, malformed webhook URL, ...).
-    const backendError = err.response?.data?.error
-    const message = typeof backendError === 'string' && backendError
-      ? backendError
-      : err.displayMessage || `We couldn't connect ${intg.name}. Please check the webhook URL.`
+    const message = apiErrorMessage(err, err.displayMessage || `We couldn't connect ${intg.name}. Please check the webhook URL.`)
     showToast(message, 'error')
   }
 }
@@ -1017,6 +1201,40 @@ function showToast(msg, kind = 'success') {
   color: var(--muted-foreground);
   line-height: 1.5;
   margin: 8px 0 0;
+}
+
+.bot-link-state {
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.link-code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.link-code-command {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 13px;
+  color: var(--foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  user-select: all;
+}
+
+.bot-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .notif-prefs {
