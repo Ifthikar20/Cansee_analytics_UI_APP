@@ -18,7 +18,7 @@
 
       <h1>Privacy Policy</h1>
       <p class="legal-intro">
-        Alicorr LLC ("Cansee", "we", "us", or "our"), operator of the Cansee service, respects your privacy. This Privacy
+        Cansee ("we", "us", or "our") respects your privacy. This Privacy
         Policy explains how we collect, use, and protect your information when you use our
         website, dashboard, applications, and APIs (the "Services").
       </p>
@@ -302,14 +302,11 @@
           us at <a href="mailto:privacy@cansee.ai">privacy@cansee.ai</a>. For security
           issues, email <a href="mailto:security@cansee.ai">security@cansee.ai</a>.
         </p>
-        <p>
-          Alicorr LLC (operator of Cansee).
-        </p>
       </section>
     </main>
 
     <footer class="legal-footer flex items-center justify-between border-t border-border px-10 py-6 text-sm text-muted-foreground">
-      <p>&copy; 2026 Alicorr LLC. All rights reserved.</p>
+      <p>&copy; 2026 Cansee. All rights reserved.</p>
       <div class="flex gap-5">
         <router-link to="/terms" class="font-medium text-muted-foreground no-underline hover:text-foreground">Terms of Service</router-link>
         <router-link to="/privacy" class="font-medium text-muted-foreground no-underline hover:text-foreground">Privacy Policy</router-link>

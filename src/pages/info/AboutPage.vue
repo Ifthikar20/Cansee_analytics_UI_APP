@@ -10,9 +10,8 @@
     <h2>How we got here</h2>
     <p>
       We started as an internal tool to track AI-citation share for a single B2B product. When
-      every brand we showed it to said "I need this", we spun it out. Today Cansee is
-      operated by Alicorr LLC and serves marketing teams across SaaS, e-commerce, and
-      professional services.
+      every brand we showed it to said "I need this", we spun it out. Today Cansee serves
+      marketing teams across SaaS, e-commerce, and professional services.
     </p>
 
     <h2>What we believe</h2>

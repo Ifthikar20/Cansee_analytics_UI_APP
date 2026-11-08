@@ -1,5 +1,5 @@
 <template>
-  <InfoPage title="Data Processing Agreement" eyebrow="Legal" intro="This Data Processing Agreement (DPA) supplements the Cansee Terms of Service and governs how Alicorr LLC processes personal data on behalf of customers ('Controllers')." updated="May 19, 2026">
+  <InfoPage title="Data Processing Agreement" eyebrow="Legal" intro="This Data Processing Agreement (DPA) supplements the Cansee Terms of Service and governs how Cansee processes personal data on behalf of customers ('Controllers')." updated="May 19, 2026">
     <h2>1. Scope</h2>
     <p>
       This DPA applies whenever Cansee processes personal data (as defined under GDPR, UK GDPR,
@@ -8,7 +8,7 @@
 
     <h2>2. Roles</h2>
     <p>
-      The Customer is the Controller. Alicorr LLC, operator of Cansee, is the Processor. Sub-processors
+      The Customer is the Controller. Cansee is the Processor. Sub-processors
       (e.g. hosting, LLM providers, email delivery) act as Sub-processors.
     </p>
 

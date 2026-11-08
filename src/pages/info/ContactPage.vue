@@ -24,12 +24,6 @@
       For interviews, quotes, or media kits, watch this page — press contact details will
       be published alongside our first public release.
     </p>
-
-    <h2>Company</h2>
-    <p>
-      Cansee is operated by Alicorr LLC. Mailing address available on request once the
-      contact form is live.
-    </p>
   </InfoPage>
 </template>
 

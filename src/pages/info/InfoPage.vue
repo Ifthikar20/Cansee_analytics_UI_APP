@@ -21,7 +21,7 @@
     </main>
 
     <footer class="info-footer">
-      <span>© 2026 Cansee, Inc.</span>
+      <span>© 2026 Cansee</span>
       <div class="info-footer-links">
         <router-link to="/terms">Terms</router-link>
         <router-link to="/privacy">Privacy</router-link>

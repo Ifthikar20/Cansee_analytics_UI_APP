@@ -777,7 +777,7 @@
 
         <!-- Bottom row: copy + meta links -->
         <div class="footer-bottom">
-          <span class="footer-copy">© 2026 Cansee, Inc. All rights reserved.</span>
+          <span class="footer-copy">© 2026 Cansee. All rights reserved.</span>
           <div class="footer-meta">
             <span class="footer-meta-item">
               <span class="footer-status-dot"></span>

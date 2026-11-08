@@ -19,8 +19,8 @@
       <h1>Terms of Service</h1>
       <p class="legal-intro">
         Welcome to Cansee. These Terms of Service ("Terms") govern your use of the Cansee
-        platform, website, APIs, and related services (collectively, the "Service") operated by
-        Alicorr LLC ("Company", "we", "us", or "our"), operator of the Cansee service.
+        platform, website, APIs, and related services (collectively, the "Service") provided by
+        Cansee ("Company", "we", "us", or "our").
       </p>
       <p class="legal-intro">
         By accessing or using the Service, you agree to be bound by these Terms. If you do not
@@ -226,14 +226,14 @@
       <!-- ── 12. Limitation of Liability ── -->
       <section id="liability">
         <h2>12. Limitation of Liability</h2>
-        <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, CANSEE INC. SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, DATA, BUSINESS OPPORTUNITIES, OR GOODWILL, ARISING OUT OF OR IN CONNECTION WITH YOUR USE OF THE SERVICE.</p>
+        <p>TO THE MAXIMUM EXTENT PERMITTED BY LAW, CANSEE SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF PROFITS, DATA, BUSINESS OPPORTUNITIES, OR GOODWILL, ARISING OUT OF OR IN CONNECTION WITH YOUR USE OF THE SERVICE.</p>
         <p>OUR TOTAL LIABILITY UNDER THESE TERMS SHALL NOT EXCEED THE AMOUNT PAID BY YOU TO US IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM.</p>
       </section>
 
       <!-- ── 13. Indemnification ── -->
       <section id="indemnification">
         <h2>13. Indemnification</h2>
-        <p>You agree to indemnify, defend, and hold harmless Alicorr LLC and its officers, directors, employees, and agents from any claims, damages, losses, liabilities, and expenses (including reasonable attorneys' fees) arising out of:</p>
+        <p>You agree to indemnify, defend, and hold harmless Cansee and its officers, directors, employees, and agents from any claims, damages, losses, liabilities, and expenses (including reasonable attorneys' fees) arising out of:</p>
         <ul>
           <li>Your use of the Service.</li>
           <li>Your violation of these Terms.</li>
@@ -266,7 +266,7 @@
         <h2>16. Contact Information</h2>
         <p>If you have any questions about these Terms, you can reach us at:</p>
         <div class="contact-card mt-3 rounded-xl bg-muted px-6 py-5">
-          <p><strong>Alicorr LLC</strong> (operator of Cansee)</p>
+          <p><strong>Cansee</strong></p>
           <p>Email: <a href="mailto:legal@cansee.ai">legal@cansee.ai</a></p>
           <p>Support: <a href="mailto:support@cansee.ai">support@cansee.ai</a></p>
           <p>Website: <a href="https://cansee.ai" target="_blank" rel="noopener">https://cansee.ai</a></p>
@@ -275,7 +275,7 @@
     </main>
 
     <footer class="legal-footer flex items-center justify-between border-t border-border px-10 py-6 text-sm text-muted-foreground">
-      <p>&copy; 2026 Alicorr LLC. All rights reserved.</p>
+      <p>&copy; 2026 Cansee. All rights reserved.</p>
       <div class="flex gap-5">
         <router-link to="/terms" class="font-medium text-muted-foreground no-underline hover:text-foreground">Terms of Service</router-link>
         <router-link to="/privacy" class="font-medium text-muted-foreground no-underline hover:text-foreground">Privacy Policy</router-link>
