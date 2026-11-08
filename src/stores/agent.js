@@ -17,6 +17,7 @@ import {
     normalizeSwarmVersion,
 } from '@/lib/agent/normalize'
 import { reduceEvents } from '@/lib/agent/reducer'
+import { fallbackTemplates, isReportTemplateKey, templatesFromCatalog } from '@/lib/agent/reportTemplates'
 import { createRunManager } from '@/lib/agent/runManager'
 import { clearDraft, clearLastChat, removePaneState, setLastChat, setLastProject } from '@/lib/agent/storage'
 import {
@@ -159,6 +160,10 @@ export const useAgentStore = defineStore('agent', () => {
     const artifacts = ref({})
     const catalog = ref([])
     const catalogLoaded = ref(false)
+    // Report templates (GET report-templates/, lib/agent/reportTemplates):
+    // the catalog's seven, or the local copy when the call failed (source
+    // 'fallback', availability unknown). Not project-scoped.
+    const reportTemplates = ref({ items: [], source: '', loading: false, error: null })
     const suggestions = ref([])
     const activity = ref([])
     // Drafts waiting for this user's review in the project (GET reviews/
@@ -170,6 +175,8 @@ export const useAgentStore = defineStore('agent', () => {
     // {detail: SwarmDetail|null, versions: {[n]: SwarmVersion}, loading, error}.
     const swarms = ref({})
 
+    // Bumped by resetAll, so a templates request from before a sign-out is dropped.
+    let authEpoch = 0
     const inflightChats = new Map()
     const stopTimers = new Map()
     // Chats this tab created whose generated title has not arrived yet, and
@@ -1037,6 +1044,7 @@ export const useAgentStore = defineStore('agent', () => {
                     parent_id: meta.parentId || undefined,
                     agent: meta.agent || undefined,
                     engines: meta.engines?.length ? [...meta.engines] : undefined,
+                    template: meta.template || undefined,
                 },
                 { idempotencyKey: meta.idempotencyKey }
             )
@@ -1291,9 +1299,11 @@ export const useAgentStore = defineStore('agent', () => {
      * POST continues in the background (see the header for how its failure
      * surfaces).
      */
-    async function send({ chatId = null, text, agent = null, engines = null } = {}) {
+    async function send({ chatId = null, text, agent = null, engines = null, template = null } = {}) {
         const body = typeof text === 'string' ? text.trim() : ''
         if (!body) throw new AgentError({ status: 400, code: ERROR_CODE.INVALID, message: 'Write a message first.' })
+        // A report template applies to this message's reply only.
+        const tpl = isReportTemplateKey(template) ? template : null
         const wid = ensureProject()
         const ep = epoch.value
         let cid = idOf(chatId) === NEW_CHAT_KEY ? null : idOf(chatId)
@@ -1311,7 +1321,7 @@ export const useAgentStore = defineStore('agent', () => {
             fresh.pending = true
             fresh.cancelOnStart = false
             // On screen while the chat is created; it then moves to that chat.
-            const tempId = addOptimistic(NEW_CHAT_KEY, null, body, agent, engines)
+            const tempId = addOptimistic(NEW_CHAT_KEY, null, body, agent, { engines, template: tpl })
             fresh.leafId = tempId
             try {
                 const { data } = await agentApi.createChat(wid, agent ? { entry_agent: agent } : {}, { ...SILENT })
@@ -1352,7 +1362,7 @@ export const useAgentStore = defineStore('agent', () => {
 
         const st = ensureChatState(cid)
         dropFailedSends(cid)
-        const tempId = addOptimistic(cid, lastPersistedLeaf(cid), body, agent, engines)
+        const tempId = addOptimistic(cid, lastPersistedLeaf(cid), body, agent, { engines, template: tpl })
         st.leafId = tempId
         st.pending = true
         st.cancelOnStart = false
@@ -1362,7 +1372,7 @@ export const useAgentStore = defineStore('agent', () => {
     }
 
     /** An optimistic user message under `chatKey`, waiting for its POST. */
-    function addOptimistic(chatKey, parentId, body, agent, engines = null) {
+    function addOptimistic(chatKey, parentId, body, agent, { engines = null, template = null } = {}) {
         const tempId = `tmp-${newId()}`
         const temp = {
             id: tempId,
@@ -1383,13 +1393,15 @@ export const useAgentStore = defineStore('agent', () => {
             local: true,
             client_id: tempId,
             // engines: the AI engines this reply's research may ask (public
-            // keys), or null for every configured one.
+            // keys), or null for every configured one. template: the report
+            // template applied to this reply, or null.
             send: {
                 idempotencyKey: newId(),
                 text: body,
                 agent: agent || null,
                 parentId,
                 engines: Array.isArray(engines) && engines.length ? [...engines] : null,
+                template: template || null,
                 error: null,
             },
         }
@@ -1864,6 +1876,42 @@ export const useAgentStore = defineStore('agent', () => {
         }
     }
 
+    /**
+     * The report templates for the gallery and the composer. Cached after the
+     * first success; a failed call keeps the local copy (source 'fallback')
+     * and `error`, and the next call tries the server again. Calls made
+     * while one is in flight share it.
+     */
+    let templatesRequest = null
+    async function loadReportTemplates({ force = false } = {}) {
+        const state = reportTemplates.value
+        if (state.source === 'catalog' && !force) return state.items
+        if (templatesRequest) return templatesRequest
+        const ep = authEpoch
+        state.loading = true
+        templatesRequest = (async () => {
+            try {
+                const { data } = await agentApi.reportTemplates({ _silentError: true })
+                if (ep !== authEpoch) return reportTemplates.value.items
+                const items = templatesFromCatalog(data)
+                if (!items.length) throw new AgentError({ message: 'The report templates could not be loaded.' })
+                reportTemplates.value = { items, source: 'catalog', loading: false, error: null }
+            } catch (err) {
+                if (ep !== authEpoch) return reportTemplates.value.items
+                reportTemplates.value = {
+                    items: fallbackTemplates(),
+                    source: 'fallback',
+                    loading: false,
+                    error: normalizeError(err).toJSON(),
+                }
+            } finally {
+                templatesRequest = null
+            }
+            return reportTemplates.value.items
+        })()
+        return templatesRequest
+    }
+
     async function loadSuggestions() {
         const wid = ensureProject()
         const ep = epoch.value
@@ -1957,6 +2005,9 @@ export const useAgentStore = defineStore('agent', () => {
         statusLoading.value = false
         catalog.value = []
         catalogLoaded.value = false
+        authEpoch += 1
+        templatesRequest = null
+        reportTemplates.value = { items: [], source: '', loading: false, error: null }
     }
 
     /* ── Watchers ── */
@@ -1997,6 +2048,7 @@ export const useAgentStore = defineStore('agent', () => {
         artifacts,
         catalog,
         catalogLoaded,
+        reportTemplates,
         suggestions,
         activity,
         reviewsWaiting,
@@ -2047,6 +2099,7 @@ export const useAgentStore = defineStore('agent', () => {
         loadArtifacts,
         // other
         loadCatalog,
+        loadReportTemplates,
         loadSuggestions,
         loadActivity,
         loadReviewsWaiting,

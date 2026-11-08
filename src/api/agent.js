@@ -22,6 +22,8 @@ const clean = (params) =>
 export default {
     status: (config) => api.get('/agent/status/', config),
     agents: (config) => api.get('/agent/agents/', config),
+    // [ReportTemplate] (reports-be contract); not project-scoped
+    reportTemplates: (config) => api.get('/agent/report-templates/', config),
 
     listChats: (wid, { q, cursor } = {}, config = {}) =>
         api.get(`${site(wid)}/chats/`, { ...config, params: clean({ q, cursor }) }),
@@ -138,7 +140,8 @@ export default {
 
     /* ── agent process ── */
 
-    // {text, parent_id?, agent?, engines?}; 202 {user_message, assistant_message, run}
+    // {text, parent_id?, agent?, engines?, template?}; 202 {user_message, assistant_message, run}
+    // 400 invalid (unknown template or engine) | template_unavailable
     sendMessage: (wid, cid, data, { idempotencyKey, ...config } = {}) =>
         api.post(
             `${live(wid)}/chats/${encodeURIComponent(cid)}/messages/`,

@@ -71,7 +71,9 @@ export const TIPS = Object.freeze({
         seats: 'Members and pending invites both use a seat. Your plan sets how many you have.',
     }),
     agent: Object.freeze({
-        plus: 'Use a specialist agent, or open a web page beside the chat.',
+        plus: 'Use a specialist agent or a report template for the next reply, or open a web page beside the chat.',
+        templates:
+            'Each template sets the sections of the report the agent writes. The previews use sample data, not yours.',
         research:
             "Research agents work in parallel: they search Google, ask the AI engines and read your and your competitors' pages, then merge everything into one results table.",
         findings: "Tick rows to add them to Findings, the project's list of issues to fix.",

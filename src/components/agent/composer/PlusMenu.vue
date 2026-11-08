@@ -2,7 +2,7 @@
   <DropdownMenuRoot :modal="false">
     <DropdownMenuTrigger as-child>
       <AgIconButton
-        label="Add an agent or a page"
+        label="Add an agent, a report template or a page"
         :tooltip="TIPS.agent.plus"
         tooltip-side="top"
         :icon="Plus"
@@ -39,6 +39,30 @@
           </AgMenuItem>
         </AgMenuSubContent>
       </DropdownMenuSub>
+      <DropdownMenuSub v-if="templates.length">
+        <DropdownMenuSubTrigger class="ag-menu-item ag-plus-sub">
+          <IconReports aria-hidden="true" />
+          <span class="ag-menu-text">Use a report template</span>
+          <ChevronRight class="ag-plus-sub-chevron" aria-hidden="true" />
+        </DropdownMenuSubTrigger>
+        <AgMenuSubContent>
+          <AgMenuItem
+            v-for="t in templates"
+            :key="t.id"
+            :disabled="!t.available"
+            :text-value="t.name"
+            @select="emit('select-template', t.id)"
+          >
+            <IconReports aria-hidden="true" />
+            <span v-if="!t.available" class="ag-menu-text ag-plus-agent">
+              <span>{{ t.name }}</span>
+              <span class="ag-plus-why">{{ t.unavailable ? t.unavailable.message : '' }}</span>
+            </span>
+            <span v-else class="ag-menu-text">{{ t.name }}</span>
+            <template v-if="t.id === template" #trail><Check aria-hidden="true" /></template>
+          </AgMenuItem>
+        </AgMenuSubContent>
+      </DropdownMenuSub>
       <AgMenuItem @select="emit('open-page')">
         <Globe aria-hidden="true" />
         <span class="ag-menu-text">Open a web page</span>
@@ -48,25 +72,29 @@
 </template>
 
 <script setup>
-// The composer's "+": pick an agent for the next message, or open a new tab
-// in the browser pane to visit a page. An agent the AI allowance cannot
-// start is listed, disabled, with the reason.
+// The composer's "+": pick an agent or a report template for the next
+// message, or open a new tab in the browser pane to visit a page. An agent
+// the AI allowance cannot start, or a template this workspace cannot run,
+// is listed, disabled, with the reason.
 import { DropdownMenuRoot, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuTrigger } from 'reka-ui'
 import { Check, ChevronRight, Globe, Plus } from '@lucide/vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
 import AgMenuContent from '@/components/agent/common/AgMenuContent.vue'
 import AgMenuItem from '@/components/agent/common/AgMenuItem.vue'
 import AgMenuSubContent from '@/components/agent/common/AgMenuSubContent.vue'
-import { IconAgents } from '@/components/agent/icons'
+import { IconAgents, IconReports } from '@/components/agent/icons'
 import { TIPS } from '@/lib/help/tips'
 
 defineProps({
   agents: { type: Array, default: () => [] },
   agent: { type: String, default: '' },
+  // lib/agent/reportTemplates templates; none hides the submenu.
+  templates: { type: Array, default: () => [] },
+  template: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['select-agent', 'open-page'])
+const emit = defineEmits(['select-agent', 'select-template', 'open-page'])
 </script>
 
 <style scoped>

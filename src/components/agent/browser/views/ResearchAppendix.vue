@@ -15,7 +15,7 @@
     <h2 v-else class="ag-apx-heading">Research data</h2>
 
     <div v-show="open || expanded" :id="bodyId" class="ag-apx-body">
-      <p v-if="!swarm && !serp.length && !engines.length && !pages.length" class="ag-apx-empty">
+      <p v-if="!swarm && !gaps.length && !serp.length && !engines.length && !pages.length" class="ag-apx-empty">
         This report was saved without research data.
       </p>
 
@@ -35,6 +35,33 @@
           >
             Download {{ sheet.title || sheet.key }} CSV
           </AgButton>
+        </div>
+      </section>
+
+      <section v-if="gaps.length" class="ag-apx-section">
+        <h3 class="ag-apx-sub">Prompt gaps</h3>
+        <div class="ag-apx-table">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Prompt</th>
+                <th scope="col">Google</th>
+                <th scope="col">AI engines</th>
+                <th scope="col">Gap</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(g, i) in gaps" :key="g.prompt?.id || i">
+                <td class="is-wide">
+                  {{ g.prompt?.text || 'Prompt' }}
+                  <span v-if="regionName(g.prompt?.location)" class="ag-apx-muted">· {{ regionName(g.prompt.location) }}</span>
+                </td>
+                <td>{{ googleLabel(g.google) }}</td>
+                <td :class="{ 'is-muted': !answered(g).length }">{{ enginesLine(g) }}</td>
+                <td>{{ gapLine(g) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -137,7 +164,7 @@ import AgButton from '@/components/agent/common/AgButton.vue'
 import { csvFilename, csvRows, tableSheets } from '@/components/agent/swarm/tableModel'
 import { formatDuration } from '@/composables/agent/useElapsed'
 import { engineMeta } from '@/lib/engines'
-import { aiOverviewUnread } from '@/lib/gap'
+import { aiOverviewUnread, gapDisplay, gapValueText, googleLabel } from '@/lib/gap'
 import { toCsv } from '@/lib/agent/csv'
 import { downloadText } from '@/lib/agent/download'
 import { displayUrl, hostOf } from '@/lib/agent/url'
@@ -156,6 +183,8 @@ const list = (value) => (Array.isArray(value) ? value.filter((v) => v && typeof 
 const serp = computed(() => list(props.data?.serp))
 const engines = computed(() => list(props.data?.engines))
 const pages = computed(() => list(props.data?.pages))
+// The prompt gaps the reply read (get_prompt_gap, one per prompt).
+const gaps = computed(() => list(props.data?.gaps))
 
 // The research agents behind the report (data.swarm, null without one).
 // The results table itself is in the report's Markdown, so only the run's
@@ -201,11 +230,30 @@ const summary = computed(() => {
     const total = Number(swarm.value.counts?.total) || 0
     parts.push(`${total} research ${total === 1 ? 'agent' : 'agents'}`)
   }
+  if (gaps.value.length) parts.push(`${gaps.value.length} prompt ${gaps.value.length === 1 ? 'gap' : 'gaps'}`)
   if (serp.value.length) parts.push(`${serp.value.length} Google ${serp.value.length === 1 ? 'page' : 'pages'}`)
   if (engines.value.length) parts.push(`${engines.value.length} engine ${engines.value.length === 1 ? 'check' : 'checks'}`)
   if (pages.value.length) parts.push(`${pages.value.length} ${pages.value.length === 1 ? 'page' : 'pages'} inspected`)
   return parts.join(' · ') || 'None'
 })
+
+// Engines with answers in the window; `mentioned` is null without one.
+function answered(gap) {
+  return list(gap.engines).filter((e) => Number(e.answers) > 0)
+}
+
+function enginesLine(gap) {
+  const asked = answered(gap)
+  if (!asked.length) return 'No answers yet'
+  const named = asked.filter((e) => e.mentioned === true).length
+  return `Named by ${named} of ${asked.length}`
+}
+
+function gapLine(gap) {
+  const value = gapValueText(gap.gap)
+  const label = gapDisplay(gap.gap).label
+  return value ? `${label} ${value}` : label
+}
 
 function results(cap) {
   return Array.isArray(cap.results) ? cap.results : []
@@ -425,6 +473,10 @@ function chars(n) {
   font-family: var(--ag-font-mono);
   font-size: 12px;
   overflow-wrap: anywhere;
+}
+
+.ag-apx-muted {
+  color: var(--ag-fg-3);
 }
 
 .ag-apx-table .is-muted {

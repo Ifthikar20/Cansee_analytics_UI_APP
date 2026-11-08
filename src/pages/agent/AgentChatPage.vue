@@ -8,6 +8,7 @@
         :chat-id="chatId || null"
         :project-name="projectName"
         :initial-agent="initialAgent"
+        :initial-template="initialTemplate"
         :pane-dom-id="PANE_PANEL_ID"
         @created="onCreated"
       />
@@ -44,7 +45,8 @@
 <script setup>
 // New chat (/projects/:websiteId/agent) and chat (/c/:chatId) share this
 // instance: moving to the chat URL after the first message keeps the page,
-// its composer and the pane. ?agent=<key> preselects an agent on a new chat;
+// its composer and the pane. ?agent=<key> preselects an agent on a new chat
+// and ?template=<key> the report template its first reply follows;
 // ?artifact=<id> opens that artifact in the pane; ?tab=<serp:…|page:…>
 // opens one of the chat's captures once the chat has loaded.
 //
@@ -70,6 +72,7 @@ import { useFirstResearch } from '@/composables/agent/useFirstResearch'
 import { useToast } from '@/composables/useToast'
 import { ASK_FROM_LABELS } from '@/lib/agent/askAgent'
 import { writerUnavailable } from '@/lib/agent/agentsMeta'
+import { isReportTemplateKey } from '@/lib/agent/reportTemplates'
 import { saveDraft } from '@/lib/agent/storage'
 import { hidesUsd, meteredRuns, runsLeftText } from '@/lib/promptRuns'
 import { noteFirstResearchChat } from '@/lib/setup/storage'
@@ -116,6 +119,13 @@ const initialAgent = computed(() => {
   if (props.chatId) return null
   const key = typeof route.query.agent === 'string' ? route.query.agent : ''
   return AGENT_KEY_LIST.includes(key) ? key : null
+})
+
+// The Reports page's template gallery opens a new chat with ?template=.
+const initialTemplate = computed(() => {
+  if (props.chatId) return null
+  const key = typeof route.query.template === 'string' ? route.query.template : ''
+  return isReportTemplateKey(key) ? key : null
 })
 
 const title = computed(() => {
