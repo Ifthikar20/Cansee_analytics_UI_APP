@@ -14,29 +14,55 @@ const props = defineProps({
   promptId: { type: String, required: true },
 })
 
+// The alerts list is paginated. Read every page (largest page size the
+// API allows) so the list and the open count cover all findings; the cap
+// bounds a pathological prompt. `total` is the server's count, used to say
+// when the cap cut the list short.
+const PAGE_SIZE = 100
+const MAX_PAGES = 20
+
 const loading = ref(true)
 const alerts = ref([])
+const total = ref(0)
 const loadFailed = ref(false)
+// Ignores a slower earlier load when the prompt changes mid-way.
+let loadSeq = 0
 
 const sorted = computed(() => [...alerts.value].sort(compareSeverity))
 const openCount = computed(() => sorted.value.filter(a => a.status === 'open').length)
 
 async function load() {
   if (!props.websiteId || !props.promptId) return
+  const seq = ++loadSeq
   loading.value = true
   loadFailed.value = false
   try {
-    // Silent: a failure renders inline below instead of a toast.
-    const { data } = await api.get(`/brand-security/websites/${props.websiteId}/alerts/`, {
-      params: { source_prompt: props.promptId },
-      _silentError: true,
-    })
-    alerts.value = Array.isArray(data) ? data : (data?.results ?? [])
+    const rows = []
+    let count = null
+    for (let page = 1; page <= MAX_PAGES; page++) {
+      // Silent: a failure renders inline below instead of a toast.
+      const res = await api.get(`/brand-security/websites/${props.websiteId}/alerts/`, {
+        params: { source_prompt: props.promptId, page, page_size: PAGE_SIZE },
+        _silentError: true,
+      })
+      if (seq !== loadSeq) return
+      const data = res?.data
+      const batch = Array.isArray(data) ? data : (data?.results ?? [])
+      rows.push(...batch)
+      if (typeof res?.meta?.count === 'number') count = res.meta.count
+      // An unpaginated answer is the whole list; otherwise stop at the
+      // last page (no next link) or on an empty page.
+      if (!res?.meta || !res.meta.next || !batch.length) break
+    }
+    alerts.value = rows
+    total.value = Math.max(count ?? rows.length, rows.length)
   } catch {
+    if (seq !== loadSeq) return
     loadFailed.value = true
     alerts.value = []
+    total.value = 0
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
@@ -111,5 +137,12 @@ function label(issue) {
         </div>
       </li>
     </ul>
+    <p
+      v-if="!loading && !loadFailed && total > sorted.length"
+      class="border-t border-border/60 px-5 py-2.5 text-[11px] text-muted-foreground"
+      data-test="findings-truncated"
+    >
+      Showing {{ sorted.length }} of {{ total }} findings.
+    </p>
   </Card>
 </template>
