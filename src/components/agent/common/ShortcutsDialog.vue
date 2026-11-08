@@ -1,5 +1,5 @@
 <script setup>
-// Keyboard shortcuts reference (Ctrl/Cmd+/ and the help menu).
+// Keyboard shortcuts reference (Ctrl/Cmd+/, the help drawer and the phone menu).
 import { computed } from 'vue'
 import { AGENT_SHORTCUTS } from '@/composables/agent/useAgentHotkeys'
 import AgDialog from './AgDialog.vue'

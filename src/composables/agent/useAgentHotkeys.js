@@ -19,6 +19,8 @@ export const AGENT_SHORTCUTS = Object.freeze([
   { id: 'sidebar', keys: 'mod+b', label: 'Show or hide the sidebar', group: 'General' },
   { id: 'pane', keys: 'mod+\\', label: 'Show or hide the browser pane', group: 'General' },
   { id: 'shortcuts', keys: 'mod+/', label: 'Keyboard shortcuts', group: 'General' },
+  // Handled by useHelpShortcut, outside text fields; listed for the dialog.
+  { id: 'help', keys: 'shift+?', label: 'Open help', group: 'General' },
   { id: 'escape', keys: 'esc', label: 'Stop the agent, or close what is open', group: 'General' },
   { id: 'send', keys: 'enter', label: 'Send the message', group: 'Composer' },
   { id: 'newline', keys: 'shift+enter', label: 'New line', group: 'Composer' },

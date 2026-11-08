@@ -57,6 +57,7 @@
 
       <AgentAnnouncer />
       <ShortcutsDialog :open="ui.shortcutsOpen" @update:open="ui.setShortcutsOpen($event)" />
+      <HelpDrawer :open-shortcuts="ui.openShortcuts" />
       <ToastContainer />
       <AddProjectDialog :open="ui.addProjectOpen" @update:open="ui.setAddProjectOpen($event)" />
     </div>
@@ -85,12 +86,14 @@ import AgentSidebar from '@/components/agent/sidebar/AgentSidebar.vue'
 import AgDrawer from '@/components/agent/common/AgDrawer.vue'
 import AgentAnnouncer from '@/components/agent/common/AgentAnnouncer.vue'
 import ShortcutsDialog from '@/components/agent/common/ShortcutsDialog.vue'
+import HelpDrawer from '@/components/help/HelpDrawer.vue'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentUiStore } from '@/stores/agentUi'
 import { useAppStore } from '@/stores/app'
 import { useShellBootstrap } from '@/composables/useShellBootstrap'
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
 import { useAgentHotkeys } from '@/composables/agent/useAgentHotkeys'
+import { useHelpShortcut } from '@/composables/useHelpShortcut'
 import { useVisualViewportInset } from '@/composables/agent/useVisualViewportInset'
 import { ensureAgentFont } from '@/lib/agent/font'
 import { sectionOf } from '@/lib/shell/nav'
@@ -117,6 +120,7 @@ provide(SHELL_TAKEOVER, {
 useShellBootstrap()
 ensureAgentFont()
 useAgentHotkeys()
+useHelpShortcut()
 useVisualViewportInset()
 // The shell is a fixed viewport; the document behind it must not scroll
 // (iOS rubber-banding, scroll chaining out of the panes).
