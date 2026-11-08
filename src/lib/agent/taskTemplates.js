@@ -125,7 +125,10 @@ function form(entryAgent, templates) {
 
 // `fields` in the order shown; `required` the ones the template cannot do
 // without. {max_prompts} is filled from GET status/ (how many prompts one
-// research covers); without it that line is left out.
+// research covers, lib/agent/availability researchPromptLimit); without it
+// that line is left out. `plan` holds what the drafted request asks for
+// beyond the server's default plan ({competitorPages}), so the count fits
+// that plan; see templatePlan().
 export const TASK_FORMS = Object.freeze({
     [RESEARCH_AGENTS_KEY]: form('gap_analyst', [
         {
@@ -141,6 +144,7 @@ export const TASK_FORMS = Object.freeze({
             summary: 'Read your competitors\' pages next to yours and list what theirs do that yours do not.',
             fields: ['competitors', 'notes'],
             required: ['competitors'],
+            plan: Object.freeze({ competitorPages: 2 }),
             text: 'Run the research agents to compare us with {competitors} on our tracked prompts.\nRead 2 competitor pages per prompt and list what their pages do that ours do not.\nUse up to {max_prompts} of our tracked prompts.\nFocus: {notes}',
         },
         {
@@ -297,6 +301,15 @@ export function competitorsText(list) {
         })
     if (words.length <= 1) return words.join('')
     return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`
+}
+
+/**
+ * The research plan a template's request asks for, as options for
+ * researchPromptLimit ({competitorPages}); {} for the default plan or an
+ * agent without templates.
+ */
+export function templatePlan(agent, templateKey) {
+    return formTemplate(agent, templateKey)?.plan || {}
 }
 
 /** The required fields of the template that are still empty, in field order. */

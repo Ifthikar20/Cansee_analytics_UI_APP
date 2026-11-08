@@ -217,6 +217,21 @@ function usd(value) {
 }
 
 /**
+ * The prompt runs left this month on an account that counts them
+ * (prompt_runs.unlimited === false): `remaining`, else limit - used -
+ * reserved; null for an unlimited account or when status/ does not say.
+ */
+export function promptRunsLeft(status) {
+    const runs = isObject(status?.prompt_runs) ? status.prompt_runs : null
+    if (!runs || runs.unlimited !== false) return null
+    const left = count(runs.remaining)
+    if (left !== null) return left
+    const limit = count(runs.limit)
+    if (limit === null) return null
+    return Math.max(0, limit - (count(runs.used) ?? 0) - (count(runs.reserved) ?? 0))
+}
+
+/**
  * "13 free prompt runs left this month" for a free account, "$4.08 of AI
  * allowance left this month" for a paid one whose server says dollars may
  * show; '' when status/ does not say (a free account never gets dollars).
@@ -225,9 +240,7 @@ export function allowanceLine(status) {
     if (!isObject(status)) return ''
     const runs = isObject(status.prompt_runs) ? status.prompt_runs : null
     if (runs && runs.unlimited === false) {
-        const limit = count(runs.limit)
-        let left = count(runs.remaining)
-        if (left === null && limit !== null) left = Math.max(0, limit - (count(runs.used) ?? 0) - (count(runs.reserved) ?? 0))
+        const left = promptRunsLeft(status)
         if (left === null) return ''
         if (left === 0) return 'No free prompt runs left this month'
         return `${left} free prompt ${left === 1 ? 'run' : 'runs'} left this month`
@@ -289,20 +302,100 @@ export function researchCeiling(status) {
 }
 
 /**
- * How many prompts one research covers with the default plan (one Google
- * page and one competitor page per prompt, content gaps and citations on,
- * every engine set up here asked), within the ceiling; null when status/
- * does not say. Same count as apps/agent/runtime/swarm/plan.py
- * max_prompts_for, capped at MAX_RESEARCH_PROMPTS and at least 1.
+ * What one research can cover with what is set up here, or null when
+ * status/ does not state a ceiling or nothing can be measured:
+ * {prompts, engines, enginesKnown, perPrompt, runsLeft, limitedBy, short}.
+ *
+ * The plan is the server's default (apps/agent/runtime/swarm/plan.py
+ * max_prompts_for): one Google page and `competitorPages` competitor pages
+ * a prompt when Google is set up, every engine set up here asked, content
+ * gaps and citations on. `prompts` fits the ceiling, at most
+ * MAX_RESEARCH_PROMPTS and at least 1.
+ *
+ * On an account that counts prompt runs, each engine answer is one run
+ * (tools/swarm.py _check_prompt_runs refuses a plan that needs more than
+ * are left), so `prompts` is also at most floor(runsLeft / engines). When
+ * not even one prompt fits, `prompts` is null and `short` says why:
+ * 'no_runs' (none left) or 'few_runs' (fewer left than engines set up);
+ * '' otherwise. `limitedBy` is 'runs' when the runs left allow fewer
+ * prompts than the ceiling, else 'ceiling'. Unknown engines count as all
+ * five.
  */
-export function researchPromptLimit(status) {
+export function researchFit(status, { competitorPages = 1 } = {}) {
     const ceiling = researchCeiling(status)
     if (!ceiling) return null
     const rows = engineRows(status)
-    const engines = rows.length ? rows.filter((e) => e.configured === true).length : 5
+    const enginesKnown = rows.length > 0
+    const engines = enginesKnown ? rows.filter((e) => e.configured === true).length : 5
     const google = googleConfigured(status) !== false
     // Nothing to measure: the research is refused.
     if (!google && engines === 0) return null
-    const perPrompt = (google ? 2 : 0) + engines + 2 + (engines > 0 ? 1 : 0)
-    return Math.max(1, Math.min(MAX_RESEARCH_PROMPTS, Math.floor(ceiling / perPrompt)))
+    const pages = Math.max(0, Math.floor(Number(competitorPages) || 0))
+    const perPrompt = (google ? 1 + pages : 0) + engines + 2 + (engines > 0 ? 1 : 0)
+    let prompts = Math.max(1, Math.min(MAX_RESEARCH_PROMPTS, Math.floor(ceiling / perPrompt)))
+    const runsLeft = promptRunsLeft(status)
+    let short = ''
+    let limitedBy = 'ceiling'
+    if (runsLeft !== null && engines > 0) {
+        const affordable = Math.floor(runsLeft / engines)
+        if (affordable < prompts) limitedBy = 'runs'
+        if (affordable < 1) {
+            prompts = null
+            short = runsLeft === 0 ? 'no_runs' : 'few_runs'
+        } else {
+            prompts = Math.min(prompts, affordable)
+        }
+    }
+    return { prompts, engines, enginesKnown, perPrompt, runsLeft, limitedBy, short }
+}
+
+function runsText(n) {
+    return `${n} free prompt ${n === 1 ? 'run' : 'runs'}`
+}
+
+function plural(n, one, many) {
+    return `${n} ${n === 1 ? one : many}`
+}
+
+/**
+ * What the prompt runs left allow one research, for an account that counts
+ * them, or '' when the ceiling is what limits it (or status/ does not say):
+ *   - "With 13 free prompt runs left and 5 AI engines set up, one research
+ *     covers up to 2 prompts."
+ *   - "No free prompt runs are left this month, so a research cannot ask
+ *     the AI engines until they renew."
+ *   - "3 free prompt runs left: one prompt asks all 5 AI engines set up
+ *     here, so ask for fewer engines."
+ */
+export function researchRunsLine(fit) {
+    if (!fit || fit.runsLeft === null || fit.runsLeft === undefined) return ''
+    const engines = plural(fit.engines, 'AI engine', 'AI engines')
+    if (fit.short === 'no_runs') return 'No free prompt runs are left this month, so a research cannot ask the AI engines until they renew.'
+    if (fit.short === 'few_runs') {
+        return `${runsText(fit.runsLeft)} left: one prompt asks all ${engines} set up here, so ask for fewer engines.`
+    }
+    if (fit.limitedBy !== 'runs' || !fit.prompts) return ''
+    return `With ${runsText(fit.runsLeft)} left and ${engines} set up, one research covers up to ${plural(fit.prompts, 'prompt', 'prompts')}.`
+}
+
+/**
+ * The free prompt runs a research takes: "Up to 2 prompts × 5 AI engines =
+ * 10 free prompt runs; 13 left this month." for `prompts` prompts, or ''
+ * when the runs or the engines set up are not known, or no engine is set up
+ * (Google results use no prompt runs).
+ */
+export function researchRunsCost(fit, prompts) {
+    if (!fit || fit.runsLeft === null || fit.runsLeft === undefined || !fit.enginesKnown || !(fit.engines > 0)) return ''
+    if (!(prompts > 0)) return ''
+    const total = prompts * fit.engines
+    return `Up to ${plural(prompts, 'prompt', 'prompts')} × ${plural(fit.engines, 'AI engine', 'AI engines')} = ${runsText(total)}; ${fit.runsLeft} left this month.`
+}
+
+/**
+ * How many prompts one research covers (researchFit().prompts), or null
+ * when status/ does not say or not even one prompt fits the prompt runs
+ * left. `opts.competitorPages`: the competitor pages a prompt reads (1).
+ */
+export function researchPromptLimit(status, opts = {}) {
+    return researchFit(status, opts)?.prompts ?? null
 }

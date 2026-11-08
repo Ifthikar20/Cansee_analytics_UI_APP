@@ -12,7 +12,7 @@ import { computed } from 'vue'
 import AgButton from '@/components/agent/common/AgButton.vue'
 import HelpTip from '@/components/ui/help/HelpTip.vue'
 import { kindMeta } from '@/lib/agent/agentsMeta'
-import { blockHelp, researchCeiling, researchPromptLimit } from '@/lib/agent/availability'
+import { blockHelp, researchCeiling, researchFit, researchRunsLine } from '@/lib/agent/availability'
 import { RESEARCH_AGENTS } from '@/lib/agent/researchAgents'
 import { formTemplates } from '@/lib/agent/taskTemplates'
 import { TIPS } from '@/lib/help/tips'
@@ -31,12 +31,17 @@ const meta = RESEARCH_AGENTS
 const presets = formTemplates(meta.key)
 
 const ceiling = computed(() => researchCeiling(props.status))
-const prompts = computed(() => researchPromptLimit(props.status))
+// The default plan; on an account that counts prompt runs, also within the
+// runs left (one engine answer is one run).
+const fit = computed(() => researchFit(props.status))
 const ceilingText = computed(() => {
   if (!ceiling.value) return ''
   const head = `Up to ${ceiling.value} agents per research`
-  if (!prompts.value) return `${head}.`
-  return `${head}, enough for ${prompts.value === 1 ? '1 prompt' : `${prompts.value} prompts`} with what is set up here.`
+  const f = fit.value
+  if (!f) return `${head}.`
+  const runs = researchRunsLine(f)
+  if (runs) return `${head}. ${runs}`
+  return `${head}, enough for ${f.prompts === 1 ? '1 prompt' : `${f.prompts} prompts`} with what is set up here.`
 })
 
 const reason = computed(() => props.block?.title || (props.noProject ? TIPS.agent.noProject : ''))

@@ -14,7 +14,15 @@ import { ChevronDown, CircleAlert } from '@lucide/vue'
 import agentApi from '@/api/agent'
 import insightsApi from '@/api/insights'
 import { askAgent } from '@/lib/agent/askAgent'
-import { agentBlock, allowanceLine, blockHelp, hidesDollars, researchPromptLimit } from '@/lib/agent/availability'
+import {
+  agentBlock,
+  allowanceLine,
+  blockHelp,
+  hidesDollars,
+  researchFit,
+  researchRunsCost,
+  researchRunsLine,
+} from '@/lib/agent/availability'
 import {
   CHANNELS,
   CHANNEL_KEYS,
@@ -29,6 +37,7 @@ import {
   hasTaskForm,
   missingFields,
   taskText,
+  templatePlan,
 } from '@/lib/agent/taskTemplates'
 import { domainOf, normalizeUrl, onSite } from '@/lib/agent/contextSections'
 import { money } from '@/lib/analytics/countrySpecs'
@@ -216,7 +225,11 @@ function pageUrl(raw) {
 const block = computed(() => agentBlock(key.value, props.status))
 const unavailable = computed(() => block.value?.title || '')
 const unavailableHelp = computed(() => blockHelp(block.value))
-const maxPrompts = computed(() => researchPromptLimit(props.status))
+// What one research covers with this template's plan (the competitor check
+// reads 2 competitor pages a prompt), within the ceiling and, on an account
+// that counts them, the prompt runs left.
+const fit = computed(() => researchFit(props.status, templatePlan(key.value, templateKey.value)))
+const maxPrompts = computed(() => fit.value?.prompts ?? null)
 
 // The research agents and the Gap Analyst have no writer request of their
 // own: say what a research draws on (prompt runs, or the reply's ceiling).
@@ -224,8 +237,16 @@ const researchCostLine = computed(() => {
   if (key.value !== RESEARCH_AGENTS_KEY && key.value !== 'gap_analyst') return ''
   const s = props.status
   if (hidesDollars(s)) {
+    const head = 'Each prompt answered by one AI engine uses one free prompt run.'
+    if (key.value === RESEARCH_AGENTS_KEY && fit.value) {
+      if (fit.value.short) return `${head} ${researchRunsLine(fit.value)}`
+      // The one-prompt preset asks about a single prompt.
+      const prompts = templateKey.value === 'prompt' ? 1 : fit.value.prompts
+      const cost = researchRunsCost(fit.value, prompts)
+      if (cost) return `${head} ${cost}`
+    }
     const left = allowanceLine(s)
-    return ['Each prompt answered by one AI engine uses one free prompt run.', left ? `${left}.` : ''].filter(Boolean).join(' ')
+    return [head, left ? `${left}.` : ''].filter(Boolean).join(' ')
   }
   const cap = s?.limits?.run_cost_usd
   if (s?.allowance?.show_usd !== true || cap === undefined || cap === null || cap === '') return ''
