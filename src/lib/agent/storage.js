@@ -12,6 +12,9 @@
 // | cs-agent-activity-seen-v1:<uid>       | activity last seen, per project       |
 // | cs-agent-findings-v1:<uid>:<wid>      | Findings filters {status, category,   |
 // |                                       | severity}                             |
+// | cs-feedback-tokens-v1:<uid>           | Help & feedback ticket tokens         |
+// | cs-feedback-seen-v1:<uid>             | Help & feedback messages seen, per    |
+// |                                       | ticket                                |
 //
 // Pane state tabs are {id, kind} plus `url` (url tabs), `artifact_id` and
 // `version` (artifact tabs), `swarm_id` and `version` (research table tabs).
@@ -27,6 +30,13 @@ const ACTIVITY_SEEN_PREFIX = 'cs-agent-activity-seen-v1:'
 const FINDINGS_PREFIX = 'cs-agent-findings-v1:'
 // The analytics board's cached layouts (stores/board.js), keyed by user and project.
 const BOARD_PREFIX = 'cs-board-v1:'
+// The Help & feedback widget's ticket tokens and read state (api/feedbackClient.js).
+// A token opens its ticket, so another account on this browser must never see it.
+const FEEDBACK_TOKENS_PREFIX = 'cs-feedback-tokens-v1:'
+const FEEDBACK_SEEN_PREFIX = 'cs-feedback-seen-v1:'
+// Before they were per user: owned by nobody we can tell, so never read,
+// and removed on logout.
+const LEGACY_SHARED_KEYS = Object.freeze(['cs-feedback-tokens', 'cs-feedback-seen'])
 
 export const USER_KEY_PREFIXES = Object.freeze([
     LAST_PROJECT_PREFIX,
@@ -36,6 +46,8 @@ export const USER_KEY_PREFIXES = Object.freeze([
     ACTIVITY_SEEN_PREFIX,
     FINDINGS_PREFIX,
     BOARD_PREFIX,
+    FEEDBACK_TOKENS_PREFIX,
+    FEEDBACK_SEEN_PREFIX,
 ])
 
 const FINDINGS_PREF_KEYS = Object.freeze(['status', 'category', 'severity'])
@@ -52,6 +64,8 @@ export const storageKeys = Object.freeze({
     draft: (uid, wid, cid) => `${DRAFT_PREFIX}${uid}:${wid}:${cid || NEW_CHAT}`,
     activitySeen: (uid) => `${ACTIVITY_SEEN_PREFIX}${uid}`,
     findings: (uid, wid) => `${FINDINGS_PREFIX}${uid}:${wid}`,
+    feedbackTokens: (uid) => `${FEEDBACK_TOKENS_PREFIX}${uid}`,
+    feedbackSeen: (uid) => `${FEEDBACK_SEEN_PREFIX}${uid}`,
 })
 
 function backend() {
@@ -298,11 +312,13 @@ export function saveFindingsPrefs(uid, wid, prefs) {
 /**
  * Remove per-user keys. With `uid`, only that user's; without, every
  * user's (used on logout, when the signed-in user may be unknown).
- * Device prefs stay. Returns the number of keys removed.
+ * Device prefs stay. The old shared feedback keys go too (not counted).
+ * Returns the number of per-user keys removed.
  */
 export function clearUserData(uid) {
     const ls = backend()
     if (!ls) return 0
+    LEGACY_SHARED_KEYS.forEach(removeKey)
     const doomed = []
     try {
         for (let i = 0; i < ls.length; i += 1) {
