@@ -45,6 +45,7 @@
     <SettingsSection
       label="Traffic"
       title="Website traffic"
+      :help="TIPS.settings.traffic"
       description="Where Cansee reads your visitors, their countries and visits from AI assistants. Each source measures something different."
     >
       <p v-if="adopting" class="cn-muted">Checking the connection...</p>
@@ -54,6 +55,7 @@
     <SettingsSection
       label="Reports"
       title="Where reports go"
+      :help="TIPS.settings.reports"
       description="Send the daily report to the tools your team already uses."
     >
       <AlertChannels />
@@ -77,6 +79,7 @@ import AlertChannels from '@/components/settings/AlertChannels.vue'
 import TrafficSources from '@/components/settings/TrafficSources.vue'
 import PropertyPickerModal from '@/components/search_console/PropertyPickerModal.vue'
 import { Button } from '@/components/ui/button'
+import { TIPS } from '@/lib/help/tips'
 import api from '@/api/client'
 import searchConsoleApi from '@/api/searchConsole'
 import { ensureWebsites } from '@/router/ensureWebsites'

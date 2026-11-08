@@ -75,6 +75,7 @@
         <div class="ob-field">
           <div class="ob-label-row">
             <label class="ob-label" for="ob-brand-offering">Offerings</label>
+            <HelpTip :text="TIPS.onboarding.offerings" label="About offerings" />
             <span v-if="!form.offerings.length" class="ob-missing">Missing</span>
           </div>
           <p v-if="!form.offerings.length" class="ob-label-hint">
@@ -106,6 +107,7 @@
         <div class="ob-field">
           <div class="ob-label-row">
             <label class="ob-label" for="ob-brand-audience">Who you sell to</label>
+            <HelpTip :text="TIPS.onboarding.audience" label="About who you sell to" />
             <span v-if="!form.audience.trim()" class="ob-missing">Missing</span>
           </div>
           <p v-if="!form.scan.audience" id="ob-brand-audience-hint" class="ob-label-hint">
@@ -162,6 +164,8 @@
 import { computed, ref, watch } from 'vue'
 
 import BrandLogo from '@/components/BrandLogo.vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+import { TIPS } from '@/lib/help/tips'
 import { LIMITS, useOnboardingFlow } from '../useOnboardingFlow'
 
 const { form, host, newOffering, addOffering, removeOffering, canContinue, next, back, goTo } = useOnboardingFlow()

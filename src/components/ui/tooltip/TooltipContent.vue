@@ -1,6 +1,10 @@
 <script setup>
+// The app's tooltip surface: the agent tooltip tokens, dark in both themes,
+// stacked above the onboarding flow and dialogs (components/ui/help/help.css).
+// It never uses bg-primary, which turns white in the dark theme.
 import { TooltipContent, TooltipPortal, useForwardPropsEmits } from 'reka-ui'
 import { cn } from '@/lib/utils'
+import '@/components/ui/help/help.css'
 
 const props = defineProps({
   sideOffset: { type: Number, default: 4 },
@@ -15,13 +19,7 @@ const delegated = useForwardPropsEmits(props, emits)
 
 <template>
   <TooltipPortal>
-    <TooltipContent
-      v-bind="delegated"
-      :class="cn(
-        'z-50 overflow-hidden rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95',
-        props.class,
-      )"
-    >
+    <TooltipContent v-bind="delegated" :collision-padding="8" :class="cn('cs-tooltip', props.class)">
       <slot />
     </TooltipContent>
   </TooltipPortal>

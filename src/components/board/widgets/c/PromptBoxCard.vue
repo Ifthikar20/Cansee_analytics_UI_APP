@@ -6,73 +6,82 @@
       <AgButton size="sm" @click="loadRuns">Try again</AgButton>
     </div>
     <div v-else class="pb-layout">
-      <form class="pb-ask" novalidate @submit.prevent="ask">
-        <label class="sr-only" :for="inputId">Question</label>
-        <textarea
-          :id="inputId"
-          ref="inputEl"
-          class="pb-input"
-          rows="1"
-          :value="text"
-          :placeholder="COPY.placeholder"
-          :disabled="locked"
-          :aria-describedby="lineId"
-          @input="onInput"
-          @keydown="onKeydown"
-          @compositionstart="ime.onCompositionstart"
-          @compositionend="ime.onCompositionend"
-        ></textarea>
+      <HintCallout hint="board.ask-ai" :when="!locked">
+        <form class="pb-ask" novalidate @submit.prevent="ask">
+          <label class="sr-only" :for="inputId">Question</label>
+          <textarea
+            :id="inputId"
+            ref="inputEl"
+            class="pb-input"
+            rows="1"
+            :value="text"
+            :placeholder="COPY.placeholder"
+            :disabled="locked"
+            :aria-describedby="lineId"
+            @input="onInput"
+            @keydown="onKeydown"
+            @compositionstart="ime.onCompositionstart"
+            @compositionend="ime.onCompositionend"
+          ></textarea>
 
-        <div class="pb-controls">
-          <label class="pb-times">
-            <span>Times per engine</span>
-            <select v-model.number="samples" class="pb-select" :disabled="locked">
-              <option v-for="n in SAMPLE_CHOICES" :key="n" :value="n">{{ n }}</option>
-            </select>
-          </label>
-          <div v-if="engineOptions.length" class="pb-chips" role="group" aria-label="Engines">
-            <button
-              v-for="engine in engineOptions"
-              :key="engine.key"
-              type="button"
-              class="pb-chip"
-              :aria-pressed="isOn(engine.key) ? 'true' : 'false'"
-              :aria-disabled="locked || isLastOn(engine.key) ? 'true' : undefined"
-              @click="toggle(engine.key)"
-            >
-              <Check v-if="isOn(engine.key)" class="pb-chip-check" :size="14" aria-hidden="true" />
-              {{ engine.label }}
-            </button>
+          <div class="pb-controls">
+            <div class="pb-group">
+              <label class="pb-times">
+                <span>Times per engine</span>
+                <select v-model.number="samples" class="pb-select" :disabled="locked">
+                  <option v-for="n in SAMPLE_CHOICES" :key="n" :value="n">{{ n }}</option>
+                </select>
+              </label>
+              <HelpTip :text="TIPS.askAi.times" label="About Times per engine" />
+            </div>
+            <div v-if="engineOptions.length" class="pb-group">
+              <div class="pb-chips" role="group" aria-label="Engines">
+                <button
+                  v-for="engine in engineOptions"
+                  :key="engine.key"
+                  type="button"
+                  class="pb-chip"
+                  :aria-pressed="isOn(engine.key) ? 'true' : 'false'"
+                  :aria-disabled="locked || isLastOn(engine.key) ? 'true' : undefined"
+                  @click="toggle(engine.key)"
+                >
+                  <Check v-if="isOn(engine.key)" class="pb-chip-check" :size="14" aria-hidden="true" />
+                  {{ engine.label }}
+                </button>
+              </div>
+              <HelpTip :text="TIPS.askAi.engines" label="About picking engines" />
+            </div>
           </div>
-        </div>
 
-        <div class="pb-go">
-          <div class="pb-line-wrap">
-            <p
-              :id="lineId"
-              class="pb-line"
-              :class="{ 'is-pending': line.pending }"
-              aria-live="polite"
-              :aria-busy="line.pending ? 'true' : undefined"
-            >{{ line.text }}</p>
-            <AgButton v-if="line.retry" size="xs" variant="ghost" @click="requestEstimate(true)">Try again</AgButton>
+          <div class="pb-go">
+            <div class="pb-line-wrap">
+              <p
+                :id="lineId"
+                class="pb-line"
+                :class="{ 'is-pending': line.pending }"
+                aria-live="polite"
+                :aria-busy="line.pending ? 'true' : undefined"
+              >{{ line.text }}</p>
+              <HelpTip v-if="line.estimate" :text="TIPS.askAi.estimate" label="About this estimate" />
+              <AgButton v-if="line.retry" size="xs" variant="ghost" @click="requestEstimate(true)">Try again</AgButton>
+            </div>
+            <AgButton type="submit" variant="primary" size="sm" :disabled="!canAsk" :loading="creating">Ask</AgButton>
           </div>
-          <AgButton type="submit" variant="primary" size="sm" :disabled="!canAsk" :loading="creating">Ask</AgButton>
-        </div>
 
-        <p v-if="costChanged" class="pb-note" role="alert">{{ COPY.costChanged }}</p>
+          <p v-if="costChanged" class="pb-note" role="alert">{{ COPY.costChanged }}</p>
 
-        <section v-if="notice" class="pb-notice" role="alert" :aria-labelledby="noticeId">
-          <p :id="noticeId" class="pb-notice-title">{{ COPY.requestTitle }}</p>
-          <p class="pb-notice-body">{{ COPY.requestBody }}</p>
-          <div class="pb-notice-actions">
-            <AgButton size="sm" variant="primary" @click="handToAgent">Ask the agent</AgButton>
-            <AgButton size="sm" :disabled="creating" @click="create">Ask the engines anyway</AgButton>
-          </div>
-        </section>
+          <section v-if="notice" class="pb-notice" role="alert" :aria-labelledby="noticeId">
+            <p :id="noticeId" class="pb-notice-title">{{ COPY.requestTitle }}</p>
+            <p class="pb-notice-body">{{ COPY.requestBody }}</p>
+            <div class="pb-notice-actions">
+              <AgButton size="sm" variant="primary" @click="handToAgent">Ask the agent</AgButton>
+              <AgButton size="sm" :disabled="creating" @click="create">Ask the engines anyway</AgButton>
+            </div>
+          </section>
 
-        <p v-if="askError" class="pb-error" role="alert">{{ askError }}</p>
-      </form>
+          <p v-if="askError" class="pb-error" role="alert">{{ askError }}</p>
+        </form>
+      </HintCallout>
 
       <section class="pb-result" :aria-labelledby="run ? questionId : undefined">
         <p v-if="!run" class="pb-intro">{{ COPY.intro }}</p>
@@ -95,7 +104,7 @@
 
           <div class="pb-after">
             <AgButton size="sm" variant="ghost" @click="readAnswers">Read the answers</AgButton>
-            <TrackPrompt :website-id="websiteId" :run="run" />
+            <TrackPrompt :website-id="websiteId" :run="run" :hint="!active && !viewer" />
           </div>
           <CardFoot>{{ footText }}</CardFoot>
         </template>
@@ -121,12 +130,15 @@ import AgButton from '@/components/agent/common/AgButton.vue'
 import BarList from '@/components/board/BarList.vue'
 import CardFoot from '@/components/board/CardFoot.vue'
 import CardSkeleton from '@/components/board/CardSkeleton.vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+import HintCallout from '@/components/ui/help/HintCallout.vue'
 import { useImeSafeEnter } from '@/composables/agent/useImeSafeEnter'
 import { useBoardSource } from '@/composables/board/useBoardSource'
 import { askAgent } from '@/lib/agent/askAgent'
 import { isAgentRequest } from '@/lib/analytics/promptIntent'
 import { useBoard } from '@/lib/board/context'
 import { engineMeta } from '@/lib/engines'
+import { TIPS } from '@/lib/help/tips'
 import TrackPrompt from './TrackPrompt.vue'
 import {
   COPY,
@@ -293,7 +305,8 @@ const line = computed(() => {
   const shown = estimate.value?.payload
   if (!shown) return { text: '', pending: true }
   const blocker = estimateBlocker(shown)
-  return { text: blocker ? blocker.message : estimateLine(shown), pending: estimate.value.key !== key.value }
+  if (blocker) return { text: blocker.message, pending: estimate.value.key !== key.value }
+  return { text: estimateLine(shown), pending: estimate.value.key !== key.value, estimate: true }
 })
 
 /* ── Asking ── */
@@ -561,6 +574,14 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 16px;
+}
+
+.pb-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .pb-times {

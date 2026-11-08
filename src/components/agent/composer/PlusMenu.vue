@@ -3,7 +3,7 @@
     <DropdownMenuTrigger as-child>
       <AgIconButton
         label="Add an agent or a page"
-        :tooltip="'Agents and pages'"
+        :tooltip="TIPS.agent.plus"
         tooltip-side="top"
         :icon="Plus"
         :size="30"
@@ -58,6 +58,7 @@ import AgMenuContent from '@/components/agent/common/AgMenuContent.vue'
 import AgMenuItem from '@/components/agent/common/AgMenuItem.vue'
 import AgMenuSubContent from '@/components/agent/common/AgMenuSubContent.vue'
 import { IconAgents } from '@/components/agent/icons'
+import { TIPS } from '@/lib/help/tips'
 
 defineProps({
   agents: { type: Array, default: () => [] },

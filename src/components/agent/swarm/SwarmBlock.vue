@@ -17,9 +17,14 @@
         <span class="ag-swarm-title ag-tnum" :class="{ 'is-shimmer': planningLive }">{{ header }}</span>
         <span class="ag-swarm-subtitle">{{ part.title || '' }}</span>
         <span class="ag-swarm-count ag-tnum">{{ countText }}</span>
+        <span class="ag-swarm-head-slot" aria-hidden="true"></span>
         <span v-if="rerunVisible" class="ag-swarm-head-slot" aria-hidden="true"></span>
         <ChevronRight class="ag-swarm-chev" :size="16" aria-hidden="true" />
       </button>
+      <!-- Over the toggle's first reserved slot, like the re-run button. -->
+      <span class="ag-swarm-head-help">
+        <HelpTip :text="TIPS.agent.research" label="About the research agents" />
+      </span>
       <SwarmRerunMenu
         v-if="rerunVisible"
         class="ag-swarm-head-rerun"
@@ -47,18 +52,19 @@
           <ArrowDown :size="12" aria-hidden="true" />
           <span>Newer results below</span>
         </button>
-        <AgButton
-          v-if="offerRerunAll"
-          class="ag-swarm-rerun-all"
-          size="xs"
-          :icon="RotateCw"
-          :loading="rerunning"
-          :disabled="rerunDisabled"
-          :title="rerunDisabled ? BUSY_REASON : undefined"
-          @click="rerunAll"
-        >
-          Re-run all agents
-        </AgButton>
+        <!-- Off while the chat is busy, but focusable, so the reason can be read. -->
+        <AgTooltip v-if="offerRerunAll" :text="rerunDisabled ? BUSY_REASON : ''">
+          <AgButton
+            class="ag-swarm-rerun-all"
+            size="xs"
+            :icon="RotateCw"
+            :loading="rerunning"
+            :aria-disabled="rerunDisabled ? 'true' : undefined"
+            @click="rerunAll"
+          >
+            Re-run all agents
+          </AgButton>
+        </AgTooltip>
       </p>
       <div v-if="groups.length && (part.status !== 'error' || hasTasks)" class="ag-swarm-body">
         <SwarmCategory
@@ -84,6 +90,9 @@
 import { computed, onBeforeUnmount, provide, reactive, ref, watch } from 'vue'
 import { ArrowDown, ChevronRight, RotateCw } from '@lucide/vue'
 import AgButton from '@/components/agent/common/AgButton.vue'
+import AgTooltip from '@/components/agent/common/AgTooltip.vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+import { TIPS } from '@/lib/help/tips'
 import SwarmCategory from './SwarmCategory.vue'
 import SwarmRerunMenu from './SwarmRerunMenu.vue'
 import SwarmStatusMark from './SwarmStatusMark.vue'
@@ -396,7 +405,7 @@ provide(
 .ag-swarm-toggle {
   display: grid;
   grid-area: 1 / 1;
-  grid-template-columns: 16px minmax(0, max-content) minmax(0, 1fr) auto 16px;
+  grid-template-columns: 16px minmax(0, max-content) minmax(0, 1fr) auto 20px 16px;
   column-gap: 10px;
   align-items: center;
   box-sizing: border-box;
@@ -412,7 +421,22 @@ provide(
 }
 
 .ag-swarm-head.has-rerun .ag-swarm-toggle {
-  grid-template-columns: 16px minmax(0, max-content) minmax(0, 1fr) auto 28px 16px;
+  grid-template-columns: 16px minmax(0, max-content) minmax(0, 1fr) auto 20px 28px 16px;
+}
+
+/* The help icon sits over the toggle's 20px slot: past the chevron (16),
+   a gap (10) and the padding (8), and the re-run slot (28 + 10) when shown. */
+.ag-swarm-head-help {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  grid-area: 1 / 1;
+  justify-self: end;
+  margin-right: 34px;
+}
+
+.ag-swarm-head.has-rerun .ag-swarm-head-help {
+  margin-right: 72px;
 }
 
 .ag-swarm-toggle:hover {
@@ -585,6 +609,14 @@ provide(
 @container ag-swarm (max-width: 519px) {
   .ag-swarm-toggle {
     column-gap: 8px;
+  }
+
+  .ag-swarm-head-help {
+    margin-right: 32px;
+  }
+
+  .ag-swarm-head.has-rerun .ag-swarm-head-help {
+    margin-right: 68px;
   }
 }
 </style>

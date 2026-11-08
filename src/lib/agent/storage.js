@@ -16,7 +16,9 @@
 // Pane state tabs are {id, kind} plus `url` (url tabs), `artifact_id` and
 // `version` (artifact tabs), `swarm_id` and `version` (research table tabs).
 //
-// Logout removes every per-user key (clearUserData).
+// Logout removes every per-user key (clearUserData). Not listed here and
+// kept on logout: `cs-hints-v1:<uid>`, the first-visit hints a user saw or
+// skipped (lib/help/hints.js), so signing in again does not replay them.
 
 export const UI_PREFS_KEY = 'cs-agent-ui-v1'
 const LAST_PROJECT_PREFIX = 'cs-agent-last-project:'

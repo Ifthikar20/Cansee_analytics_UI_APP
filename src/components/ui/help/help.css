@@ -1,0 +1,204 @@
+/* Contextual help: the tooltip surface every tooltip shares (HelpTip and
+   the ui/tooltip primitives), the HelpTip trigger and the first-visit
+   coachmark (HintCallout).
+
+   Imported by the components that use it, so it also loads on pages
+   outside AppShell. The colours are the agent tooltip tokens
+   (assets/agent/tokens.css): dark in both themes. The fallbacks are the
+   light theme's values, for a page that has not loaded the tokens.
+
+   Stacking: 1100, above the onboarding flow and BaseModal (1000) and
+   below toasts (10000). AgTooltip keeps its own 110 (portal.css). */
+
+.cs-tooltip {
+  z-index: 1100;
+  box-sizing: border-box;
+  max-width: min(280px, calc(100vw - 16px));
+  padding: 6px 10px;
+  border: 1px solid var(--ag-tooltip-border, #1a1a18);
+  border-radius: 7px;
+  background: var(--ag-tooltip-bg, #1a1a18);
+  color: var(--ag-tooltip-fg, #fafafa);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: break-word;
+  transform-origin: var(--reka-tooltip-content-transform-origin, center);
+}
+
+.cs-tooltip[data-state='delayed-open'],
+.cs-tooltip[data-state='instant-open'] {
+  animation: cs-help-fade 120ms ease-out;
+}
+
+/* ── HelpTip trigger ── */
+
+/* The icon: a 20px button with a 24px hit area. A caller can set
+   --cs-helptip-fg and --cs-helptip-fg-hover for its surface. */
+.cs-helptip {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cs-helptip-fg, var(--ag-fg-3, #74746f));
+  font: inherit;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.cs-helptip::before {
+  position: absolute;
+  inset: -2px;
+  content: '';
+}
+
+.cs-helptip:hover,
+.cs-helptip[data-state='delayed-open'],
+.cs-helptip[data-state='instant-open'] {
+  color: var(--cs-helptip-fg-hover, var(--ag-fg-1, #1a1a18));
+}
+
+.cs-helptip:focus-visible {
+  outline: 2px solid var(--cs-helptip-ring, var(--ag-ring, currentColor));
+  outline-offset: 1px;
+}
+
+.cs-helptip > svg {
+  width: var(--cs-helptip-icon, 14px);
+  height: var(--cs-helptip-icon, 14px);
+}
+
+/* With text as its trigger (a badge, a flag): the text keeps its own look,
+   with a dotted underline (--cs-helptip-decoration: none drops it). */
+.cs-helptip.has-text {
+  width: auto;
+  height: auto;
+  border-radius: var(--cs-helptip-radius, 4px);
+  color: inherit;
+  text-align: inherit;
+  vertical-align: baseline;
+  text-decoration: var(--cs-helptip-decoration, underline dotted);
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset: 3px;
+}
+
+.cs-helptip.has-text::before {
+  content: none;
+}
+
+.cs-helptip.has-text:hover {
+  color: inherit;
+  text-decoration-color: currentColor;
+}
+
+/* ── HintCallout (first-visit coachmark) ── */
+
+.cs-hint {
+  z-index: 1100;
+  box-sizing: border-box;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  padding: 14px 16px 12px;
+  border: 1px solid var(--ag-menu-border, #e3e3de);
+  border-radius: 12px;
+  background: var(--ag-menu-bg, #ffffff);
+  box-shadow: var(--ag-shadow-pop, 0 10px 30px rgba(20, 20, 18, 0.12));
+  color: var(--ag-fg-1, #1a1a18);
+  font-size: 13px;
+  line-height: 18px;
+  outline: none;
+  transform-origin: var(--reka-popover-content-transform-origin, top left);
+}
+
+.cs-hint[data-state='open'] {
+  animation: cs-help-pop 140ms ease-out;
+}
+
+.cs-hint-title {
+  margin: 0 0 4px;
+  color: var(--ag-fg-1, #1a1a18);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.cs-hint-body {
+  margin: 0;
+  color: var(--ag-fg-2, #5c5c57);
+}
+
+.cs-hint-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cs-hint-btn {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ag-fg-2, #5c5c57);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.cs-hint-btn:hover {
+  background: var(--ag-menu-hover, #f0f0ed);
+  color: var(--ag-fg-1, #1a1a18);
+}
+
+.cs-hint-btn.is-primary {
+  background: var(--ag-send-bg, #1a1a18);
+  color: var(--ag-send-fg, #ffffff);
+}
+
+.cs-hint-btn.is-primary:hover {
+  opacity: 0.9;
+}
+
+.cs-hint-btn:focus-visible {
+  outline: 2px solid var(--ag-ring, currentColor);
+  outline-offset: 2px;
+}
+
+@keyframes cs-help-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes cs-help-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cs-tooltip[data-state='delayed-open'],
+  .cs-tooltip[data-state='instant-open'],
+  .cs-hint[data-state='open'] {
+    animation: none;
+  }
+}

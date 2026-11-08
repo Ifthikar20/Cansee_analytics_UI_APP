@@ -36,7 +36,10 @@
             <dd>{{ status.serp_configured ? 'Available' : 'Not configured' }}</dd>
           </div>
           <div v-if="engines.configured.length || engines.missing.length" class="ob-summary-row">
-            <dt>AI engines</dt>
+            <dt>
+              AI engines
+              <HelpTip v-if="engines.missing.length" :text="TIPS.onboarding.engines" label="About engines that are not configured" />
+            </dt>
             <dd>
               <span v-if="engines.configured.length">{{ engines.configured.join(', ') }}</span>
               <span v-if="engines.missing.length" class="ob-summary-muted">
@@ -45,7 +48,10 @@
             </dd>
           </div>
           <div v-if="allowanceText" class="ob-summary-row">
-            <dt>AI allowance</dt>
+            <dt>
+              AI allowance
+              <HelpTip :text="TIPS.onboarding.allowance" label="About the AI allowance" />
+            </dt>
             <dd class="ob-tnum">{{ allowanceText }}</dd>
           </div>
         </template>
@@ -103,6 +109,8 @@
 
 <script setup>
 import { computed } from 'vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+import { TIPS } from '@/lib/help/tips'
 
 import { useOnboardingFlow } from '../useOnboardingFlow'
 

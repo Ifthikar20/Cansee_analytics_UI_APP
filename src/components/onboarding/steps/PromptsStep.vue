@@ -6,6 +6,7 @@
       <p class="ob-sub">
         We'll track these questions on Google and in each AI engine your account
         has connected. Choose up to 5.
+        <HelpTip :text="TIPS.onboarding.prompts" label="What is a prompt?" />
       </p>
 
       <div class="ob-card">
@@ -57,6 +58,7 @@
 
         <div class="ob-field ob-field--inline">
           <label class="ob-label" for="ob-prompt-location">Search from</label>
+          <HelpTip :text="TIPS.onboarding.location" label="About Search from" />
           <span class="ob-select">
             <select id="ob-prompt-location" v-model="form.location" class="ob-text-input ob-select-input">
               <option v-for="c in COUNTRIES" :key="c.code" :value="c.code">{{ c.label }}</option>
@@ -88,6 +90,8 @@
 
 <script setup>
 import { computed } from 'vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+import { TIPS } from '@/lib/help/tips'
 
 import { COUNTRIES } from '@/lib/countries'
 import { LIMITS, useOnboardingFlow } from '../useOnboardingFlow'

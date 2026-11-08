@@ -230,18 +230,19 @@
       <AgButton v-if="canOpen" size="xs" :icon="ArrowUpRight" @click="openCapture(task.pane.tab_id, $event)">
         Open in browser
       </AgButton>
-      <AgButton
-        v-if="tree.rerun.visible"
-        class="ag-swarm-detail-rerun"
-        size="xs"
-        :icon="RotateCw"
-        :loading="rerunning"
-        :disabled="tree.rerun.disabled"
-        :title="tree.rerun.disabled ? tree.rerun.reason : undefined"
-        @click="rerun"
-      >
-        Re-run this agent
-      </AgButton>
+      <!-- Off while the chat is busy, but focusable, so the reason can be read. -->
+      <AgTooltip v-if="tree.rerun.visible" :text="tree.rerun.disabled ? tree.rerun.reason || '' : ''">
+        <AgButton
+          class="ag-swarm-detail-rerun"
+          size="xs"
+          :icon="RotateCw"
+          :loading="rerunning"
+          :aria-disabled="tree.rerun.disabled ? 'true' : undefined"
+          @click="rerun"
+        >
+          Re-run this agent
+        </AgButton>
+      </AgTooltip>
     </div>
   </div>
 </template>
@@ -254,6 +255,7 @@
 import { computed, inject, ref } from 'vue'
 import { ArrowUpRight, RotateCw } from '@lucide/vue'
 import AgButton from '@/components/agent/common/AgButton.vue'
+import AgTooltip from '@/components/agent/common/AgTooltip.vue'
 import { formatNumber } from '@/components/agent/browser/format'
 import { engineMeta } from '@/lib/engines'
 import { taskError } from '@/lib/agent/normalize'

@@ -40,6 +40,7 @@
                 :aria-describedby="errors.enabled ? 'ap-enabled-error' : undefined"
               />
               <label for="ap-enabled" class="ap-switch-label">Run Autopilot every day</label>
+              <HelpTip :text="TIPS.settings.autopilot" label="About the daily run" />
             </div>
             <p v-if="errors.enabled" id="ap-enabled-error" class="ap-error">{{ errors.enabled }}</p>
           </div>
@@ -164,6 +165,8 @@ import AutopilotRunsTable from '@/components/settings/autopilot/AutopilotRunsTab
 import DailyTextSection from '@/components/settings/autopilot/DailyTextSection.vue'
 import RunNowDialog from '@/components/settings/autopilot/RunNowDialog.vue'
 import { Button } from '@/components/ui/button'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+import { TIPS } from '@/lib/help/tips'
 import autopilotApi from '@/api/autopilot'
 import { useAppStore } from '@/stores/app'
 import { useToast } from '@/composables/useToast'
@@ -560,6 +563,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  --cs-helptip-fg: var(--muted-foreground);
+  --cs-helptip-fg-hover: var(--foreground);
 }
 
 .ap-switch-label {

@@ -177,6 +177,15 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 .ob-root :focus-visible { outline-color: var(--ob-accent); }
+/* Help icons (HelpTip) in the flow's own light palette; their tips are
+   portalled above the flow (help.css). */
+.ob-root {
+  --cs-helptip-fg: var(--ob-muted);
+  --cs-helptip-fg-hover: var(--ob-fg);
+  --cs-helptip-ring: var(--ob-accent);
+}
+.ob-sub .cs-helptip,
+.ob-summary-row dt .cs-helptip { margin-left: 4px; }
 
 /* ── Topbar (white on video) ─────────────────────────────────────── */
 .ob-topbar {

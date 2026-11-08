@@ -1,11 +1,15 @@
 <script setup>
 // Workspace sections. Project-scoped entries need a project; without one they
-// render disabled (the projects list stays reachable). Reviews shows how
-// many drafts wait for this user's review, loaded with the activity.
-import { computed, markRaw } from 'vue'
+// render disabled (the projects list stays reachable) but stay focusable,
+// with the reason in a tooltip and in their description. An enabled
+// section's tooltip says what it holds. Reviews shows how many drafts wait
+// for this user's review, loaded with the activity.
+import { computed, markRaw, useId } from 'vue'
 import { useRoute } from 'vue-router'
 import { ClipboardCheck } from '@lucide/vue'
 import { useAgentStore } from '@/stores/agent'
+import AgTooltip from '@/components/agent/common/AgTooltip.vue'
+import { TIPS } from '@/lib/help/tips'
 import {
   IconAgent,
   IconAgents,
@@ -22,6 +26,7 @@ const props = defineProps({
 })
 
 const route = useRoute()
+const noProjectId = `${useId()}-no-project`
 const agent = useAgentStore()
 
 const ITEMS = [
@@ -65,23 +70,36 @@ const items = computed(() =>
 <template>
   <ul class="ag-nav" role="list">
     <li v-for="item in items" :key="item.key">
-      <router-link
-        v-if="item.enabled"
-        :to="item.to"
-        class="ag-nav-row"
-        :class="{ 'is-active': item.active }"
-        :aria-current="item.active ? 'page' : undefined"
-      >
-        <component :is="item.icon" class="ag-nav-icon" :size="16" />
-        <span class="ag-nav-label">{{ item.label }}</span>
-        <span v-if="item.count" class="ag-nav-count ag-tnum" :aria-label="`${item.count} waiting for your review`">
-          {{ item.count }}
+      <AgTooltip v-if="item.enabled" :text="TIPS.agent.nav[item.key] || ''" side="right">
+        <router-link
+          :to="item.to"
+          class="ag-nav-row"
+          :class="{ 'is-active': item.active }"
+          :aria-current="item.active ? 'page' : undefined"
+        >
+          <component :is="item.icon" class="ag-nav-icon" :size="16" />
+          <span class="ag-nav-label">{{ item.label }}</span>
+          <span v-if="item.count" class="ag-nav-count ag-tnum" :aria-label="`${item.count} waiting for your review`">
+            {{ item.count }}
+          </span>
+        </router-link>
+      </AgTooltip>
+      <!-- Focusable, so keyboard users reach the reason it is off. -->
+      <AgTooltip v-else :text="TIPS.agent.noProject" side="right">
+        <span
+          class="ag-nav-row is-disabled"
+          role="link"
+          aria-disabled="true"
+          tabindex="0"
+          :aria-describedby="noProjectId"
+        >
+          <component :is="item.icon" class="ag-nav-icon" :size="16" />
+          <span class="ag-nav-label">{{ item.label }}</span>
         </span>
-      </router-link>
-      <span v-else class="ag-nav-row is-disabled" aria-disabled="true">
-        <component :is="item.icon" class="ag-nav-icon" :size="16" />
-        <span class="ag-nav-label">{{ item.label }}</span>
-      </span>
+      </AgTooltip>
+    </li>
+    <li v-if="items.some((item) => !item.enabled)" hidden>
+      <span :id="noProjectId">{{ TIPS.agent.noProject }}</span>
     </li>
   </ul>
 </template>
