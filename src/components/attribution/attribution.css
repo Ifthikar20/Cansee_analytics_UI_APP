@@ -1,0 +1,110 @@
+/* Source attribution styles shared by the chat viewer (ChatDetailModal),
+   its findings list and the source viewer. Unscoped on purpose: the answer's
+   source marks are injected via v-html, which scoped CSS cannot reach.
+   Everything is prefixed (cdm-src, att-, sv-) to stay collision-free.
+   --att-c is the owner's color: your site, a competitor, or a third party. */
+
+.cdm-src,
+.att-owner--you,
+.sv-mark--you {
+  --att-c: #7232e0;
+}
+.cdm-src--competitor,
+.att-owner--competitor,
+.sv-mark--competitor {
+  --att-c: #be123c;
+}
+.cdm-src--third_party,
+.att-owner--third_party,
+.sv-mark--third_party {
+  --att-c: #1d4ed8;
+}
+[data-theme='dark'] .cdm-src,
+[data-theme='dark'] .att-owner--you,
+[data-theme='dark'] .sv-mark--you {
+  --att-c: #b794f6;
+}
+[data-theme='dark'] .cdm-src--competitor,
+[data-theme='dark'] .att-owner--competitor,
+[data-theme='dark'] .sv-mark--competitor {
+  --att-c: #fda4af;
+}
+[data-theme='dark'] .cdm-src--third_party,
+[data-theme='dark'] .att-owner--third_party,
+[data-theme='dark'] .sv-mark--third_party {
+  --att-c: #93c5fd;
+}
+
+/* A finding's span in the answer: an underline in the owner's color, so
+   brand marks inside it keep their own fill. */
+.cdm-src {
+  color: inherit;
+  background: color-mix(in srgb, var(--att-c) 6%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--att-c) 55%, transparent);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.cdm-src:hover {
+  background: color-mix(in srgb, var(--att-c) 12%, transparent);
+}
+.cdm-src:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+.cdm-src--active {
+  background: color-mix(in srgb, var(--att-c) 18%, transparent);
+  border-bottom-color: var(--att-c);
+}
+.cdm-src-n {
+  margin-left: 1px;
+  font-size: 0.68em;
+  font-weight: 700;
+  color: var(--att-c);
+}
+
+/* Owner badge (Yours / Competitor / Third party). */
+.att-owner {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--att-c);
+  background: color-mix(in srgb, var(--att-c) 12%, transparent);
+}
+
+/* Confidence label: Confirmed is solid, Likely is outlined. */
+.att-conf {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 9999px;
+  padding: 0 7px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+.att-conf--confirmed {
+  border-color: transparent;
+  background: var(--secondary);
+  color: var(--foreground);
+}
+
+/* The cited passage on the source page. */
+.sv-mark {
+  color: inherit;
+  background: color-mix(in srgb, var(--att-c) 16%, transparent);
+  box-shadow: inset 0 -2px 0 var(--att-c);
+  border-radius: 2px;
+  padding: 1px 0;
+  cursor: help;
+}
+.sv-mark:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}

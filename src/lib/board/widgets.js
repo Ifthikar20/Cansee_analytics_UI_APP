@@ -51,11 +51,16 @@ export const WIDGETS = Object.freeze([
 ])
 
 // The board a project starts with, and the one the server sends while
-// nothing is saved (autopilot_contract.md 6): Ask AI, then Prompt ranking.
+// nothing is saved (apps/boards/layout.py keeps the same list): Ask AI,
+// Prompt ranking and Summary across the full width, then Citations and
+// Who AI recommends side by side.
 export const DEFAULT_LAYOUT = Object.freeze(
     [
         { key: 'prompt-box', size: 'full' },
         { key: 'ranking', size: 'full' },
+        { key: 'summary', size: 'full' },
+        { key: 'citations', size: 'half' },
+        { key: 'who-recommends', size: 'half' },
     ].map((w) => Object.freeze(w))
 )
 

@@ -1,11 +1,17 @@
 <script setup>
 import { engineMeta } from '@/lib/engines'
-import { ref, computed, watch, useId } from 'vue'
+import { ref, computed, watch, useId, nextTick } from 'vue'
 import { X, ExternalLink, ArrowLeft, ArrowRight, Loader2 } from '@lucide/vue'
-import api from '@/api/client'
+import citationsApi from '@/api/citations'
 import BrandLogo from '@/components/BrandLogo.vue'
+import AttributionFindings from '@/components/attribution/AttributionFindings.vue'
+import AttributionSummary from '@/components/attribution/AttributionSummary.vue'
+import SourceViewer from '@/components/attribution/SourceViewer.vue'
+import '@/components/attribution/attribution.css'
+import { useAttribution } from '@/composables/useAttribution'
 import { useBodyScrollLock } from '@/composables/useBodyScrollLock'
 import { useDialogFocus } from '@/composables/useDialogFocus'
+import { buildAnswerHtml, buildBrandClassMap, layoutFindings } from '@/lib/attribution/answerHtml'
 import { safeHref } from '@/utils/safeHref'
 
 const props = defineProps({
@@ -59,81 +65,97 @@ const rankedBrands = computed(() => {
 const brandRows = computed(() => rankedBrands.value.filter(b => b.kind !== 'info'))
 const infoRows = computed(() => rankedBrands.value.filter(b => b.kind === 'info'))
 
-/* Highlight brand mentions in any text — the tracked brand in green and
+/* Highlight brand mentions in any text: the tracked brand in green and
    every competitor in its OWN color, so a mention in the answer and the
-   same brand's row in the Details panel read as one thing. Colors are
-   assigned by the model's ranking order (rankedBrands), so the mapping
-   is stable across the prompt bubble, the response, and the panel.
-   Escapes HTML first, then renders markdown bold (**text**) as <strong>
-   instead of leaking literal asterisks, then wraps whole-word brand
-   matches in classed <mark>s (styles live in the <style> block below,
-   with dark-theme variants). */
-const COMPETITOR_CLASS_COUNT = 8
-
-const brandClassMap = computed(() => {
-  const map = new Map()
-  const own = (detail.value?.brand || '').trim().toLowerCase()
-  // "YNAB (You Need A Budget)"-style names also answer to either half,
-  // so bare mentions later in the answer light up in the same color.
-  const register = (name, cls) => {
-    const key = (name || '').trim().toLowerCase()
-    if (!key || map.has(key)) return
-    map.set(key, cls)
-    const short = key.replace(/\s*\(.*\)\s*$/, '')
-    const inner = (key.match(/\(([^)]{3,})\)\s*$/) || [])[1]
-    for (const alias of [short, inner]) {
-      const a = (alias || '').trim()
-      if (a && a.length > 2 && !map.has(a)) map.set(a, cls)
-    }
-  }
-  let i = 0
-  for (const b of brandRows.value) {
-    const key = (b.name || '').trim().toLowerCase()
-    if (!key || map.has(key)) continue
-    register(key, key === own ? 'cdm-mark--own' : `cdm-mark--c${i++ % COMPETITOR_CLASS_COUNT}`)
-  }
-  // Informational terms get a neutral dotted style — visible, but never
-  // dressed up as a competitor brand.
-  for (const b of infoRows.value) {
-    const key = (b.name || '').trim().toLowerCase()
-    if (!key || map.has(key)) continue
-    register(key, 'cdm-mark--info')
-  }
-  // The tracked brand is highlightable even when the detector did not
-  // list it among this answer's brands (e.g. it only appears in the
-  // prompt bubble).
-  if (own && !map.has(own)) register(own, 'cdm-mark--own')
-  return map
-})
+   same brand's row in the Details panel read as one thing. Colors follow
+   the model's ranking order (rankedBrands), so the mapping is stable across
+   the prompt bubble, the response, and the panel. The markup (escaping,
+   **bold**, brand marks, finding spans) is built by
+   lib/attribution/answerHtml.js; styles live in the <style> block below
+   and in attribution/attribution.css, with dark-theme variants. */
+const brandClassMap = computed(() =>
+  buildBrandClassMap({ own: detail.value?.brand, brands: brandRows.value, info: infoRows.value }),
+)
 
 function brandMarkClass(name) {
   return brandClassMap.value.get((name || '').trim().toLowerCase()) || ''
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-  ))
-}
 function highlight(text) {
-  let safe = escapeHtml(text || '')
-  // Model responses arrive as raw markdown: show **bold** as bold, not
-  // as star-star noise around brand names. (Kept per-line: the lazy
-  // dot never crosses a newline, so an unmatched ** can't swallow a
-  // paragraph.)
-  safe = safe.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-  const names = [...brandClassMap.value.keys()]
-  if (!names.length) return safe
-  names.sort((a, b) => b.length - a.length)
-  const escaped = names.map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-  // Lookarounds instead of \b: a word boundary can never match next to
-  // a name that starts/ends in a non-word character ("YNAB (You Need A
-  // Budget)" ends in ")"), which silently dropped those highlights.
-  const re = new RegExp(`(?<!\\w)(${escaped.join('|')})(?!\\w)`, 'gi')
-  return safe.replace(re, (m) => {
-    const cls = brandClassMap.value.get(m.toLowerCase())
-    return cls ? `<mark class="cdm-mark ${cls}">${m}</mark>` : m
-  })
+  return buildAnswerHtml(text, { brandClasses: brandClassMap.value })
+}
+
+/* Source attribution (attribution_contract.md 1): where this answer most
+   likely got its information. Loaded (and started when needed) while the
+   viewer shows this response; polled while pending. Findings are numbered
+   in answer order and their spans marked in the response. */
+const { state: attribution, retry: retryAttribution } = useAttribution(
+  () => props.websiteId,
+  () => props.resultId,
+  () => props.open,
+)
+const findingsLayout = computed(() => {
+  const findings = attribution.value.phase === 'ready' ? attribution.value.data?.findings : null
+  if (!findings?.length) return { items: [], spans: [] }
+  return layoutFindings(detail.value?.response_text || '', findings)
+})
+const selectedId = ref('')
+const viewingId = ref('')
+const viewing = computed(() =>
+  findingsLayout.value.items.find((i) => String(i.finding.id ?? i.n) === viewingId.value) || null,
+)
+const responseHtml = computed(() =>
+  buildAnswerHtml(detail.value?.response_text, {
+    brandClasses: brandClassMap.value,
+    spans: findingsLayout.value.spans,
+    activeId: selectedId.value,
+  }),
+)
+
+watch(
+  () => [props.open, props.resultId],
+  () => {
+    selectedId.value = ''
+    viewingId.value = ''
+  },
+)
+
+function byData(attr, id) {
+  const root = dialogRef.value
+  if (!root || !id) return null
+  return [...root.querySelectorAll(`[${attr}]`)].find((el) => el.getAttribute(attr) === id) || null
+}
+
+// Select a finding from the answer (scrolls its row into view) or from
+// the list (scrolls its span into view).
+async function selectFinding(id, from) {
+  selectedId.value = id
+  await nextTick()
+  const target = from === 'answer' ? byData('data-finding-row', id) : byData('data-finding', id)
+  if (target && typeof target.scrollIntoView === 'function') {
+    target.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }
+}
+
+function findingFromEvent(event) {
+  const mark = event.target instanceof Element ? event.target.closest('[data-finding]') : null
+  return mark ? mark.getAttribute('data-finding') : ''
+}
+function onAnswerClick(event) {
+  const id = findingFromEvent(event)
+  if (id) selectFinding(id, 'answer')
+}
+function onAnswerKeydown(event) {
+  if (event.key !== 'Enter' && event.key !== ' ') return
+  const id = findingFromEvent(event)
+  if (!id) return
+  event.preventDefault()
+  selectFinding(id, 'answer')
+}
+
+function openSource(id) {
+  selectedId.value = id
+  viewingId.value = id
 }
 
 async function load() {
@@ -143,10 +165,7 @@ async function load() {
   detail.value = null
   try {
     // Silent: the failure renders inside the viewer.
-    const res = await api.get(
-      `/citations/websites/${props.websiteId}/chats/${props.resultId}/`,
-      { _silentError: true },
-    )
+    const res = await citationsApi.chat(props.websiteId, props.resultId)
     detail.value = res.data || null
   } catch {
     error.value = "We couldn't load this answer."
@@ -180,7 +199,7 @@ useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
       aria-modal="true"
       :aria-labelledby="titleId"
       tabindex="-1"
-      class="flex h-[85vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl outline-none"
+      class="relative flex h-[85vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl outline-none"
     >
       <h2 :id="titleId" class="sr-only">{{ dialogTitle }}</h2>
       <!-- Conversation -->
@@ -207,6 +226,7 @@ useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
             <button type="button" class="font-medium text-foreground underline underline-offset-2" @click="load">Try again</button>
           </div>
           <template v-else-if="detail">
+            <AttributionSummary :state="attribution" />
             <!-- user prompt bubble -->
             <div class="mb-5 flex justify-end">
               <div class="max-w-[80%] rounded-2xl bg-secondary px-4 py-2.5 text-sm text-foreground" v-html="highlight(detail.prompt)"></div>
@@ -225,8 +245,22 @@ useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
                 Competitors — one color per brand
               </span>
             </div>
-            <!-- response -->
-            <div class="whitespace-pre-wrap text-sm leading-relaxed text-foreground" v-html="detail.response_text ? highlight(detail.response_text) : 'No response text captured.'"></div>
+            <!-- response: finding spans are clickable marks (data-finding) -->
+            <div
+              class="whitespace-pre-wrap text-sm leading-relaxed text-foreground"
+              @click="onAnswerClick"
+              @keydown="onAnswerKeydown"
+              v-html="detail.response_text ? responseHtml : 'No response text captured.'"
+            ></div>
+            <AttributionFindings
+              v-if="detail.response_text && attribution.phase !== 'idle'"
+              :state="attribution"
+              :items="findingsLayout.items"
+              :selected-id="selectedId"
+              @select="selectFinding($event, 'list')"
+              @open="openSource"
+              @retry="retryAttribution"
+            />
           </template>
         </div>
 
@@ -344,6 +378,16 @@ useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
           </div>
         </template>
       </aside>
+
+      <SourceViewer
+        v-if="viewing"
+        :key="viewingId"
+        :website-id="websiteId"
+        :finding="viewing.finding"
+        :number="viewing.n"
+        :engine-label="detail?.model ? modelLabel : 'The AI engine'"
+        @close="viewingId = ''"
+      />
     </div>
   </div>
   </Teleport>

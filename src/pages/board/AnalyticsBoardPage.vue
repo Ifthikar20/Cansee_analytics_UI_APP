@@ -409,7 +409,7 @@ watch(
     <AgConfirmDialog
       v-model:open="resetOpen"
       title="Reset this board?"
-      description="Your board goes back to Ask AI and Prompt ranking. Widgets you added are removed; their data is not touched."
+      description="Your board goes back to Ask AI, Prompt ranking, Summary, Citations and Who AI recommends. Widgets you added are removed; their data is not touched."
       confirm-label="Reset board"
       destructive
       @confirm="confirmReset"

@@ -32,7 +32,7 @@ export const TIPS = Object.freeze({
     board: Object.freeze({
         addWidget:
             "Add more views to this board, such as Competitors, Citations or Sentiment. Click a card's title to open its detailed view.",
-        options: 'Board options. Reset board puts back Ask AI and Prompt ranking; your data is not touched.',
+        options: 'Board options. Reset board puts back Ask AI, Prompt ranking, Summary, Citations and Who AI recommends; your data is not touched.',
         emptyBody: 'Widgets show how Google and the AI engines treat your brand. Start with Ask AI or Prompt ranking.',
     }),
     setup: Object.freeze({
