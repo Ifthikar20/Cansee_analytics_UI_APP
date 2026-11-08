@@ -626,16 +626,23 @@ const headerFacts = computed(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row, i) in filteredUrls" :key="i"
+              <!-- The whole row opens the detail on a click; the title is a
+                   button so the keyboard and screen readers reach it too. -->
+              <tr v-for="(row, i) in filteredUrls" :key="row.normalizedUrl || row.url || i"
                 @click="openDetail(row)"
                 class="cursor-pointer border-b border-border/60 transition-colors hover:bg-muted/50">
                 <td class="py-3 pr-3">
                   <div class="flex items-center gap-2.5">
                     <img :src="faviconFor(row.path)" alt="" class="size-4 shrink-0 rounded-sm" @error="onFaviconError" />
-                    <div class="min-w-0">
-                      <div class="truncate font-medium text-foreground" :title="row.title">{{ row.title }}</div>
-                      <div class="truncate text-xs text-muted-foreground" :title="row.path">{{ row.path }}</div>
-                    </div>
+                    <button
+                      type="button"
+                      class="min-w-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      data-open-url
+                      @click.stop="openDetail(row)"
+                    >
+                      <span class="block truncate font-medium text-foreground" :title="row.title">{{ row.title }}</span>
+                      <span class="block truncate text-xs text-muted-foreground" :title="row.path">{{ row.path }}</span>
+                    </button>
                   </div>
                 </td>
                 <td class="py-3 pr-3 text-muted-foreground">{{ row.type }}</td>

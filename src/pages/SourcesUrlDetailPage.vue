@@ -418,11 +418,20 @@ function fmtTime(iso) {
                 </tr>
               </thead>
               <tbody>
+                <!-- A click anywhere on the row opens the answer; the chat
+                     cell is a button so the keyboard reaches it too. -->
                 <tr v-for="(c, ci) in chats" :key="c.result_id"
                   class="cursor-pointer border-b border-border/60 hover:bg-muted/50" @click="openChat(ci)">
                   <td class="py-3 pr-3">
-                    <div class="font-medium text-foreground line-clamp-1">{{ c.prompt }}</div>
-                    <div class="text-xs text-muted-foreground line-clamp-1">{{ c.response_preview }}</div>
+                    <button
+                      type="button"
+                      class="block w-full rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      data-open-chat
+                      @click.stop="openChat(ci)"
+                    >
+                      <span class="block font-medium text-foreground line-clamp-1">{{ c.prompt }}</span>
+                      <span class="block text-xs text-muted-foreground line-clamp-1">{{ c.response_preview }}</span>
+                    </button>
                   </td>
                   <td class="py-3 pr-3">
                     <span :class="c.brand_mentioned ? 'text-[color:var(--chart-2)]' : 'text-destructive'" class="text-xs font-semibold">
