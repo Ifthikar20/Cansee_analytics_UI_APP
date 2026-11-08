@@ -87,8 +87,8 @@
       <!-- Enterprise users get their own identifier-first flow: type a
            work email on /sso and get routed to the company IdP. A quiet
            link, not another provider button — B2C users never need it.
-           Hidden while business features are off (the backend is the real
-           gate; VITE_ORG_FEATURES_ENABLED=false just removes the door). -->
+           Shown only when the build opts in with VITE_ORG_FEATURES_ENABLED=true
+           (the backend is the real gate; this just hides a door that 404s). -->
       <p v-if="orgFeaturesEnabled" class="text-center text-sm">
         <router-link to="/sso" class="login-link login-link--underline">
           Enterprise single sign-on
@@ -120,9 +120,9 @@ const loading = ref(false)
 const error = ref('')
 // Set when the backend answers 403 sso_required: {org_name, domain, methods, email}
 const ssoRequired = ref(null)
-// Cosmetic mirror of the backend's ORG_FEATURES_ENABLED master switch:
-// on unless the build explicitly says false.
-const orgFeaturesEnabled = import.meta.env.VITE_ORG_FEATURES_ENABLED !== 'false'
+// Cosmetic mirror of the backend's ORG_FEATURES_ENABLED master switch,
+// which defaults to off: shown only when the build explicitly says true.
+const orgFeaturesEnabled = import.meta.env.VITE_ORG_FEATURES_ENABLED === 'true'
 
 // Auto-login from the local dev-login script (scripts/login.sh).
 // DEV-ONLY: import.meta.env.DEV is statically false in production builds, so

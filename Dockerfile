@@ -5,8 +5,10 @@ FROM node:22.23-alpine AS build
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install
+# Install exactly what package-lock.json pins so every build is reproducible;
+# npm ci fails if the lockfile and package.json disagree.
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # Cache-bust on every CI build so identical file mtimes never serve a stale layer.
 ARG CACHE_DATE=unknown
@@ -29,6 +31,27 @@ ENV VITE_ASSET_CDN=$VITE_ASSET_CDN
 # Must be an https:// URL. Empty default falls back to a sales@ mailto.
 ARG VITE_DEMO_BOOKING_URL=
 ENV VITE_DEMO_BOOKING_URL=$VITE_DEMO_BOOKING_URL
+
+# Microsoft Entra ID application client ID. Empty disables Microsoft sign-in.
+ARG VITE_MICROSOFT_CLIENT_ID=
+ENV VITE_MICROSOFT_CLIENT_ID=$VITE_MICROSOFT_CLIENT_ID
+
+# Enterprise single sign-on is shown only when this is exactly "true"
+# (mirrors the API's ORG_FEATURES_ENABLED, which defaults to off).
+ARG VITE_ORG_FEATURES_ENABLED=
+ENV VITE_ORG_FEATURES_ENABLED=$VITE_ORG_FEATURES_ENABLED
+
+# Cookiebot domain group ID for the consent banner. Empty means no banner.
+ARG VITE_COOKIEBOT_CBID=
+ENV VITE_COOKIEBOT_CBID=$VITE_COOKIEBOT_CBID
+
+# Origin of the feedback service. Empty hides the in-app feedback button.
+ARG VITE_FEEDBACK_API_URL=
+ENV VITE_FEEDBACK_API_URL=$VITE_FEEDBACK_API_URL
+
+# Public origin for blog canonical URLs and the sitemap. Empty means https://cansee.ai.
+ARG VITE_SITE_URL=
+ENV VITE_SITE_URL=$VITE_SITE_URL
 
 COPY . .
 RUN npm run build

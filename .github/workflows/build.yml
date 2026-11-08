@@ -67,6 +67,11 @@ jobs:
             VITE_GOOGLE_CLIENT_ID=${{ vars.VITE_GOOGLE_CLIENT_ID }}
             VITE_ASSET_CDN=${{ vars.VITE_ASSET_CDN }}
             VITE_DEMO_BOOKING_URL=${{ vars.VITE_DEMO_BOOKING_URL }}
+            VITE_MICROSOFT_CLIENT_ID=${{ vars.VITE_MICROSOFT_CLIENT_ID }}
+            VITE_ORG_FEATURES_ENABLED=${{ vars.VITE_ORG_FEATURES_ENABLED }}
+            VITE_COOKIEBOT_CBID=${{ vars.VITE_COOKIEBOT_CBID }}
+            VITE_FEEDBACK_API_URL=${{ vars.VITE_FEEDBACK_API_URL }}
+            VITE_SITE_URL=${{ vars.VITE_SITE_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

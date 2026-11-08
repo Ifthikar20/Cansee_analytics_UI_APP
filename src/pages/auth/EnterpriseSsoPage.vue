@@ -107,10 +107,10 @@ const error = ref('')
 // {org_name, domain, methods, login_hint} once the domain resolves.
 const org = ref(null)
 
-// Cosmetic mirror of the backend's ORG_FEATURES_ENABLED master switch —
-// a build with business features off sends deep links back to login
-// (the backend 404s the discovery endpoint regardless).
-if (import.meta.env.VITE_ORG_FEATURES_ENABLED === 'false') {
+// Cosmetic mirror of the backend's ORG_FEATURES_ENABLED master switch,
+// which defaults to off. Unless the build opts in with 'true', deep links
+// go back to login (the backend 404s the discovery endpoint regardless).
+if (import.meta.env.VITE_ORG_FEATURES_ENABLED !== 'true') {
   useRouter().replace({ name: 'login' })
 }
 
