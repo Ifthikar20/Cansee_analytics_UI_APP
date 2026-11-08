@@ -3,6 +3,10 @@
 // GET /agent/command-center/ payload: counts come from recorded agent runs
 // and AI spend from the usage ledger, so a measured zero is 0 and nothing
 // here is estimated.
+//
+// Free accounts never see dollars: with `hideUsd` the AI spend tile, chart,
+// agent measure and Top users column give way to the ledger's request
+// counts (spend_by_category requests), or are left out.
 import { formatValue, toNumber } from '@/lib/charts/format'
 import { periodDays } from './visibilitySpecs'
 
@@ -59,8 +63,18 @@ export function windowDays(payload, fallback = '30d') {
     return periodDays(payload?.window?.period || fallback)
 }
 
+/**
+ * AI requests the ledger recorded in the window (spend_by_category
+ * requests summed), or null when the payload has no count to add up.
+ */
+export function aiRequests(payload) {
+    const rows = Array.isArray(payload?.spend_by_category) ? payload.spend_by_category : []
+    const counts = rows.map((r) => toNumber(r?.requests)).filter((n) => n !== null)
+    return counts.length ? counts.reduce((a, b) => a + b, 0) : null
+}
+
 /** The five headline tiles (VizStatTile props plus a key). */
-export function commandTiles(payload, { period = payload?.window?.period || '30d' } = {}) {
+export function commandTiles(payload, { period = payload?.window?.period || '30d', hideUsd = false } = {}) {
     const t = payload?.totals || {}
     const vs = `vs previous ${periodDays(period)} days`
     const delta = (value, goodWhen) => (value === null ? null : { value, unit: 'pct', label: vs, goodWhen })
@@ -82,13 +96,15 @@ export function commandTiles(payload, { period = payload?.window?.period || '30d
             delta: delta(pctChange(t.active_users, t.active_users_prev), 'up'),
         },
         { key: 'drafts_saved', label: 'Drafts saved', value: toNumber(t.drafts_saved), kind: 'count', delta: null },
-        {
-            key: 'ai_usd',
-            label: 'AI spend',
-            value: toNumber(t.ai_usd),
-            kind: 'usd',
-            delta: delta(pctChange(t.ai_usd, t.ai_usd_prev), 'down'),
-        },
+        hideUsd
+            ? { key: 'ai_requests', label: 'AI requests', value: aiRequests(payload), kind: 'count', delta: null }
+            : {
+                key: 'ai_usd',
+                label: 'AI spend',
+                value: toNumber(t.ai_usd),
+                kind: 'usd',
+                delta: delta(pctChange(t.ai_usd, t.ai_usd_prev), 'down'),
+            },
         {
             key: 'failed',
             label: 'Failed runs',
@@ -166,8 +182,36 @@ export function spendOverTime(payload) {
     }
 }
 
-/** Runs, drafts saved and AI spend by agent; one measure at a time. */
-export function runsByAgent(payload) {
+/**
+ * AI requests by what they were for (spend_by_category requests), in the
+ * categories' usual order: the count that stands in for AI spend on the
+ * Free plan. Categories the payload does not list are left out.
+ */
+export function requestsByCategory(payload) {
+    const rows = (Array.isArray(payload?.spend_by_category) ? payload.spend_by_category : []).filter(
+        (r) => r && r.key && toNumber(r.requests) !== null,
+    )
+    const order = SPEND_CATEGORIES.map((c) => c.key)
+    const rank = (key) => (order.includes(key) ? order.indexOf(key) : order.length)
+    rows.sort((a, b) => rank(a.key) - rank(b.key))
+    return {
+        id: 'command.requests',
+        title: 'AI requests',
+        subtitle: 'Requests to the AI service in this window, by what they were for.',
+        x: 'category',
+        value: 'count',
+        labels: rows.map((r) => String(r.key)),
+        label_names: Object.fromEntries(
+            rows.map((r) => [String(r.key), r.label || SPEND_CATEGORIES.find((c) => c.key === r.key)?.label || String(r.key)]),
+        ),
+        label_header: 'Used for',
+        datasets: [{ key: 'requests', label: 'Requests', data: rows.map((r) => toNumber(r.requests)) }],
+        type: 'hbar',
+    }
+}
+
+/** Runs, drafts saved and AI spend by agent; one measure at a time (no spend with hideUsd). */
+export function runsByAgent(payload, { hideUsd = false } = {}) {
     const rows = (payload?.by_agent || []).filter((r) => r && r.key)
     const column = (field) => rows.map((r) => toNumber(r[field]))
     return {
@@ -181,7 +225,7 @@ export function runsByAgent(payload) {
         datasets: [
             { key: 'runs', label: 'Runs', value: 'count', data: column('runs') },
             { key: 'drafts_saved', label: 'Drafts saved', value: 'count', data: column('drafts_saved') },
-            { key: 'ai_usd', label: 'AI spend', value: 'usd', data: column('ai_usd') },
+            ...(hideUsd ? [] : [{ key: 'ai_usd', label: 'AI spend', value: 'usd', data: column('ai_usd') }]),
         ],
         pick_one: true,
         type: 'hbar',
@@ -205,8 +249,8 @@ export function runsByTeam(payload) {
     }
 }
 
-/** Top users of the organization scope as table rows (null in `me`). */
-export function topUserRows(payload) {
+/** Top users of the organization scope as table rows (null in `me`); ai_usd is '' with hideUsd. */
+export function topUserRows(payload, { hideUsd = false } = {}) {
     if (!Array.isArray(payload?.top_users)) return null
     return payload.top_users
         .filter((u) => u && (u.user_id || u.name))
@@ -217,18 +261,18 @@ export function topUserRows(payload) {
             role: ROLE_LABELS[u.role] || '',
             runs: formatValue(u.runs, { value: 'count' }) ?? '',
             active_days: formatValue(u.active_days, { value: 'count' }) ?? '',
-            ai_usd: formatValue(u.ai_usd, { value: 'usd' }) ?? '',
+            ai_usd: hideUsd ? '' : (formatValue(u.ai_usd, { value: 'usd' }) ?? ''),
             last_active_at: u.last_active_at || '',
         }))
 }
 
 /** The page's empty state for `empty_reason`, or null when there is activity. */
-export function commandEmpty(payload, period) {
+export function commandEmpty(payload, period, { hideUsd = false } = {}) {
     if (payload?.empty_reason !== 'no_activity') return null
     return {
         kind: 'empty',
         title: `No agent runs or AI use in the last ${windowDays(payload, period)} days.`,
-        body: 'Runs and AI spend show up here when someone uses the agent or checks prompts.',
+        body: `Runs and AI ${hideUsd ? 'use' : 'spend'} show up here when someone uses the agent or checks prompts.`,
         action: { label: 'Open the agent', to: { name: 'agent' } },
     }
 }

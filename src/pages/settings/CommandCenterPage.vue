@@ -71,7 +71,7 @@
                     <th scope="col">Role</th>
                     <th scope="col" class="is-num">Runs</th>
                     <th scope="col" class="is-num">Active days</th>
-                    <th scope="col" class="is-num">AI spend</th>
+                    <th v-if="!hideUsd" scope="col" class="is-num">AI spend</th>
                     <th scope="col">Last active</th>
                   </tr>
                 </thead>
@@ -84,7 +84,7 @@
                     <td>{{ row.role }}</td>
                     <td class="is-num">{{ row.runs }}</td>
                     <td class="is-num">{{ row.active_days }}</td>
-                    <td class="is-num">{{ row.ai_usd }}</td>
+                    <td v-if="!hideUsd" class="is-num">{{ row.ai_usd }}</td>
                     <td>
                       <time v-if="row.last_active_at" :datetime="row.last_active_at">{{ timeAgo(row.last_active_at) }}</time>
                     </td>
@@ -103,15 +103,18 @@
 // The usage dashboard (the Command Center design, p2_contract.md 14): agent
 // runs, active users, drafts saved and AI spend from recorded runs and the
 // usage ledger, for the signed-in user or, for organization owners and
-// admins, the whole organization. Filters live in the URL query.
+// admins, the whole organization. Filters live in the URL query. Free
+// accounts never see dollars: AI spend gives way to request counts.
 import { computed, watch } from 'vue'
 import { CircleX } from '@lucide/vue'
 import agentApi from '@/api/agent'
 import { useAnalyticsQuery } from '@/composables/analytics/useAnalyticsQuery'
 import { useQueryState } from '@/composables/analytics/useQueryState'
 import {
-  activeUsersOverTime, commandEmpty, commandTiles, runsByAgent, runsByTeam, runsOverTime, spendOverTime, topUserRows,
+  activeUsersOverTime, commandEmpty, commandTiles, requestsByCategory, runsByAgent, runsByTeam, runsOverTime, spendOverTime,
+  topUserRows,
 } from '@/lib/analytics/commandSpecs'
+import { useHideUsd } from '@/composables/useHideUsd'
 import { relativeTime } from '@/components/agent/common/agentText'
 import SettingsShell from '@/components/settings/SettingsShell.vue'
 import AnalyticsHeader from '@/components/analytics/AnalyticsHeader.vue'
@@ -123,6 +126,9 @@ import VizStatTile from '@/components/charts/VizStatTile.vue'
 import VizState from '@/components/charts/VizState.vue'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
+
+// The Free plan (session limits.prompt_runs metered) never shows dollars.
+const hideUsd = useHideUsd()
 
 const { scope, project, period } = useQueryState(
   { scope: '', project: '', period: '30d' },
@@ -174,21 +180,23 @@ const subtitle = computed(() => {
   return 'How you use the agents and the AI allowance, from recorded runs and usage.'
 })
 
-const pageEmpty = computed(() => (data.value ? commandEmpty(data.value, period.value) : null))
-const tiles = computed(() => commandTiles(data.value, { period: data.value?.window?.period || period.value }))
+const pageEmpty = computed(() => (data.value ? commandEmpty(data.value, period.value, { hideUsd: hideUsd.value }) : null))
+const tiles = computed(() =>
+  commandTiles(data.value, { period: data.value?.window?.period || period.value, hideUsd: hideUsd.value }),
+)
 
 const specs = computed(() => {
   const d = data.value
   return {
     runs: runsOverTime(d),
     users: activeUsersOverTime(d),
-    spend: spendOverTime(d),
-    agents: runsByAgent(d),
+    spend: hideUsd.value ? requestsByCategory(d) : spendOverTime(d),
+    agents: runsByAgent(d, { hideUsd: hideUsd.value }),
     teams: runsByTeam(d),
   }
 })
 
-const topUsers = computed(() => topUserRows(data.value))
+const topUsers = computed(() => topUserRows(data.value, { hideUsd: hideUsd.value }))
 
 function timeAgo(iso) {
   return relativeTime(iso)
