@@ -44,6 +44,7 @@ import { ensureWebsites } from '@/router/ensureWebsites'
 import { activeProjectId, entryProjectId } from '@/router/analyticsEntry'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
+import { useShellTakeover } from '@/lib/shell/takeover'
 
 const route = useRoute()
 const router = useRouter()
@@ -51,6 +52,8 @@ const app = useAppStore()
 const auth = useAuthStore()
 
 const showOnboarding = computed(() => auth.session?.onboarding?.needs_onboarding === true)
+// The wizard covers the screen; the shell's header behind it goes inert.
+useShellTakeover(showOnboarding)
 
 // loading | failed | empty
 const state = ref('loading')

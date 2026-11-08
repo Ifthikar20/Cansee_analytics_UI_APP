@@ -1,9 +1,10 @@
 <template>
-  <!-- Full-page takeover, not a dialog: during first-run onboarding the
-       AppLayout renders a bare router-view, so this is the only content
-       on screen. Escape intentionally does nothing — the escape hatch
-       is the always-visible Sign out. -->
-  <main class="ob-root" aria-label="Set up your Cansee">
+  <!-- Full-page takeover, not a dialog. It renders inside AppShell's
+       <main> (AnalyticsEntryPage), so it is a region rather than a second
+       main landmark; the entry page makes the shell's header inert while
+       it shows. Escape intentionally does nothing: the escape hatch is the
+       always-visible Sign out. -->
+  <div class="ob-root" role="region" aria-label="Set up your Cansee">
     <WatercolorBackdrop />
 
     <header class="ob-topbar">
@@ -65,7 +66,7 @@
         <a href="/privacy" target="_blank" rel="noopener">Privacy</a>
       </nav>
     </footer>
-  </main>
+  </div>
 </template>
 
 <script setup>

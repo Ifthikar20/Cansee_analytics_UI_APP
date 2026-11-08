@@ -1,9 +1,19 @@
 <template>
   <TooltipProvider :delay-duration="400" :skip-delay-duration="200">
     <div class="ag-root app-frame">
-      <a :href="`#${mainId}`" class="app-skip" @click.prevent="focusMain">Skip to content</a>
+      <a
+        :href="`#${mainId}`"
+        class="app-skip"
+        :inert="takeover || undefined"
+        :aria-hidden="takeover ? 'true' : undefined"
+        @click.prevent="focusMain"
+      >Skip to content</a>
 
-      <AppHeader :website-id="websiteId" />
+      <AppHeader
+        :website-id="websiteId"
+        :inert="takeover || undefined"
+        :aria-hidden="takeover ? 'true' : undefined"
+      />
 
       <div
         v-if="isAgent"
@@ -64,7 +74,7 @@
 import '@/assets/agent/tokens.css'
 import '@/assets/agent/base.css'
 import '@/assets/agent/portal.css'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, provide, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -84,12 +94,24 @@ import { useAgentHotkeys } from '@/composables/agent/useAgentHotkeys'
 import { useVisualViewportInset } from '@/composables/agent/useVisualViewportInset'
 import { ensureAgentFont } from '@/lib/agent/font'
 import { sectionOf } from '@/lib/shell/nav'
+import { SHELL_TAKEOVER } from '@/lib/shell/takeover'
 
 const route = useRoute()
 const app = useAppStore()
 const agent = useAgentStore()
 const ui = useAgentUiStore()
 const mainEl = ref(null)
+
+// A page covering the whole screen (first-run onboarding) hides the header
+// and skip link from focus and assistive technology (lib/shell/takeover.js).
+const takeovers = reactive(new Set())
+const takeover = computed(() => takeovers.size > 0)
+provide(SHELL_TAKEOVER, {
+  set(token, on) {
+    if (on) takeovers.add(token)
+    else takeovers.delete(token)
+  },
+})
 
 // fetchMe, the website list and plan limits on mount.
 useShellBootstrap()
