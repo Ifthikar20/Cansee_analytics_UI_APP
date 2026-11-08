@@ -3,14 +3,18 @@
 // panel: the run's question becomes a tracked prompt without a scan, so
 // nothing is spent twice; Autopilot asks it from its next run. The answers
 // Ask AI got stay in its own tables. Past the plan's cap the server adds
-// nothing and says why (403 tracked_prompt_limit).
+// nothing and says why (403 tracked_prompt_limit). With `hint`, the first
+// time the button shows it is pointed out (hint board.track).
 import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import promptBoxApi from '@/api/promptBox'
 import AgButton from '@/components/agent/common/AgButton.vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+import HintCallout from '@/components/ui/help/HintCallout.vue'
 import { useBoardSource } from '@/composables/board/useBoardSource'
 import { useBoard } from '@/lib/board/context'
 import { useAgentUiStore } from '@/stores/agentUi'
+import { TIPS } from '@/lib/help/tips'
 import { COPY, failureOf } from './specs'
 import { rememberTracked, trackedOf } from './usePromptBoxRun'
 
@@ -18,6 +22,8 @@ const props = defineProps({
   websiteId: { type: String, required: true },
   // The run whose question is tracked: {id, text, tracked: {prompt_id, brand_prompt_id}}.
   run: { type: Object, required: true },
+  // Offer the first-visit hint (the card, once its run has ended).
+  hint: { type: Boolean, default: false },
 })
 
 const board = useBoard()
@@ -90,7 +96,10 @@ function openPrompt() {
       <AgButton size="sm" variant="ghost" @click="openPrompt">Open it</AgButton>
     </template>
     <template v-else>
-      <AgButton size="sm" :loading="saving" @click="track">Track this prompt</AgButton>
+      <HintCallout hint="board.track" :when="hint && !saving">
+        <AgButton size="sm" :loading="saving" @click="track">Track this prompt</AgButton>
+      </HintCallout>
+      <HelpTip :text="TIPS.askAi.track" label="About tracking this prompt" />
       <p v-if="outcome === 'limit'" class="pb-track-note" role="alert">
         {{ message }} <RouterLink class="pb-track-link" :to="{ name: 'billing' }">See plans</RouterLink>
       </p>

@@ -2,7 +2,9 @@
 // Text button in the agent look. Variants: secondary (the reference's Open
 // and Export buttons), primary, ghost, danger. Sizes: sm (30px, 14/500),
 // md (32px), xs (26px, 13/500). With `to` it renders a router-link, with
-// `href` an <a>.
+// `href` an <a>. A button that must explain why it is off takes
+// aria-disabled="true" instead of `disabled`, so it keeps focus and hover
+// for its tooltip; its click handler must then do nothing.
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import AgSpinner from './AgSpinner.vue'
@@ -36,7 +38,7 @@ const tagProps = computed(() => {
     class="ag-button"
     :class="[`is-${variant}`, `is-${size}`, { 'is-block': block, 'is-loading': loading }]"
     :aria-busy="loading ? 'true' : undefined"
-    :aria-disabled="(to || href) && disabled ? 'true' : undefined"
+    :aria-disabled="(to || href) && disabled ? 'true' : $attrs['aria-disabled']"
   >
     <AgSpinner v-if="loading" :size="14" />
     <component :is="icon" v-else-if="icon" :size="size === 'xs' ? 14 : 16" aria-hidden="true" />
@@ -88,7 +90,7 @@ const tagProps = computed(() => {
   color: var(--ag-fg-1);
 }
 
-.ag-button.is-secondary:hover:not(:disabled) {
+.ag-button.is-secondary:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--ag-btn-hover);
   opacity: 1;
 }
@@ -99,7 +101,7 @@ const tagProps = computed(() => {
   color: var(--ag-send-fg);
 }
 
-.ag-button.is-primary:hover:not(:disabled) {
+.ag-button.is-primary:hover:not(:disabled):not([aria-disabled='true']) {
   opacity: 0.88;
 }
 
@@ -108,7 +110,7 @@ const tagProps = computed(() => {
   color: var(--ag-fg-2);
 }
 
-.ag-button.is-ghost:hover:not(:disabled) {
+.ag-button.is-ghost:hover:not(:disabled):not([aria-disabled='true']) {
   background: var(--ag-ghost-hover);
   color: var(--ag-fg-1);
   opacity: 1;
@@ -120,7 +122,7 @@ const tagProps = computed(() => {
   color: #ffffff;
 }
 
-.ag-button.is-danger:hover:not(:disabled) {
+.ag-button.is-danger:hover:not(:disabled):not([aria-disabled='true']) {
   opacity: 0.9;
 }
 
@@ -129,6 +131,12 @@ const tagProps = computed(() => {
   opacity: 0.5;
   cursor: default;
   pointer-events: none;
+}
+
+/* A button that is aria-disabled stays hoverable and focusable, so a
+   tooltip can say why it is off; its click handler does nothing. */
+button.ag-button[aria-disabled='true']:not(:disabled) {
+  pointer-events: auto;
 }
 
 .ag-button.is-loading {

@@ -18,6 +18,8 @@ import { HELP_LINKS, navItems } from '@/lib/shell/nav'
 import { FEEDBACK_ENABLED } from '@/api/feedbackClient'
 import FeedbackWidget from '@/components/feedback/FeedbackWidget.vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
+import AgTooltip from '@/components/agent/common/AgTooltip.vue'
+import { TIPS } from '@/lib/help/tips'
 import AccountMenu from './AccountMenu.vue'
 import HelpMenu from './HelpMenu.vue'
 import OrgMenu from './OrgMenu.vue'
@@ -115,14 +117,14 @@ useEventListener(document, 'keydown', (event) => {
       </div>
 
       <nav class="shell-nav" aria-label="Main">
-        <router-link
-          v-for="item in items"
-          :key="item.key"
-          :to="item.to"
-          class="shell-link"
-          :class="{ 'is-active': item.active }"
-          :aria-current="item.active ? 'page' : undefined"
-        >{{ item.label }}</router-link>
+        <AgTooltip v-for="item in items" :key="item.key" :text="TIPS.header.nav[item.key] || ''">
+          <router-link
+            :to="item.to"
+            class="shell-link"
+            :class="{ 'is-active': item.active }"
+            :aria-current="item.active ? 'page' : undefined"
+          >{{ item.label }}</router-link>
+        </AgTooltip>
       </nav>
 
       <div class="shell-actions">

@@ -57,6 +57,11 @@
           <tr>
             <th v-if="selectable" scope="col" class="ag-st-sel">
               <span class="ag-st-sr">Add to findings</span>
+              <HintCallout hint="agent.findings-select" :when="hasDrafts">
+                <span class="ag-st-sel-help">
+                  <HelpTip :text="TIPS.agent.findings" label="What adding to findings does" side="right" />
+                </span>
+              </HintCallout>
             </th>
             <th
               v-for="(col, i) in columns"
@@ -161,6 +166,9 @@
 import { computed, ref, useId, watch } from 'vue'
 import { ArrowDown, ArrowUp, Download, PanelRight } from '@lucide/vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+import HintCallout from '@/components/ui/help/HintCallout.vue'
+import { TIPS } from '@/lib/help/tips'
 import SwarmTableActions from './SwarmTableActions.vue'
 import {
   ariaSort,
@@ -266,6 +274,8 @@ function onSheetKey(event) {
 const sorts = ref({})
 const sort = computed(() => sorts.value[sheetKey.value] || { key: null, dir: null })
 const rows = computed(() => sortRows(sheetRows(sheet.value), sort.value.key, sort.value.dir))
+// A row can still be ticked: the findings hint points at the column then.
+const hasDrafts = computed(() => rows.value.some((row) => hasDraft(row) && !isAdded(row.key)))
 
 function sortBy(key) {
   sorts.value = { ...sorts.value, [sheetKey.value]: nextSort(sort.value, key) }
@@ -614,6 +624,16 @@ function download() {
 .ag-st-table thead .ag-st-sel {
   z-index: 3;
   background: var(--ag-tab-bg);
+}
+
+/* The help icon, centred over the row checkboxes (14px at 10px). */
+.ag-st-table thead th.ag-st-sel {
+  padding: 0 0 0 7px;
+}
+
+.ag-st-sel-help {
+  display: inline-flex;
+  vertical-align: middle;
 }
 
 .ag-st-check {

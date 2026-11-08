@@ -8,6 +8,7 @@
     <div v-if="authStore.isOrgAdmin" class="om-toolbar">
       <span v-if="seats" class="om-seats" :class="{ 'om-seats--full': seats.used >= seats.max }">
         {{ seats.used }} of {{ seats.max }} seats used
+        <HelpTip :text="TIPS.settings.seats" label="About seats" />
       </span>
       <Button size="sm" class="om-btn" @click="composerOpen = !composerOpen">
         {{ composerOpen ? 'Close' : 'Invite people' }}
@@ -25,12 +26,13 @@
           :disabled="inviteBusy"
           @keydown.enter.prevent="sendInvites"
         />
-        <select v-model="inviteRole" class="om-select" :disabled="inviteBusy">
+        <select v-model="inviteRole" class="om-select" aria-label="Role" :disabled="inviteBusy">
           <option value="member">Member</option>
           <option value="viewer">Viewer</option>
           <!-- Only the owner can mint new admins. -->
           <option v-if="authStore.isOrgOwner" value="admin">Admin</option>
         </select>
+        <HelpTip :text="TIPS.settings.roles" label="About roles" />
         <Button size="sm" class="om-btn" :disabled="inviteBusy || !inviteEmails.trim()" @click="sendInvites">
           {{ inviteBusy ? 'Sending…' : 'Send invites' }}
         </Button>
@@ -179,6 +181,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useOrgStore } from '@/stores/org'
 import { useToast } from '@/composables/useToast'
 import SettingsSection from '@/components/settings/SettingsSection.vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+import { TIPS } from '@/lib/help/tips'
 import BaseModal from '@/components/ui/BaseModal.vue'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -368,6 +372,8 @@ onMounted(() => {
   align-items: center;
   gap: 14px;
   margin-bottom: 14px;
+  --cs-helptip-fg: var(--muted-foreground);
+  --cs-helptip-fg-hover: var(--foreground);
 }
 .om-seats {
   font-size: 12px;
@@ -391,8 +397,11 @@ onMounted(() => {
 }
 .om-composer-row {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  --cs-helptip-fg: var(--muted-foreground);
+  --cs-helptip-fg-hover: var(--foreground);
 }
 .om-input {
   flex: 1 1 220px;

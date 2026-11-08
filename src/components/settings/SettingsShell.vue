@@ -13,16 +13,21 @@
       <aside class="ss-nav" aria-label="Settings sections">
         <template v-for="group in NAV" :key="group.label">
           <p class="ss-nav-group">{{ group.label }}</p>
-          <router-link
+          <AgTooltip
             v-for="item in visibleItems(group)" :key="item.key"
-            :to="item.to"
-            class="ss-nav-item"
-            :class="{ 'is-active': active === item.key }"
-            :aria-current="active === item.key ? 'page' : null"
+            :text="TIPS.settings.nav[item.key] || ''"
+            side="right"
           >
-            <NavIcon :paths="item.icon" :size="16" class="ss-nav-icon" />
-            <span>{{ item.label }}</span>
-          </router-link>
+            <router-link
+              :to="item.to"
+              class="ss-nav-item"
+              :class="{ 'is-active': active === item.key }"
+              :aria-current="active === item.key ? 'page' : null"
+            >
+              <NavIcon :paths="item.icon" :size="16" class="ss-nav-icon" />
+              <span>{{ item.label }}</span>
+            </router-link>
+          </AgTooltip>
         </template>
       </aside>
 
@@ -76,6 +81,8 @@
 import { computed, h, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import AgTooltip from '@/components/agent/common/AgTooltip.vue'
+import { TIPS } from '@/lib/help/tips'
 
 const props = defineProps({
   /** Key of the active nav item: account | subscription | notifications | project | autopilot | connections | brand-facts | usage | command-center | appearance | contact | team | domains */

@@ -12,8 +12,12 @@ import {
   AlertDialogRoot,
   AlertDialogTitle,
 } from 'reka-ui'
+import { holdHints } from '@/stores/hints'
 
 const open = defineModel('open', { type: Boolean, default: false })
+
+// No first-visit hint while this is open.
+holdHints(() => open.value)
 
 const props = defineProps({
   title: { type: String, required: true },

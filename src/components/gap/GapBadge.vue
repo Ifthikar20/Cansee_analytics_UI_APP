@@ -1,14 +1,19 @@
 <template>
-  <span class="gap-badge" :title="meta.blurb">
-    {{ meta.label }}
-    <span v-if="showValue && valueText" class="gap-badge-value">{{ valueText }}</span>
+  <span class="gap-badge">
+    <HelpTip v-if="meta.blurb" :text="meta.blurb">{{ meta.label }}</HelpTip>
+    <template v-else>{{ meta.label }}</template>
+    <template v-if="showValue && valueText">
+      {{ ' ' }}<span class="gap-badge-value">{{ valueText }}</span>
+    </template>
   </span>
 </template>
 
 <script setup>
 // A gap class in words, with its value when asked: "AI ahead +40",
-// "Not definite". Plain text, no colour: the words carry the class.
+// "Not definite". Plain text, no colour: the words carry the class. The
+// class's one-line meaning is a HelpTip on its words (hover, focus or tap).
 import { computed } from 'vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
 import { gapDisplay, gapMeta, gapValue, gapValueText } from '@/lib/gap'
 
 const props = defineProps({

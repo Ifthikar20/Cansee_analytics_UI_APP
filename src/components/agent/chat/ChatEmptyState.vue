@@ -1,7 +1,9 @@
 <template>
   <div class="ag-empty">
     <h2 class="ag-empty-title">{{ greeting }}</h2>
-    <AgentChips :agents="agents" :agent="agent" @pick="emit('pick-agent', $event)" />
+    <HintCallout hint="agent.chips" :when="agents.some((a) => a && !a.unavailable)" align="center">
+      <AgentChips :agents="agents" :agent="agent" @pick="emit('pick-agent', $event)" />
+    </HintCallout>
     <SuggestionGrid
       class="ag-empty-suggest"
       :suggestions="suggestions"
@@ -13,8 +15,10 @@
 
 <script setup>
 // A new chat: the greeting, the four agents, and suggestions that come only
-// from the project's real tracked prompts (none when it has none).
+// from the project's real tracked prompts (none when it has none). The
+// first new chat points the agents out (hint agent.chips).
 import { computed } from 'vue'
+import HintCallout from '@/components/ui/help/HintCallout.vue'
 import AgentChips from './AgentChips.vue'
 import SuggestionGrid from './SuggestionGrid.vue'
 

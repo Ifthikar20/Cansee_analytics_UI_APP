@@ -39,6 +39,7 @@
 <script setup>
 import { ref, useId } from 'vue'
 import { useDialogFocus } from '@/composables/useDialogFocus'
+import { holdHints } from '@/stores/hints'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -64,6 +65,9 @@ function close() {
 // to what opened it, and Escape closes the dialog opened last (only while it
 // is open).
 useDialogFocus(cardRef, () => props.modelValue, { onEscape: close })
+
+// No first-visit hint while the modal is open.
+holdHints(() => props.modelValue)
 
 defineExpose({ close })
 </script>

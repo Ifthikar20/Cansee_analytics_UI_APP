@@ -3,18 +3,19 @@
     <Check class="ag-saved-icon" aria-hidden="true" />
     <span>Saved to Reports</span>
   </router-link>
-  <AgButton
-    v-else
-    class="ag-save"
-    variant="ghost"
-    size="xs"
-    :icon="FilePlus2"
-    :loading="saving"
-    :disabled="disabled"
-    @click="save"
-  >
-    {{ saving ? 'Saving' : 'Save report' }}
-  </AgButton>
+  <AgTooltip v-else :text="TIPS.agent.saveReport">
+    <AgButton
+      class="ag-save"
+      variant="ghost"
+      size="xs"
+      :icon="FilePlus2"
+      :loading="saving"
+      :disabled="disabled"
+      @click="save"
+    >
+      {{ saving ? 'Saving' : 'Save report' }}
+    </AgButton>
+  </AgTooltip>
 </template>
 
 <script setup>
@@ -24,6 +25,8 @@
 import { computed, ref, watch } from 'vue'
 import { Check, FilePlus2 } from '@lucide/vue'
 import AgButton from '@/components/agent/common/AgButton.vue'
+import AgTooltip from '@/components/agent/common/AgTooltip.vue'
+import { TIPS } from '@/lib/help/tips'
 import { useAgentStore } from '@/stores/agent'
 import { useAgentUiStore } from '@/stores/agentUi'
 import { useToast } from '@/composables/useToast'

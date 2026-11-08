@@ -11,6 +11,8 @@ import { useAuthStore } from '@/stores/auth'
 import AgMenuContent from '@/components/agent/common/AgMenuContent.vue'
 import AgMenuItem from '@/components/agent/common/AgMenuItem.vue'
 import AgMenuLabel from '@/components/agent/common/AgMenuLabel.vue'
+import TipButton from '@/components/ui/help/TipButton.vue'
+import { TIPS } from '@/lib/help/tips'
 
 const ROLE_LABELS = { owner: 'Owner', admin: 'Admin', member: 'Member', viewer: 'Viewer' }
 
@@ -31,11 +33,11 @@ function goSettings(section) {
     <span class="shell-sep" aria-hidden="true">/</span>
     <DropdownMenuRoot>
       <DropdownMenuTrigger as-child>
-        <button type="button" class="shell-chip" :aria-label="`Organization: ${org.name}`">
+        <TipButton class="shell-chip" :tip="TIPS.header.org" :aria-label="`Organization: ${org.name}`">
           <span class="shell-org-mark" aria-hidden="true">{{ mark }}</span>
           <span class="shell-chip-text">{{ org.name }}</span>
           <span v-if="roleLabel" class="shell-role">{{ roleLabel }}</span>
-        </button>
+        </TipButton>
       </DropdownMenuTrigger>
 
       <AgMenuContent align="start" :width="240">

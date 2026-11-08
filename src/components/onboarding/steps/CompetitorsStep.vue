@@ -54,7 +54,10 @@
         </p>
 
         <div class="ob-field">
-          <span id="ob-competitor-add-label" class="ob-label">Add a competitor</span>
+          <div class="ob-label-row">
+            <span id="ob-competitor-add-label" class="ob-label">Add a competitor</span>
+            <HelpTip :text="TIPS.onboarding.competitors" label="About competitors" />
+          </div>
           <div class="ob-add-row" role="group" aria-labelledby="ob-competitor-add-label">
             <input
               v-model="newCompetitorName"
@@ -103,6 +106,8 @@
 
 <script setup>
 import { computed } from 'vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+import { TIPS } from '@/lib/help/tips'
 
 import { LIMITS, useOnboardingFlow } from '../useOnboardingFlow'
 

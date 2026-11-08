@@ -19,7 +19,9 @@
           <dt>
             Title
             <span class="ag-fact-meta ag-tnum">{{ countLabel(seo.title_length, seo.title) }}</span>
-            <span v-if="titleFlag" class="ag-fact-flag" :class="titleFlag.tone" :title="titleFlag.hint">{{ titleFlag.label }}</span>
+            <HelpTip v-if="titleFlag" :text="titleFlag.hint">
+              <span class="ag-fact-flag" :class="titleFlag.tone">{{ titleFlag.label }}</span>
+            </HelpTip>
           </dt>
           <dd :class="{ 'is-empty': !seo.title }">{{ seo.title || 'Missing' }}</dd>
         </div>
@@ -28,9 +30,9 @@
           <dt>
             Meta description
             <span class="ag-fact-meta ag-tnum">{{ countLabel(seo.meta_description_length, seo.meta_description) }}</span>
-            <span v-if="descriptionFlag" class="ag-fact-flag" :class="descriptionFlag.tone" :title="descriptionFlag.hint">
-              {{ descriptionFlag.label }}
-            </span>
+            <HelpTip v-if="descriptionFlag" :text="descriptionFlag.hint">
+              <span class="ag-fact-flag" :class="descriptionFlag.tone">{{ descriptionFlag.label }}</span>
+            </HelpTip>
           </dt>
           <dd :class="{ 'is-empty': !seo.meta_description }">{{ seo.meta_description || 'Missing' }}</dd>
         </div>
@@ -38,9 +40,9 @@
         <div class="ag-fact">
           <dt>
             Canonical
-            <span v-if="canonicalElsewhere" class="ag-fact-flag is-info" title="The canonical URL is not this page's address.">
-              Points elsewhere
-            </span>
+            <HelpTip v-if="canonicalElsewhere" text="The canonical URL is not this page's address.">
+              <span class="ag-fact-flag is-info">Points elsewhere</span>
+            </HelpTip>
           </dt>
           <dd :class="{ 'is-empty': !seo.canonical }" class="is-url">{{ seo.canonical || 'Not set' }}</dd>
         </div>
@@ -48,7 +50,9 @@
         <div class="ag-fact">
           <dt>
             Robots
-            <span v-if="noindex" class="ag-fact-flag is-danger" title="This page asks search engines not to index it.">noindex</span>
+            <HelpTip v-if="noindex" text="This page asks search engines not to index it.">
+              <span class="ag-fact-flag is-danger">noindex</span>
+            </HelpTip>
           </dt>
           <dd :class="{ 'is-empty': !seo.robots }">{{ seo.robots || 'Not set' }}</dd>
         </div>
@@ -148,6 +152,7 @@
 <script setup>
 import { computed, useId } from 'vue'
 import { ChevronDown, ListChecks } from '@lucide/vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
 import { formatBytes, formatMs, formatNumber } from '../format'
 
 const props = defineProps({
@@ -320,6 +325,8 @@ const responseLabel = computed(() =>
 }
 
 .ag-fact dt {
+  --cs-helptip-decoration: none;
+  --cs-helptip-radius: 5px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

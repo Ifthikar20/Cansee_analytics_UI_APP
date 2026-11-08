@@ -1,20 +1,25 @@
 <template>
   <div class="ag-chips" role="group" aria-label="Agents">
-    <button
-      v-for="a in agents"
-      :key="a.key"
-      type="button"
-      class="ag-chip"
-      :class="{ 'is-unavailable': a.unavailable }"
-      :aria-pressed="a.key === agent ? 'true' : 'false'"
-      :aria-disabled="a.unavailable ? 'true' : undefined"
-      :title="a.unavailable || a.description || undefined"
-      @click="pick(a)"
-    >
-      <component :is="a.icon" class="ag-chip-icon" aria-hidden="true" />
-      <span class="ag-chip-name">{{ a.name }}</span>
-      <span v-if="a.unavailable" class="ag-sr-only">: {{ a.unavailable }}</span>
-    </button>
+    <AgTooltip v-for="a in agents" :key="a.key" :text="a.unavailable || a.description || ''" side="bottom">
+      <button
+        type="button"
+        class="ag-chip"
+        :class="{ 'is-unavailable': a.unavailable }"
+        :aria-pressed="a.key === agent ? 'true' : 'false'"
+        :aria-disabled="a.unavailable ? 'true' : undefined"
+        :aria-describedby="!a.unavailable && a.description ? descId(a) : undefined"
+        @click="pick(a)"
+      >
+        <component :is="a.icon" class="ag-chip-icon" aria-hidden="true" />
+        <span class="ag-chip-name">{{ a.name }}</span>
+        <span v-if="a.unavailable" class="ag-sr-only">: {{ a.unavailable }}</span>
+      </button>
+    </AgTooltip>
+    <!-- Each description, for the chip's aria-describedby: the tooltip
+         shows it on hover and keyboard focus only. -->
+    <template v-for="a in agents" :key="`desc-${a.key}`">
+      <span v-if="!a.unavailable && a.description" :id="descId(a)" hidden>{{ a.description }}</span>
+    </template>
     <p v-if="note" class="ag-chips-note" aria-hidden="true">{{ note }}</p>
   </div>
 </template>
@@ -22,7 +27,11 @@
 <script setup>
 // The four agents as chips; picking one sets the composer's agent. A writing
 // agent the AI allowance cannot start is shown disabled, with the reason.
-import { computed } from 'vue'
+// Each chip's description, or the reason it is off, is its tooltip (never a
+// title=, which keyboard cannot reach). The reason is also in the chip's name
+// and the note below; a description is also the chip's aria-describedby.
+import { computed, useId } from 'vue'
+import AgTooltip from '@/components/agent/common/AgTooltip.vue'
 
 const props = defineProps({
   agents: { type: Array, default: () => [] },
@@ -30,6 +39,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['pick'])
+
+const uid = useId()
+const descId = (a) => `${uid}-desc-${a.key}`
 
 function pick(a) {
   if (a.key === props.agent) emit('pick', null)

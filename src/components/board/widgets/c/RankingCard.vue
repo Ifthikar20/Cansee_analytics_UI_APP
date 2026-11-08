@@ -8,6 +8,7 @@
     <template v-else>
       <p v-if="lead" class="rk-lead">
         {{ lead.text }}
+        <HelpTip v-if="lead.turnOn" :text="TIPS.ranking.autopilot" label="About Autopilot" />
         <RouterLink v-if="lead.turnOn" class="rk-link" :to="{ name: 'settings-autopilot' }">Turn it on</RouterLink>
       </p>
 
@@ -17,16 +18,25 @@
       </div>
 
       <div v-if="empty" class="rk-state is-inline">
-        <p class="rk-state-title">{{ empty.title }}</p>
+        <p class="rk-state-title">
+          {{ empty.title }}
+          <HelpTip v-if="!empty.action" :text="TIPS.ranking.notRanked" label="Why prompts are not ranked yet" />
+        </p>
         <AgButton v-if="empty.action" size="sm" @click="board.open('prompts', { add: '1' })">{{ empty.action }}</AgButton>
       </div>
       <div v-else class="rk-lists">
         <section class="rk-list" :aria-labelledby="topId">
-          <h3 :id="topId" class="rk-list-title">Keep you visible</h3>
+          <div class="rk-list-head">
+            <h3 :id="topId" class="rk-list-title">Keep you visible</h3>
+            <HelpTip :text="TIPS.ranking.top" label="About Keep you visible" />
+          </div>
           <BarList :items="lists.top" :max="100" label="Keep you visible" @select="openPrompt" />
         </section>
         <section v-if="lists.weakest.length" class="rk-list" :aria-labelledby="weakId">
-          <h3 :id="weakId" class="rk-list-title">Weakest</h3>
+          <div class="rk-list-head">
+            <h3 :id="weakId" class="rk-list-title">Weakest</h3>
+            <HelpTip :text="TIPS.ranking.weakest" label="About Weakest" />
+          </div>
           <BarList :items="lists.weakest" :max="100" label="Weakest" @select="openPrompt" />
         </section>
       </div>
@@ -53,9 +63,11 @@ import AgButton from '@/components/agent/common/AgButton.vue'
 import BarList from '@/components/board/BarList.vue'
 import CardFoot from '@/components/board/CardFoot.vue'
 import CardSkeleton from '@/components/board/CardSkeleton.vue'
+import HelpTip from '@/components/ui/help/HelpTip.vue'
 import { useBoardSource } from '@/composables/board/useBoardSource'
 import { useBoard } from '@/lib/board/context'
 import { widgetMeta } from '@/lib/board/widgets'
+import { TIPS } from '@/lib/help/tips'
 import { COPY, autopilotLine, overCapLine, rankingEmpty, rankingFoot, rankingLists } from './specs'
 
 defineProps({
@@ -168,6 +180,13 @@ function openPrompt(promptId) {
 .rk-list {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rk-list-head {
+  display: flex;
+  align-items: center;
   gap: 4px;
   min-width: 0;
 }

@@ -7,7 +7,11 @@
     <p v-if="label" class="sc-label">{{ label }}</p>
     <div class="sc" :class="{ 'sc--danger': danger }">
       <div class="sc-head">
-        <h3 class="sc-title">{{ title }}</h3>
+        <div v-if="help" class="sc-title-row">
+          <h3 class="sc-title">{{ title }}</h3>
+          <HelpTip :text="help" :label="`About ${title}`" />
+        </div>
+        <h3 v-else class="sc-title">{{ title }}</h3>
         <p v-if="description" class="sc-desc">{{ description }}</p>
       </div>
       <div class="sc-body">
@@ -21,6 +25,8 @@
 </template>
 
 <script setup>
+import HelpTip from '@/components/ui/help/HelpTip.vue'
+
 defineProps({
   /** Uppercase group eyebrow above the card (e.g. "Profile"). */
   label: { type: String, default: '' },
@@ -28,6 +34,8 @@ defineProps({
   title: { type: String, required: true },
   /** One plain sentence under the heading. */
   description: { type: String, default: '' },
+  /** More about the section, in a help icon beside the title. */
+  help: { type: String, default: '' },
   /** Destructive tone: the card border picks up the destructive colour. */
   danger: { type: Boolean, default: false },
 })
@@ -55,6 +63,14 @@ defineProps({
   padding: 22px 24px 24px;
 }
 .sc--danger { border-color: color-mix(in srgb, var(--destructive) 35%, transparent); }
+
+.sc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  --cs-helptip-fg: var(--muted-foreground);
+  --cs-helptip-fg-hover: var(--foreground);
+}
 
 .sc-head {
   padding-bottom: 18px;

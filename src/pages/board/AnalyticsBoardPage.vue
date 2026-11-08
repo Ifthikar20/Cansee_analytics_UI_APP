@@ -21,6 +21,8 @@ import AgEmptyState from '@/components/agent/common/AgEmptyState.vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
 import AgMenuContent from '@/components/agent/common/AgMenuContent.vue'
 import AgMenuItem from '@/components/agent/common/AgMenuItem.vue'
+import AgTooltip from '@/components/agent/common/AgTooltip.vue'
+import HintCallout from '@/components/ui/help/HintCallout.vue'
 import BoardGrid from '@/components/board/BoardGrid.vue'
 import BoardPanel from '@/components/board/BoardPanel.vue'
 import BoardSaveState from '@/components/board/BoardSaveState.vue'
@@ -31,6 +33,8 @@ import { BOARD_CONTEXT } from '@/lib/board/context'
 import { DEFAULT_LAYOUT, panelTitle, widgetMeta } from '@/lib/board/widgets'
 import { useAppStore } from '@/stores/app'
 import { useBoardStore } from '@/stores/board'
+import { useHintsStore } from '@/stores/hints'
+import { TIPS } from '@/lib/help/tips'
 
 const WIDE_KEY = 'cs-board-panel-wide'
 
@@ -186,6 +190,15 @@ watch(
 )
 onBeforeUnmount(() => unlockScroll({ keepPlace: false }))
 
+// No first-visit hint over the side panel, the catalog or the reset dialog.
+const hints = useHintsStore()
+watch(
+  () => covered.value || catalogOpen.value || resetOpen.value,
+  (on) => hints.suspend('board', on),
+  { immediate: true },
+)
+onBeforeUnmount(() => hints.suspend('board', false))
+
 let opener = null
 let restoreOnClose = true
 
@@ -319,19 +332,23 @@ watch(
           <h1 id="bd-title" class="bd-title">Analytics</h1>
           <div class="bd-bar-actions">
             <BoardSaveState class="bd-save-head" :website-id="websiteId" />
-            <AgButton
-              class="bd-add"
-              data-bd-add
-              :icon="Plus"
-              aria-label="Add widget"
-              :disabled="layoutLoading"
-              @click="catalogOpen = true"
-            >
-              Add widget
-            </AgButton>
+            <HintCallout hint="board.add-widget" :when="!layoutLoading" align="end">
+              <AgTooltip :text="TIPS.board.addWidget">
+                <AgButton
+                  class="bd-add"
+                  data-bd-add
+                  :icon="Plus"
+                  aria-label="Add widget"
+                  :disabled="layoutLoading"
+                  @click="catalogOpen = true"
+                >
+                  Add widget
+                </AgButton>
+              </AgTooltip>
+            </HintCallout>
             <DropdownMenuRoot :modal="false">
               <DropdownMenuTrigger as-child>
-                <AgIconButton label="Board options" data-bd-options :size="32">
+                <AgIconButton label="Board options" :tooltip="TIPS.board.options" data-bd-options :size="32">
                   <MoreHorizontal :size="16" aria-hidden="true" />
                 </AgIconButton>
               </DropdownMenuTrigger>
@@ -352,7 +369,7 @@ watch(
           v-if="!layoutLoading && !widgets.length"
           class="bd-empty"
           title="Your board is empty."
-          body="Add a widget to start."
+          :body="TIPS.board.emptyBody"
         >
           <AgButton :icon="Plus" @click="catalogOpen = true">Add widget</AgButton>
         </AgEmptyState>
