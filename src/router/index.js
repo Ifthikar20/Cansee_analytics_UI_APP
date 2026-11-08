@@ -84,6 +84,12 @@ const routes = [
         meta: { public: true }
     },
     {
+        path: '/demo',
+        name: 'demo',
+        component: () => import('@/pages/info/BookDemoPage.vue'),
+        meta: { public: true }
+    },
+    {
         path: '/blog',
         name: 'blog',
         component: () => import('@/pages/info/BlogPage.vue'),

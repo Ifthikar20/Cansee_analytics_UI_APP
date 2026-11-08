@@ -319,6 +319,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 import { SUPPORT_EMAIL, SUPPORT_SUBJECT } from '@/constants/support'
 import { TIERS } from '@/constants/pricing'
+import { openDemoLink } from '@/constants/demo'
 import { describeSubscription } from '@/lib/plan'
 import { isPolarUrl } from '@/utils/polarRedirect'
 
@@ -487,7 +488,7 @@ async function changePlan(tier) {
 }
 
 function contactEnterprise() {
-  window.location.href = enterpriseTier.value?.contactTarget || 'mailto:sales@cansee.ai'
+  openDemoLink(enterpriseTier.value?.contactTarget)
 }
 
 async function openPortal() {

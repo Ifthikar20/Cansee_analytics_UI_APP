@@ -1,3 +1,5 @@
+import { DEMO_BOOKING_HREF } from './demo'
+
 // Pricing tiers shown on the paywall.
 //
 // Two tiers: Pro ($45/mo self-serve, 7-day trial) and Business
@@ -50,9 +52,10 @@ export const TIERS = [
             'API access + white-label',
             'Dedicated account manager',
         ],
-        cta: 'Contact sales',
+        cta: 'Book a demo',
         planCode: 'business',
-        contactTarget: 'mailto:sales@cansee.ai?subject=Business plan inquiry',
+        // Scheduler URL when VITE_DEMO_BOOKING_URL is set, else a sales mailto.
+        contactTarget: DEMO_BOOKING_HREF,
         highlight: false,
     },
 ]

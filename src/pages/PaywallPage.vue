@@ -147,6 +147,7 @@ import WatercolorBackdrop from '@/components/onboarding/WatercolorBackdrop.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 import { TIERS } from '@/constants/pricing'
+import { openDemoLink } from '@/constants/demo'
 import { isPolarUrl } from '@/utils/polarRedirect'
 
 const router = useRouter()
@@ -246,7 +247,7 @@ async function continueFree() {
 
 function contactSales() {
   const t = enterpriseTier.value
-  window.location.href = t?.contactTarget || 'mailto:sales@cansee.ai'
+  openDemoLink(t?.contactTarget)
 }
 
 async function signOut() {

@@ -23,6 +23,11 @@ ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
 ARG VITE_ASSET_CDN=
 ENV VITE_ASSET_CDN=$VITE_ASSET_CDN
 
+# Scheduling page for every "Book a demo" button (Cal.com, Calendly, ...).
+# Must be an https:// URL. Empty default falls back to a sales@ mailto.
+ARG VITE_DEMO_BOOKING_URL=
+ENV VITE_DEMO_BOOKING_URL=$VITE_DEMO_BOOKING_URL
+
 COPY . .
 RUN npm run build
 

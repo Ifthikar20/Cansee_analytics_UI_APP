@@ -11,6 +11,9 @@ import { fileURLToPath, URL } from 'node:url'
 //                           secret stays on the backend. The same client
 //                           needs {origin}/auth/google/callback in its
 //                           authorized redirect URIs.
+//   VITE_DEMO_BOOKING_URL - https:// scheduling page for "Book a demo"
+//                           (Cal.com, Calendly). Unset falls back to
+//                           a sales@cansee.ai mailto.
 
 export default defineConfig({
   plugins: [vue(), tailwindcss()],

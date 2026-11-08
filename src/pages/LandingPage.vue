@@ -51,6 +51,7 @@
         </nav>
 
         <div class="nav-right">
+          <router-link to="/demo" class="nav-link-text">Book a Demo</router-link>
           <router-link to="/login" class="nav-link-text">Log In</router-link>
           <router-link to="/login" class="nav-cta">
             Get Started
@@ -91,6 +92,7 @@
         <span class="nav-sheet-eyebrow">More</span>
         <a href="#features" @click="closeNav">Features</a>
         <a href="#how" @click="closeNav">How It Works</a>
+        <router-link to="/demo" @click="closeNav">Book a Demo</router-link>
         <router-link to="/login" class="nav-sheet-login" @click="closeNav">Log In</router-link>
         <router-link to="/login" class="nav-sheet-cta" @click="closeNav">Get Started</router-link>
       </div>
@@ -686,7 +688,10 @@
       <div class="wrap cta-inner">
         <h2>Ready to grow <em>smarter?</em></h2>
         <p>Start your first AI visibility prompt run in minutes.</p>
-        <router-link to="/login" class="btn-primary">Get Started</router-link>
+        <div class="cta-actions">
+          <router-link to="/login" class="btn-primary">Get Started</router-link>
+          <router-link to="/demo" class="btn-ghost">Book a Demo</router-link>
+        </div>
       </div>
     </section>
 
@@ -747,6 +752,7 @@
             <div class="footer-col-title">Company</div>
             <router-link to="/about">About</router-link>
             <router-link to="/contact">Contact us</router-link>
+            <router-link to="/demo">Book a demo</router-link>
             <a href="mailto:hello@cansee.ai">hello@cansee.ai</a>
           </div>
 
@@ -2386,6 +2392,16 @@ strong { font-weight: 600; }
   transition: opacity .2s ease, transform .35s var(--ease);
 }
 .btn-primary:hover { opacity: .9; transform: translateY(-2px); }
+.cta-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.btn-ghost {
+  display: inline-flex; align-items: center;
+  height: 42px; padding: 0 26px; margin-top: 8px;
+  background: transparent; color: var(--on-ink);
+  border: 1px solid var(--on-ink-mut);
+  border-radius: var(--r-pill); text-decoration: none;
+  transition: opacity .2s ease, transform .35s var(--ease);
+}
+.btn-ghost:hover { opacity: .85; transform: translateY(-2px); }
 
 /* ═══ Sticky CTA pill ═══════════════════════════════════════ */
 
