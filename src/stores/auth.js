@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import api from '@/api/client'
+import authApi from '@/api/auth'
 import { describeSubscription } from '@/lib/plan'
 import { clearUserData as clearAgentUserData } from '@/lib/agent/storage'
 import { useAppStore } from '@/stores/app'
@@ -130,6 +131,18 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
+    // Record acceptance of the current Terms of Service and keep the
+    // session's terms block in step, which closes the acceptance modal.
+    // Rejects on failure; a terms_version_mismatch error means the terms
+    // changed meanwhile, and the caller reloads the session.
+    async function acceptTerms(version) {
+        const { data } = await authApi.acceptTerms(version)
+        if (data?.terms && session.value) {
+            session.value = { ...session.value, terms: data.terms }
+        }
+        return data?.terms || null
+    }
+
     async function refreshToken() {
         try {
             const { data: result } = await api.post('/auth/refresh/', {}, { _silentError: true })
@@ -200,6 +213,7 @@ export const useAuthStore = defineStore('auth', () => {
         logout,
         fetchMe,
         fetchSession,
+        acceptTerms,
         refreshToken,
         clearAuth,
         onClearAuth,
