@@ -14,8 +14,8 @@
 </template>
 
 <script setup>
-// A new chat: the greeting, the four agents, and suggestions that come only
-// from the project's real tracked prompts (none when it has none). The
+// A new chat: the greeting, the agents as chips, and suggestions that come
+// only from the project's real tracked prompts (none when it has none). The
 // first new chat points the agents out (hint agent.chips).
 import { computed } from 'vue'
 import HintCallout from '@/components/ui/help/HintCallout.vue'

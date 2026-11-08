@@ -28,6 +28,10 @@ export const AGENT_TEAMS = Object.freeze({
     messaging_brief: ['product_marketing', 'brand'],
 })
 
+// The research agents (backend constants.py AGENT_TEAMS research_agents).
+// Not an agent key: they run as a tool of the Gap Analyst.
+export const RESEARCH_AGENTS_TEAMS = Object.freeze(['aeo_seo'])
+
 /** The label of a team key, '' for an unknown one. */
 export function teamLabel(key) {
     return TEAMS.find((t) => t.key === key)?.label || ''

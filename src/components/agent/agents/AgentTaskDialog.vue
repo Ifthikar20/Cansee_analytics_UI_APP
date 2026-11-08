@@ -1,18 +1,45 @@
 <script setup>
-// The inputs one of the six specialist agents needs, drafted into a task
-// for a new chat (p2_contract.md 15d). The dialog never sends anything:
-// Open in chat hands the text to the composer through askAgent and the
-// person reviews it there. Lists come from Cansee's own data; a list that
-// fails keeps free entry where the field has it.
-import { computed, ref, watch } from 'vue'
+// The inputs an agent needs, drafted into a task for a new chat
+// (p2_contract.md 15d). The six specialists ask for their own inputs; the
+// four general agents and the research agents start from a task template
+// (lib/agent/taskTemplates TASK_FORMS) whose fields it shows. The dialog
+// never sends anything: Open in chat hands the text to the composer through
+// askAgent and the person reviews it there. Lists come from Cansee's own
+// data; a list that fails keeps free entry where the field has it. A
+// project switch while it is open starts it over, so a list of the previous
+// project never shows.
+import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronDown, CircleAlert } from '@lucide/vue'
 import agentApi from '@/api/agent'
 import insightsApi from '@/api/insights'
 import { askAgent } from '@/lib/agent/askAgent'
-import { writerUnavailable } from '@/lib/agent/agentsMeta'
 import { hidesUsd } from '@/lib/promptRuns'
-import { CHANNELS, CHANNEL_KEYS, PR_FORMATS, taskText } from '@/lib/agent/taskTemplates'
+import {
+  agentBlock,
+  allowanceLine,
+  blockHelp,
+  hidesDollars,
+  researchFit,
+  researchRunsCost,
+  researchRunsLine,
+} from '@/lib/agent/availability'
+import {
+  CHANNELS,
+  CHANNEL_KEYS,
+  FORM_FIELDS,
+  PR_FORMATS,
+  RESEARCH_AGENTS_KEY,
+  entryAgentOf,
+  fieldLabel,
+  formTaskText,
+  formTemplate,
+  formTemplates,
+  hasTaskForm,
+  missingFields,
+  taskText,
+  templatePlan,
+} from '@/lib/agent/taskTemplates'
 import { domainOf, normalizeUrl, onSite } from '@/lib/agent/contextSections'
 import { money } from '@/lib/analytics/countrySpecs'
 import AgButton from '@/components/agent/common/AgButton.vue'
@@ -33,6 +60,9 @@ const props = defineProps({
   website: { type: Object, default: null },
   // GET status/
   status: { type: Object, default: null },
+  // The task template to start from (agents with TASK_FORMS); the first one
+  // when empty or unknown.
+  template: { type: String, default: '' },
 })
 
 const router = useRouter()
@@ -59,6 +89,16 @@ const claimKey = ref('')
 const pageError = ref('')
 const theirError = ref('')
 const sending = ref(false)
+
+// Task templates (the four general agents and the research agents).
+const hasForm = computed(() => hasTaskForm(key.value))
+const templates = computed(() => formTemplates(key.value))
+const templateKey = ref('')
+const currentTemplate = computed(() => formTemplate(key.value, templateKey.value))
+const templateFields = computed(() => (currentTemplate.value ? currentTemplate.value.fields.filter((f) => f !== 'notes') : []))
+const form = reactive({ prompt: '', question: '', search: '', offering: '', cta: '', audience: '', region: '', url: '' })
+const pickedCompetitors = ref([])
+const urlError = ref('')
 
 /* ── Lists ── */
 
@@ -113,32 +153,52 @@ const NEEDS = {
   comparison_page: ['prompts'],
   social_posts: ['drafts'],
   pr_writer: ['claims'],
+  [RESEARCH_AGENTS_KEY]: ['prompts'],
+  gap_analyst: ['prompts'],
+  landing_page: ['prompts'],
+  aeo_article: ['prompts'],
+}
+
+function reset() {
+  token += 1
+  page.value = ''
+  prompt.value = ''
+  notes.value = ''
+  competitor.value = competitors.value[0]?.domain || ''
+  theirUrl.value = ''
+  channels.value = ['linkedin', 'x']
+  artifactId.value = ''
+  format.value = 'press_release'
+  claimKey.value = ''
+  pageError.value = ''
+  theirError.value = ''
+  urlError.value = ''
+  sending.value = false
+  templateKey.value = formTemplate(key.value, props.template)?.key || ''
+  for (const field of Object.keys(form)) form[field] = ''
+  pickedCompetitors.value = competitors.value.map((c) => c.domain)
+  pages.value = list()
+  prompts.value = list()
+  drafts.value = list()
+  claims.value = list()
+  if (props.websiteId) for (const what of NEEDS[key.value] || []) loaders[what]()
 }
 
 watch(
   open,
   (isOpen) => {
-    if (!isOpen) return
-    token += 1
-    page.value = ''
-    prompt.value = ''
-    notes.value = ''
-    competitor.value = competitors.value[0]?.domain || ''
-    theirUrl.value = ''
-    channels.value = ['linkedin', 'x']
-    artifactId.value = ''
-    format.value = 'press_release'
-    claimKey.value = ''
-    pageError.value = ''
-    theirError.value = ''
-    sending.value = false
-    pages.value = list()
-    prompts.value = list()
-    drafts.value = list()
-    claims.value = list()
-    if (props.websiteId) for (const what of NEEDS[key.value] || []) loaders[what]()
+    if (isOpen) reset()
   },
   { immediate: true },
+)
+
+// Another project while open: its lists, competitors and page checks are
+// that project's, so start over (a late answer of the old one is dropped).
+watch(
+  () => props.websiteId,
+  (now, before) => {
+    if (open.value && now !== before) reset()
+  },
 )
 
 const pickedCompetitor = computed(() => competitors.value.find((c) => c.domain === competitor.value) || null)
@@ -162,7 +222,37 @@ function pageUrl(raw) {
 
 /* ── Cost and availability ── */
 
-const unavailable = computed(() => writerUnavailable(key.value, props.status))
+// Why this agent cannot run now ({title, action, setting}), or null.
+const block = computed(() => agentBlock(key.value, props.status))
+const unavailable = computed(() => block.value?.title || '')
+const unavailableHelp = computed(() => blockHelp(block.value))
+// What one research covers with this template's plan (the competitor check
+// reads 2 competitor pages a prompt), within the ceiling and, on an account
+// that counts them, the prompt runs left.
+const fit = computed(() => researchFit(props.status, templatePlan(key.value, templateKey.value)))
+const maxPrompts = computed(() => fit.value?.prompts ?? null)
+
+// The research agents and the Gap Analyst have no writer request of their
+// own: say what a research draws on (prompt runs, or the reply's ceiling).
+const researchCostLine = computed(() => {
+  if (key.value !== RESEARCH_AGENTS_KEY && key.value !== 'gap_analyst') return ''
+  const s = props.status
+  if (hidesDollars(s)) {
+    const head = 'Each prompt answered by one AI engine uses one free prompt run.'
+    if (key.value === RESEARCH_AGENTS_KEY && fit.value) {
+      if (fit.value.short) return `${head} ${researchRunsLine(fit.value)}`
+      // The one-prompt preset asks about a single prompt.
+      const prompts = templateKey.value === 'prompt' ? 1 : fit.value.prompts
+      const cost = researchRunsCost(fit.value, prompts)
+      if (cost) return `${head} ${cost}`
+    }
+    const left = allowanceLine(s)
+    return [head, left ? `${left}.` : ''].filter(Boolean).join(' ')
+  }
+  const cap = s?.limits?.run_cost_usd
+  if (s?.allowance?.show_usd !== true || cap === undefined || cap === null || cap === '') return ''
+  return `The whole reply, research included, stops at ${money(cap)}.`
+})
 
 const costLine = computed(() => {
   const s = props.status
@@ -182,6 +272,7 @@ const costLine = computed(() => {
 /* ── The drafted task ── */
 
 const valid = computed(() => {
+  if (hasForm.value) return missingFields(key.value, templateKey.value, formValues()).length === 0
   switch (key.value) {
     case 'page_optimizer':
       return Boolean(page.value.trim())
@@ -195,6 +286,20 @@ const valid = computed(() => {
       return true
   }
 })
+
+// The template's values: its fields, the tracked competitors ticked, and
+// how many prompts one research covers.
+function formValues() {
+  return {
+    ...form,
+    url: form.url.trim() ? pageUrl(form.url) : '',
+    notes: notes.value.trim().slice(0, NOTES_MAX),
+    competitors: competitors.value.filter((c) => pickedCompetitors.value.includes(c.domain)),
+    max_prompts: maxPrompts.value,
+  }
+}
+
+const draftText = computed(() => (hasForm.value ? formTaskText(key.value, templateKey.value, formValues()) : ''))
 
 function values() {
   const base = { notes: notes.value.trim().slice(0, NOTES_MAX), prompt: prompt.value.trim() }
@@ -240,6 +345,14 @@ function values() {
 function check() {
   pageError.value = ''
   theirError.value = ''
+  urlError.value = ''
+  if (hasForm.value && templateFields.value.includes('url') && form.url.trim()) {
+    const url = pageUrl(form.url)
+    if (!url || (domain.value && !onSite(url, domain.value))) {
+      urlError.value = `Use a page of ${domain.value || 'your site'}.`
+      return false
+    }
+  }
   if (key.value === 'page_optimizer') {
     const url = pageUrl(page.value)
     if (!url || (domain.value && !onSite(url, domain.value))) {
@@ -264,9 +377,9 @@ async function openInChat() {
   try {
     const moved = await askAgent(router, {
       websiteId: props.websiteId,
-      agent: key.value,
+      agent: entryAgentOf(key.value),
       from: 'agents',
-      text: taskText(key.value, values()),
+      text: hasForm.value ? formTaskText(key.value, templateKey.value, formValues()) : taskText(key.value, values()),
     })
     if (moved) open.value = false
   } finally {
@@ -275,11 +388,77 @@ async function openInChat() {
 }
 
 const fieldId = (suffix) => `ag-atd-${key.value}-${suffix}`
+const blankChat = computed(() =>
+  props.websiteId ? { name: 'agent-home', params: { websiteId: props.websiteId }, query: { agent: entryAgentOf(key.value) } } : null,
+)
 </script>
 
 <template>
   <AgDialog v-model:open="open" :title="name" :description="agent?.description || ''" wide>
     <form :id="fieldId('form')" class="ag-atd" novalidate @submit.prevent="openInChat">
+      <!-- Task templates: the four general agents and the research agents -->
+      <template v-if="hasForm">
+        <fieldset class="ag-atd-group">
+          <legend class="ag-atd-label">Start from</legend>
+          <label v-for="t in templates" :key="t.key" class="ag-atd-template">
+            <input
+              v-model="templateKey"
+              type="radio"
+              :name="fieldId('template')"
+              :value="t.key"
+              :aria-describedby="fieldId(`template-${t.key}`)"
+            />
+            <span class="ag-atd-template-text">
+              <span class="ag-atd-template-name">{{ t.label }}</span>
+              <span :id="fieldId(`template-${t.key}`)" class="ag-atd-template-summary">{{ t.summary }}</span>
+            </span>
+          </label>
+        </fieldset>
+
+        <template v-for="field in templateFields" :key="`${templateKey}-${field}`">
+          <fieldset v-if="FORM_FIELDS[field].kind === 'competitors'" class="ag-atd-group">
+            <legend class="ag-atd-label">{{ fieldLabel(currentTemplate, field) }}</legend>
+            <p v-if="!competitors.length" class="ag-atd-hint">
+              Track competitors in Project settings first.
+              <RouterLink :to="{ name: 'settings-project' }" class="ag-atd-link" @click="open = false">Project settings</RouterLink>
+            </p>
+            <label v-for="c in competitors" :key="c.domain" class="ag-atd-check">
+              <input v-model="pickedCompetitors" type="checkbox" :value="c.domain" />
+              <span>{{ c.name || c.domain }}</span>
+            </label>
+          </fieldset>
+          <div v-else class="ag-atd-field">
+            <label class="ag-atd-label" :for="fieldId(field)">{{ fieldLabel(currentTemplate, field) }}</label>
+            <input
+              :id="fieldId(field)"
+              v-model="form[field]"
+              class="ag-atd-input"
+              :type="FORM_FIELDS[field].kind === 'url' ? 'url' : 'text'"
+              :inputmode="FORM_FIELDS[field].kind === 'url' ? 'url' : undefined"
+              :list="FORM_FIELDS[field].kind === 'prompt' ? fieldId('prompts') : undefined"
+              autocomplete="off"
+              :maxlength="FORM_FIELDS[field].max || undefined"
+              :placeholder="FORM_FIELDS[field].kind === 'url' ? (domain ? `https://${domain}/` : 'https://') : undefined"
+              :aria-invalid="FORM_FIELDS[field].kind === 'url' && urlError ? 'true' : undefined"
+              :aria-describedby="FORM_FIELDS[field].kind === 'url' ? fieldId('url-hint') : undefined"
+            />
+            <template v-if="FORM_FIELDS[field].kind === 'prompt'">
+              <datalist :id="fieldId('prompts')">
+                <option v-for="p in prompts.items" :key="p.prompt_id || p.text" :value="p.text" />
+              </datalist>
+              <p v-if="prompts.state === 'ready' && prompts.items.length" class="ag-atd-hint">Pick one of your tracked prompts or type another.</p>
+              <p v-else-if="prompts.state === 'error'" class="ag-atd-list-state">
+                Couldn't load your tracked prompts.
+                <button type="button" class="ag-atd-retry" @click="loaders.prompts()">Try again</button>
+              </p>
+            </template>
+            <p v-if="FORM_FIELDS[field].kind === 'url'" :id="fieldId('url-hint')" class="ag-atd-hint" :class="{ 'is-error': urlError }">
+              {{ urlError || `Use a page of ${domain || 'your site'}.` }}
+            </p>
+          </div>
+        </template>
+      </template>
+
       <!-- Page Optimizer -->
       <template v-if="key === 'page_optimizer'">
         <div class="ag-atd-field">
@@ -422,19 +601,33 @@ const fieldId = (suffix) => `ag-atd-${key.value}-${suffix}`
         <label class="ag-atd-label" :for="fieldId('notes')">
           <template v-if="key === 'social_posts'">Topic</template>
           <template v-else-if="key === 'pr_writer'">About</template>
+          <template v-else-if="hasForm">{{ fieldLabel(currentTemplate, 'notes') }}</template>
           <template v-else>Focus (optional)</template>
         </label>
         <textarea :id="fieldId('notes')" v-model="notes" class="ag-atd-input ag-atd-area" rows="3" :maxlength="NOTES_MAX" />
       </div>
 
+      <div v-if="hasForm && draftText" class="ag-atd-preview">
+        <p :id="fieldId('preview-label')" class="ag-atd-label">Drafted message</p>
+        <p class="ag-atd-preview-text" :aria-labelledby="fieldId('preview-label')">{{ draftText }}</p>
+        <p class="ag-atd-hint">It opens in a new chat for you to review and send. Nothing runs until you send it.</p>
+      </div>
+
       <p v-if="costLine" class="ag-atd-cost">{{ costLine }}</p>
+      <p v-if="researchCostLine" class="ag-atd-cost">{{ researchCostLine }}</p>
       <p v-if="unavailable" class="ag-atd-unavailable" role="status">
         <CircleAlert :size="14" aria-hidden="true" />
-        <span>{{ unavailable }}</span>
+        <span>
+          <span class="ag-atd-unavailable-title">{{ unavailable }}</span>
+          <span v-if="unavailableHelp" class="ag-atd-unavailable-help">{{ unavailableHelp }}</span>
+        </span>
       </p>
     </form>
 
     <template #actions>
+      <AgButton v-if="hasForm && blankChat && !unavailable" variant="ghost" :to="blankChat" class="ag-atd-blank" @click="open = false">
+        Blank chat
+      </AgButton>
       <AgButton @click="open = false">Cancel</AgButton>
       <AgButton
         type="submit"
@@ -575,6 +768,77 @@ const fieldId = (suffix) => `ag-atd-${key.value}-${suffix}`
   color: var(--ag-fg-3);
   font-size: 13px;
   line-height: 19px;
+}
+
+.ag-atd-template {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--ag-card-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.ag-atd-template:has(input:checked) {
+  border-color: color-mix(in srgb, var(--ag-accent) 55%, var(--ag-card-border));
+  background: var(--ag-row-active);
+}
+
+.ag-atd-template input {
+  margin: 3px 0 0;
+  accent-color: var(--ag-accent);
+}
+
+.ag-atd-template-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ag-atd-template-name {
+  color: var(--ag-fg-1);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.ag-atd-template-summary {
+  color: var(--ag-fg-3);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.ag-atd-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ag-atd-preview-text {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--ag-bubble-bg);
+  color: var(--ag-fg-1b);
+  font-size: 13px;
+  line-height: 19px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.ag-atd-blank {
+  margin-right: auto;
+}
+
+.ag-atd-unavailable-title,
+.ag-atd-unavailable-help {
+  display: block;
+}
+
+.ag-atd-unavailable-help {
+  color: var(--ag-fg-3);
 }
 
 .ag-atd-unavailable {
