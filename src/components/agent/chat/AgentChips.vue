@@ -25,8 +25,9 @@
 </template>
 
 <script setup>
-// The four agents as chips; picking one sets the composer's agent. A writing
-// agent the AI allowance cannot start is shown disabled, with the reason.
+// The agents as chips (all ten from agentList(), in catalog order); picking
+// one sets the composer's agent. A writing agent the AI allowance cannot
+// start is shown disabled, with the reason.
 // Each chip's description, or the reason it is off, is its tooltip (never a
 // title=, which keyboard cannot reach). The reason is also in the chip's name
 // and the note below; a description is also the chip's aria-describedby.
@@ -66,7 +67,9 @@ const note = computed(() => {
 </script>
 
 <style scoped>
-/* Two by two: four names never fit one row of the 520-640px column. */
+/* Two columns: ten chips make five rows in the 520-640px column, and a
+   long name ("Comparison Page Agent") still fits a 206px chip; anything
+   longer ends in an ellipsis. One column below 400px. */
 .ag-chips {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
