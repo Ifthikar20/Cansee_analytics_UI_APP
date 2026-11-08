@@ -27,6 +27,7 @@
 
 <script setup>
 import { onMounted, onUnmounted } from 'vue'
+import { holdHints } from '@/stores/hints'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -47,6 +48,9 @@ function onEscape(e) {
 }
 onMounted(() => window.addEventListener('keydown', onEscape))
 onUnmounted(() => window.removeEventListener('keydown', onEscape))
+
+// No first-visit hint while the modal is open.
+holdHints(() => props.modelValue)
 
 defineExpose({ close })
 </script>

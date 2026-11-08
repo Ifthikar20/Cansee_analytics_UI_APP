@@ -7,12 +7,14 @@
 //   - without a signed-in user, or during onboarding;
 //   - for an organization viewer, who cannot take the actions the tips
 //     point at (a caller passes `when: false` for other read-only cases);
-//   - while a page suspends hints (a board panel or dialog is open);
+//   - while a page suspends hints (a board panel is open) or a dialog,
+//     drawer or modal is open (BaseModal, AgDialog, AgConfirmDialog and
+//     AgDrawer call holdHints);
 //   - once the user chose "Skip tips".
 //
 // State is per user and per browser (lib/help/hints.js); there is no
 // server copy. "Show tips again" in the help drawer calls resetHints().
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import { defineStore, getActivePinia } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { HINT_KEYS, clearHintState, loadHintState, pickHint, saveHintState } from '@/lib/help/hints'
@@ -145,4 +147,25 @@ export function resetHints() {
     if (!getActivePinia()) return false
     useHintsStore().reset()
     return true
+}
+
+let holdCount = 0
+
+/**
+ * For a dialog, drawer or modal: holds every hint while `isOpen()` is true,
+ * and releases on unmount, so a coachmark never shows over (or under) an
+ * open dialog and is not dismissed by a press inside it. Call it in a
+ * component's setup. Does nothing without Pinia (a component test that
+ * installs none).
+ */
+export function holdHints(isOpen) {
+    const reason = `dialog-${++holdCount}`
+    let held = false
+    function set(on) {
+        if (on === held || !getActivePinia()) return
+        held = on
+        useHintsStore().suspend(reason, on)
+    }
+    watch(() => Boolean(isOpen()), set, { immediate: true })
+    onScopeDispose(() => set(false))
 }
