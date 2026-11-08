@@ -4,8 +4,17 @@
 // long-polling after 6 SSE failures or an UnsupportedTransport. Events are
 // de-duplicated by seq and handed to the store in one batch per animation
 // frame. A `resync` event pauses the transport while the store reloads the
-// message snapshot, then resumes from its parts_seq. The session ends on a
-// terminal event, a fatal error, or detach (which never cancels the run).
+// message snapshot, then resumes from its parts_seq; a snapshot that cannot
+// be loaded (a web API error) is retried with backoff and does not count
+// toward MAX_CONSECUTIVE_RESYNCS. While the agent process is unreachable
+// (503 agent_unavailable or no network) for OFFLINE_CHECK_MS, the session
+// asks the web API (the same onResync hook) whether the run is still active
+// there, and again every OFFLINE_CHECK_MS: the server's sweeper ends a run
+// whose process is gone as interrupted, and the session then ends with it.
+// nudge() (the browser came back online, the tab became visible) cuts a
+// backoff short and makes an offline session check at once. The session
+// ends on a terminal event, a fatal error, or detach (which never cancels
+// the run).
 import { BACKOFF_BASE_MS, backoffDelay, sleep } from './backoff'
 import { POLL_WAIT_SECONDS, pollRunEvents } from './poller'
 import { MaintenanceError, OfflineError, TransportError, UnsupportedTransport, isAbortError, openRunStream } from './streamClient'
@@ -17,6 +26,10 @@ export const MAX_CONSECUTIVE_RESYNCS = 3
 // A poll that comes back empty faster than this waits before the next one,
 // so a server that ignores `wait` cannot drive a hot loop.
 export const MIN_EMPTY_POLL_MS = 1000
+// While the agent process cannot be reached, ask the web API this often
+// whether the run is still active. The server ends a run whose process
+// stopped heartbeating after AGENT_STALE_SECONDS (90 s by default).
+export const OFFLINE_CHECK_MS = 30000
 
 /** Run `fn` on the next animation frame, or after 100 ms when frames are paused (hidden tab). */
 export function frameScheduler(fn) {
@@ -56,6 +69,13 @@ class RunSession {
         this.attempt = 0
         this.sseFailures = 0
         this.resyncs = 0
+        // Resyncs whose snapshot could not be loaded, in a row.
+        this.resyncFailures = 0
+        // While unreachable: when it started and when the server was last asked.
+        this.offlineSince = null
+        this.offlineCheckedAt = null
+        this.checkNow = false
+        this.wakeCtrl = null
         this.retryBase = null
         this.pendingResync = null
         this.stopCtrl = new AbortController()
@@ -74,9 +94,29 @@ class RunSession {
         if (this.stopped) return
         this.stopped = true
         this.stopCtrl.abort()
+        this.wakeCtrl?.abort()
         this.connCtrl?.abort()
         this.clearWatchdog()
         this.flush()
+    }
+
+    /** Retry now instead of after the backoff; an unreachable session also asks the server at once. */
+    nudge() {
+        if (this.stopped || this.closed) return
+        if (this.offlineSince !== null) this.checkNow = true
+        this.wakeCtrl?.abort()
+    }
+
+    /** Sleep `ms`, cut short by stop() or nudge(). */
+    async pause(ms) {
+        if (this.stopped) return
+        const ctrl = new AbortController()
+        this.wakeCtrl = ctrl
+        try {
+            await this.deps.sleep(ms, ctrl.signal)
+        } finally {
+            if (this.wakeCtrl === ctrl) this.wakeCtrl = null
+        }
     }
 
     report(state) {
@@ -146,6 +186,11 @@ class RunSession {
     async loop() {
         try {
             while (!this.stopped && !this.terminal) {
+                // A snapshot that could not be loaded is retried before reading again.
+                if (this.pendingResync) {
+                    if (!(await this.resync())) break
+                    continue
+                }
                 let failure = null
                 try {
                     if (this.mode === 'sse') await this.readSse()
@@ -172,6 +217,13 @@ class RunSession {
                     }
                 }
                 if (this.stopped || this.terminal) break
+                if (failure instanceof OfflineError) {
+                    if (!(await this.whileOffline())) break
+                } else if (!(failure instanceof MaintenanceError)) {
+                    this.offlineSince = null
+                    this.offlineCheckedAt = null
+                }
+                if (this.stopped || this.terminal) break
                 if (this.pendingResync) {
                     if (!(await this.resync())) break
                     continue
@@ -182,11 +234,40 @@ class RunSession {
                 if (!(failure instanceof OfflineError || failure instanceof MaintenanceError)) {
                     this.report(TRANSPORT_STATE.RECONNECTING)
                 }
-                await this.deps.sleep(Math.max(delay, Number(failure.retryAfterMs) || 0), this.stopCtrl.signal)
+                await this.pause(Math.max(delay, Number(failure.retryAfterMs) || 0))
             }
         } finally {
             this.finish()
         }
+    }
+
+    /**
+     * The agent process could not be reached. After OFFLINE_CHECK_MS of
+     * that (or at once after a nudge), ask the web API whether the run is
+     * still active; returns false when the server has finished it.
+     */
+    async whileOffline() {
+        const now = this.deps.now()
+        if (this.offlineSince === null) this.offlineSince = now
+        const since = this.offlineCheckedAt ?? this.offlineSince
+        if (!this.checkNow && now - since < this.deps.offlineCheckMs) return true
+        this.checkNow = false
+        this.offlineCheckedAt = now
+        let result
+        try {
+            result = await this.deps.onResync?.(this.runId, 'agent_unavailable')
+        } catch {
+            result = null
+        }
+        if (this.stopped) return false
+        // The web API could not be asked either: keep trying the stream.
+        if (!result) return true
+        if (!result.active) {
+            this.terminal = true
+            return false
+        }
+        this.lastSeq = Math.max(0, Number(result.lastSeq) || 0)
+        return true
     }
 
     switchToPolling() {
@@ -205,7 +286,10 @@ class RunSession {
                 runId: this.runId,
                 lastSeq: this.lastSeq,
                 signal: ctrl.signal,
-                onOpen: () => this.report(TRANSPORT_STATE.OPEN),
+                onOpen: () => {
+                    this.markReachable()
+                    this.report(TRANSPORT_STATE.OPEN)
+                },
                 onBytes: () => this.armWatchdog(),
                 onRetry: (ms) => {
                     if (Number.isFinite(ms) && ms > 0) this.retryBase = ms
@@ -239,7 +323,10 @@ class RunSession {
             const result = await this.deps.poll({ runId: this.runId, after: this.lastSeq, wait, signal: ctrl.signal })
             this.clearWatchdog()
             this.attempt = 0
+            this.markReachable()
             this.report(TRANSPORT_STATE.OPEN)
+            // The poll answer carries the run's place in line while it waits (contract RunQueue).
+            if (result && result.queue !== undefined) this.deps.onQueue?.(this.runId, result.queue)
             const events = result?.events || []
             this.receive(events)
             if (result?.terminal && !this.terminal && !this.pendingResync) {
@@ -248,7 +335,7 @@ class RunSession {
                 this.pendingResync = 'terminal_without_event'
             }
             if (!events.length && !this.terminal && !this.pendingResync && Date.now() - startedAt < MIN_EMPTY_POLL_MS) {
-                await this.deps.sleep(MIN_EMPTY_POLL_MS, this.stopCtrl.signal)
+                await this.pause(MIN_EMPTY_POLL_MS)
             }
         } finally {
             this.clearWatchdog()
@@ -256,17 +343,30 @@ class RunSession {
         }
     }
 
+    markReachable() {
+        this.offlineSince = null
+        this.offlineCheckedAt = null
+        this.checkNow = false
+    }
+
+    /**
+     * Reload the snapshot and resume from it. Only snapshots that loaded
+     * count toward MAX_CONSECUTIVE_RESYNCS (the server kept asking for a
+     * resync with no event in between); one that could not be loaded is
+     * retried after a backoff, so a short web API outage does not end a
+     * healthy run.
+     */
     async resync() {
         const reason = this.pendingResync
         this.pendingResync = null
         this.flush()
-        this.resyncs += 1
-        if (this.resyncs > MAX_CONSECUTIVE_RESYNCS) {
+        if (this.resyncs >= MAX_CONSECUTIVE_RESYNCS) {
             this.error = new TransportError('resync did not converge', { code: 'resync_failed', fatal: true, retryable: false })
             return false
         }
-        if (this.resyncs > 1) {
-            await this.deps.sleep(this.deps.backoff(this.resyncs - 2, { base: this.retryBase ?? BACKOFF_BASE_MS }), this.stopCtrl.signal)
+        const waits = this.resyncs + this.resyncFailures
+        if (waits > 0) {
+            await this.pause(this.deps.backoff(waits - 1, { base: this.retryBase ?? BACKOFF_BASE_MS }))
             if (this.stopped) return false
         }
         let result
@@ -276,7 +376,14 @@ class RunSession {
             result = null
         }
         if (this.stopped) return false
-        if (!result) return true
+        if (!result) {
+            this.resyncFailures += 1
+            this.pendingResync = reason
+            this.report(TRANSPORT_STATE.RECONNECTING)
+            return true
+        }
+        this.resyncFailures = 0
+        this.resyncs += 1
         if (!result.active) {
             this.terminal = true
             return false
@@ -302,9 +409,11 @@ class RunSession {
  *   applyEvents(runId, events),            batch of new events, in seq order
  *   onTransport(runId, {state, mode, attempt}),
  *   onResync(runId, reason) -> Promise<{active, lastSeq} | null>,
+ *                                          also asked while the agent is unreachable (reason 'agent_unavailable')
+ *   onQueue(runId, queue),                 a poll answer's `queue` (RunQueue {position, ahead, slots} or null)
  *   onClose(runId, {terminal, error}),     the session ended by itself
  * }
- * plus optional overrides for tests: openStream, poll, schedule, backoff, sleep, watchdogMs, pollWait.
+ * plus optional overrides for tests: openStream, poll, schedule, backoff, sleep, now, watchdogMs, pollWait, offlineCheckMs.
  */
 export function createRunManager(hooks = {}) {
     const deps = {
@@ -313,8 +422,10 @@ export function createRunManager(hooks = {}) {
         schedule: frameScheduler,
         backoff: backoffDelay,
         sleep,
+        now: () => Date.now(),
         watchdogMs: WATCHDOG_MS,
         pollWait: POLL_WAIT_SECONDS,
+        offlineCheckMs: OFFLINE_CHECK_MS,
         ...hooks,
     }
     const sessions = new Map()
@@ -348,5 +459,10 @@ export function createRunManager(hooks = {}) {
         return sessions.has(String(runId))
     }
 
-    return { attach, detach, detachAll, isAttached, sessions }
+    /** Reconnect every session now (the browser is back online, the tab is visible again). */
+    function nudge() {
+        for (const session of sessions.values()) session.nudge()
+    }
+
+    return { attach, detach, detachAll, isAttached, nudge, sessions }
 }

@@ -1,12 +1,16 @@
 // Long-poll transport, the fallback when SSE is unsupported or keeps
 // failing. GET live/runs/<rid>/events/?after=&wait= is NOT enveloped:
-// {events, next_after, terminal, run_status}.
+// {events, next_after, terminal, run_status, queue}. `queue` (contract
+// RunQueue {position, ahead, slots}, or null) is the run's place in line
+// while it waits for a free run slot; older servers leave it out.
+import { normalizeQueue } from './normalize'
 import { AGENT_LIVE_BASE, errorFromResponse, fetchWithAuth } from './streamClient'
 
 export const POLL_WAIT_SECONDS = 25
 
 /**
- * One long-poll request. Resolves {events, nextAfter, terminal, runStatus};
+ * One long-poll request. Resolves {events, nextAfter, terminal, runStatus, queue};
+ * `queue` is undefined when the server sent no such field.
  * rejects with the same error classes as openRunStream.
  */
 export async function pollRunEvents({ runId, after = 0, wait = POLL_WAIT_SECONDS, signal } = {}) {
@@ -29,5 +33,6 @@ export async function pollRunEvents({ runId, after = 0, wait = POLL_WAIT_SECONDS
         nextAfter: Number.isFinite(nextAfter) ? nextAfter : Number(after) || 0,
         terminal: Boolean(payload?.terminal),
         runStatus: payload?.run_status || null,
+        queue: payload && typeof payload === 'object' && 'queue' in payload ? normalizeQueue(payload.queue) : undefined,
     }
 }

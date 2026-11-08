@@ -4,7 +4,12 @@
     <div class="ag-msg-error-text">
       <p class="ag-msg-error-title">{{ copy.title }}</p>
       <p v-if="copy.body" class="ag-msg-error-body">{{ copy.body }}</p>
-      <div v-if="showRetry || copy.billing || newChatTo" class="ag-msg-error-actions">
+      <p v-if="hint" class="ag-msg-error-body">{{ hint }}</p>
+      <div v-if="showRetry || showReload || copy.billing || newChatTo" class="ag-msg-error-actions">
+        <button v-if="showReload" type="button" class="ag-msg-error-btn" @click="emit('reload')">
+          <RefreshCw aria-hidden="true" />
+          Reload chat
+        </button>
         <button v-if="showRetry" type="button" class="ag-msg-error-btn" :disabled="busy" @click="emit('retry')">
           <RotateCcw aria-hidden="true" />
           Retry
@@ -19,9 +24,10 @@
 <script setup>
 // A reply that failed or was interrupted: copy specific to the error code,
 // the server's own message for codes the UI does not know, and Retry when
-// trying again can help.
+// trying again can help, or Reload chat when this tab lost track of the
+// reply (it may still be running on the server).
 import { computed } from 'vue'
-import { CircleAlert, RotateCcw } from '@lucide/vue'
+import { CircleAlert, RefreshCw, RotateCcw } from '@lucide/vue'
 import { errorCopy } from './parts'
 
 const props = defineProps({
@@ -34,12 +40,17 @@ const props = defineProps({
   retryable: { type: Boolean, default: null },
   websiteId: { type: [String, Number], default: null },
   busy: { type: Boolean, default: false },
+  // An extra line for staff (the setting to change), or ''.
+  hint: { type: String, default: '' },
+  // The parent can reload the chat (it listens for `reload`).
+  canReload: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['retry'])
+const emit = defineEmits(['retry', 'reload'])
 
 const copy = computed(() => errorCopy(props.code, props.message, props.status))
 const showRetry = computed(() => props.canRetry && (props.retryable ?? copy.value.retry))
+const showReload = computed(() => props.canReload && Boolean(copy.value.reload))
 const newChatTo = computed(() =>
   copy.value.newChat && props.websiteId !== null && props.websiteId !== ''
     ? { name: 'agent-home', params: { websiteId: String(props.websiteId) } }
