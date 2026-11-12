@@ -1,8 +1,10 @@
 <script setup>
 // The Analytics board (board_contract.md 1, 2 and 9; frame_board.md B1): one
-// page of widgets, a full page under the header on the agent's surface. The
-// frame's <main id="app-main"> scrolls it; its toolbar sticks to the top of
-// main. The layout is the user's (stores/board.js); `+ Add widget` and a
+// page of cards on paper, a full page under the header. The frame's
+// <main id="app-main"> scrolls it; its header line sticks to the top of
+// main: the project's name and what the board is, the plus that adds a
+// widget, and on the right the save state, the density (2, 3 or 4 columns,
+// remembered per user on this browser) and the board's options. The layout is the user's (stores/board.js); `+ Add widget` and a
 // panel's Add to board are the only ways a widget goes on, and cards move by
 // drag and drop or their menu. ?widget=<key> opens that widget's expanded
 // view in the side panel and never touches the layout; every other query
@@ -25,8 +27,8 @@ import AgEmptyState from '@/components/agent/common/AgEmptyState.vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
 import AgMenuContent from '@/components/agent/common/AgMenuContent.vue'
 import AgMenuItem from '@/components/agent/common/AgMenuItem.vue'
-import AgTooltip from '@/components/agent/common/AgTooltip.vue'
 import HintCallout from '@/components/ui/help/HintCallout.vue'
+import BoardDensity from '@/components/board/BoardDensity.vue'
 import BoardGrid from '@/components/board/BoardGrid.vue'
 import BoardPanel from '@/components/board/BoardPanel.vue'
 import BoardSaveState from '@/components/board/BoardSaveState.vue'
@@ -36,8 +38,10 @@ import { invalidate, revalidate, useBoardSource } from '@/composables/board/useB
 import { useSetupStatus } from '@/composables/setup/useSetupStatus'
 import { useScrollParent } from '@/composables/board/useScrollParent'
 import { BOARD_CONTEXT, SETUP_POINTER } from '@/lib/board/context'
+import { boardHeadline, readDensity, writeDensity } from '@/lib/board/frame'
 import { DEFAULT_LAYOUT, panelTitle, widgetMeta } from '@/lib/board/widgets'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { useBoardStore } from '@/stores/board'
 import { useHintsStore } from '@/stores/hints'
 import { TIPS } from '@/lib/help/tips'
@@ -51,6 +55,7 @@ const props = defineProps({
 const route = useRoute()
 const router = useRouter()
 const app = useAppStore()
+const auth = useAuthStore()
 const store = useBoardStore()
 
 const rootEl = ref(null)
@@ -70,6 +75,19 @@ watch(
   (wid) => store.load(wid),
   { immediate: true },
 )
+
+/* ── Columns ── */
+
+// The user's density on this browser; another account reads its own.
+const userId = computed(() => auth.user?.id ?? '')
+const density = ref(readDensity(userId.value))
+watch(userId, (uid) => {
+  density.value = readDensity(uid)
+})
+function setDensity(value) {
+  density.value = value
+  writeDensity(userId.value, value)
+}
 
 /* ── The scroll container (the frame's main) ── */
 
@@ -325,9 +343,10 @@ function confirmReset() {
 
 /* ── Document title ── */
 
-const projectName = computed(
-  () => app.websites.find((w) => String(w.id) === String(props.websiteId))?.name || '',
-)
+const project = computed(() => app.websites.find((w) => String(w.id) === String(props.websiteId)) || null)
+const projectName = computed(() => project.value?.name || '')
+// The header line: the project's name, then what is true of this board.
+const headline = computed(() => boardHeadline(project.value))
 const documentTitle = computed(() =>
   [panelKey.value ? panelTitle(panelKey.value, route.query) : '', 'Analytics', projectName.value, 'Cansee']
     .filter(Boolean)
@@ -350,23 +369,28 @@ watch(
     <section class="bd-main" aria-labelledby="bd-title" :inert="covered ? true : undefined">
       <div class="bd-top" :class="{ 'is-stuck': stuck }" data-bd-sticky>
         <header class="bd-bar">
-          <h1 id="bd-title" class="bd-title">Analytics</h1>
+          <h1 id="bd-title" class="bd-title">
+            <span class="bd-title-name">{{ headline.name ? `${headline.name} Analytics` : 'Analytics' }}</span>
+            <span class="bd-title-desc">
+              <template v-for="word in headline.descriptors" :key="word">, {{ word }}</template>
+            </span>
+          </h1>
+          <HintCallout hint="board.add-widget" :when="!layoutLoading" align="start">
+            <AgIconButton
+              class="bd-add"
+              data-bd-add
+              label="Add widget"
+              :tooltip="TIPS.board.addWidget"
+              :size="32"
+              :disabled="layoutLoading"
+              @click="catalogOpen = true"
+            >
+              <Plus :size="22" :stroke-width="1.5" aria-hidden="true" />
+            </AgIconButton>
+          </HintCallout>
           <div class="bd-bar-actions">
             <BoardSaveState class="bd-save-head" :website-id="websiteId" />
-            <HintCallout hint="board.add-widget" :when="!layoutLoading" align="end">
-              <AgTooltip :text="TIPS.board.addWidget">
-                <AgButton
-                  class="bd-add"
-                  data-bd-add
-                  :icon="Plus"
-                  aria-label="Add widget"
-                  :disabled="layoutLoading"
-                  @click="catalogOpen = true"
-                >
-                  Add widget
-                </AgButton>
-              </AgTooltip>
-            </HintCallout>
+            <BoardDensity class="bd-density-toggle" :model-value="density" @update:model-value="setDensity" />
             <DropdownMenuRoot :modal="false">
               <DropdownMenuTrigger as-child>
                 <AgIconButton label="Board options" :tooltip="TIPS.board.options" data-bd-options :size="32">
@@ -401,7 +425,7 @@ watch(
           <AgButton :icon="Plus" @click="catalogOpen = true">Add widget</AgButton>
         </AgEmptyState>
         <!-- Keyed by project: another project's cards mount fresh. -->
-        <BoardGrid v-else :key="websiteId" :widgets="widgets" :pending="layoutLoading" />
+        <BoardGrid v-else :key="websiteId" :widgets="widgets" :pending="layoutLoading" :columns="density" />
       </div>
     </section>
 
@@ -409,7 +433,7 @@ watch(
     <AgConfirmDialog
       v-model:open="resetOpen"
       title="Reset this board?"
-      description="Your board goes back to Ask AI and Prompt ranking. Widgets you added are removed; their data is not touched."
+      description="Your board goes back to the six widgets a new board starts with. Widgets you added are removed; their data is not touched."
       confirm-label="Reset board"
       destructive
       @confirm="confirmReset"
@@ -418,32 +442,28 @@ watch(
 </template>
 
 <style scoped>
-/* The agent surface for everything on the board, the panel included:
-   charts and the reused pages paint these tokens. Teleported dialogs keep
-   the app's own. */
+/* The board paints the theme's own surfaces: paper under flat cards. The
+   panel and the reused pages inside it wear the same tokens. Teleported
+   dialogs keep the app's own. */
 .bd-surface {
-  --background: var(--ag-pane-bg);
-  --card: var(--ag-pane-bg);
-  --viz-surface: var(--ag-pane-bg);
-  --border: var(--ag-card-border);
   font-family: var(--ag-font);
   font-feature-settings: var(--ag-font-features);
 }
 
 /* The page fills main, which scrolls it. The gutter is the header bar's own
    side padding, so the board's left edge lines up with the logo; on a very
-   wide screen the content stops at 1600px and is centred. */
+   wide screen the content stops at 1920px and is centred. */
 .bd {
   --bd-gutter: var(--app-gutter, 24px);
-  --bd-max: 1600px;
+  --bd-max: 1920px;
   --bd-sheet-w: clamp(560px, 60%, 960px);
   position: relative;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   min-height: 100%;
-  background: var(--ag-pane-bg);
-  color: var(--ag-fg-1);
+  background: var(--background);
+  color: var(--foreground);
 }
 
 .bd-main {
@@ -454,17 +474,19 @@ watch(
   container: bd-main / inline-size;
 }
 
-/* The toolbar sticks to the top of main, above the cards (a lifted card's
-   cell is z 5) and under the panel layer (20). */
+/* The header line sticks to the top of main, above the cards (a lifted
+   card's cell is z 5) and under the panel layer (20). Once the board
+   scrolls under it, a hairline marks its edge. */
 .bd-top {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--ag-pane-bg);
+  border-bottom: 1px solid transparent;
+  background: var(--background);
 }
 
 .bd-top.is-stuck {
-  box-shadow: none;
+  border-bottom-color: var(--rule);
 }
 
 .bd-bar {
@@ -472,28 +494,43 @@ watch(
   align-items: center;
   gap: 8px;
   box-sizing: content-box;
-  height: 48px;
+  height: 72px;
   max-width: var(--bd-max);
   margin: 0 auto;
   padding: 0 var(--bd-gutter);
 }
 
+/* The project's name in ink, then what the board is in gray. */
 .bd-title {
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  color: var(--ag-fg-1);
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
+  color: var(--foreground);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 32px;
+  letter-spacing: -0.02em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.bd-title-desc {
+  color: var(--muted-foreground);
+}
+
+/* The plus that adds a widget, in the line's own ink. (The class lands on
+   the button inside AgIconButton's tooltip, outside this scope.) */
+.bd-bar :deep(.bd-add) {
+  flex: 0 0 auto;
+  color: var(--foreground);
+}
+
 .bd-bar-actions {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   margin-left: auto;
 }
 
@@ -504,7 +541,7 @@ watch(
   width: 100%;
   max-width: calc(var(--bd-max) + 2 * var(--bd-gutter));
   margin: 0 auto;
-  padding: 8px var(--bd-gutter) 64px;
+  padding: 4px var(--bd-gutter) 96px;
   container: board / inline-size;
 }
 
@@ -513,12 +550,14 @@ watch(
   margin: 48px auto 0;
 }
 
-/* The save state sits in the toolbar; on a narrow board its long failure
-   lines take a row of their own under it, inside the sticky block. */
+/* The save state sits in the header line; on a narrow board its long
+   failure lines take a row of their own under it, inside the sticky block. */
 .bd-save-row {
   display: none;
 }
 
+/* A narrow board is one column: no density to choose, and the header line
+   keeps to the project's name. */
 @container bd-main (max-width: 639px) {
   .bd-save-head :deep(.bd-save-failure) {
     display: none;
@@ -531,16 +570,19 @@ watch(
   .bd-save-row:not(:empty) {
     padding: 0 var(--bd-gutter) 8px;
   }
-}
 
-@media (max-width: 479px) {
-  .bd-add {
-    width: 32px;
-    padding: 0;
+  .bd-density-toggle,
+  .bd-title-desc {
+    display: none;
   }
 
-  .bd-add :deep(.ag-button-text) {
-    display: none;
+  .bd-bar {
+    height: 56px;
+  }
+
+  .bd-title {
+    font-size: 18px;
+    line-height: 28px;
   }
 }
 </style>

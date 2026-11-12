@@ -25,6 +25,8 @@ defineProps({
   // Hide the description visually but keep it for screen readers.
   hideDescription: { type: Boolean, default: false },
   wide: { type: Boolean, default: false },
+  // Room for a gallery of tiles: as wide as the window allows, to 1120px.
+  gallery: { type: Boolean, default: false },
 })
 </script>
 
@@ -32,7 +34,7 @@ defineProps({
   <DialogRoot v-model:open="open">
     <DialogPortal>
       <DialogOverlay class="ag-portal ag-overlay" />
-      <DialogContent class="ag-portal ag-dialog" :class="{ 'is-wide': wide }">
+      <DialogContent class="ag-portal ag-dialog" :class="{ 'is-wide': wide, 'is-gallery': gallery }">
         <div class="ag-dlg-head">
           <DialogTitle class="ag-dialog-title">{{ title }}</DialogTitle>
           <DialogClose class="ag-dlg-close" aria-label="Close">

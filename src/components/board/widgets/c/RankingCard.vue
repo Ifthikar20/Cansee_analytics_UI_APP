@@ -67,7 +67,8 @@ import CardSkeleton from '@/components/board/CardSkeleton.vue'
 import SetupPointer from '@/components/board/SetupPointer.vue'
 import HelpTip from '@/components/ui/help/HelpTip.vue'
 import { useBoardSource } from '@/composables/board/useBoardSource'
-import { useBoard } from '@/lib/board/context'
+import { useBoard, useCardStatus } from '@/lib/board/context'
+import { cardStatus } from '@/lib/board/frame'
 import { widgetMeta } from '@/lib/board/widgets'
 import { TIPS } from '@/lib/help/tips'
 import { COPY, autopilotLine, overCapLine, rankingEmpty, rankingFoot, rankingLists } from './specs'
@@ -93,6 +94,15 @@ const lead = computed(() => autopilotLine(data.value?.autopilot))
 const overCap = computed(() => overCapLine(data.value?.tracked))
 const empty = computed(() => rankingEmpty(data.value))
 const lists = computed(() => rankingLists(prompts.value))
+// The chip in the card's corner: live only with ranked prompts on show.
+useCardStatus(() =>
+  cardStatus({
+    loading: phase.value === 'loading',
+    failed: phase.value === 'failed',
+    emptyKind: empty.value ? 'empty' : '',
+    stale: stale.value,
+  }),
+)
 const footText = computed(() =>
   [empty.value ? '' : rankingFoot(data.value), stale.value ? COPY.staleNote : ''].filter(Boolean).join(' '),
 )
@@ -196,9 +206,12 @@ function openPrompt(promptId) {
 .rk-list-title {
   margin: 0;
   color: var(--ag-fg-3);
+  font-family: var(--font-mono);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* A wide card: the two lists side by side. */

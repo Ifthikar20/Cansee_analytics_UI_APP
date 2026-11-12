@@ -2,7 +2,7 @@
 // board page provides BOARD_CONTEXT; cards and panels call useBoard() to
 // open and close panels and to refetch the shared data sources. The panel
 // provides IN_PANEL, so a reused page can tell it renders there.
-import { computed, inject } from 'vue'
+import { computed, inject, onScopeDispose, toValue, watchEffect } from 'vue'
 import { routeLocationKey, routerKey } from 'vue-router'
 import { boardLocation } from './links'
 
@@ -14,11 +14,28 @@ export const CARD_RETRY = Symbol('board-card-retry')
 // is hidden), show()}. The board page provides it (SetupPointer reads it).
 export const SETUP_POINTER = Symbol('board-setup-pointer')
 
+// The card's line to its frame: a setter for what its body shows now (a
+// status of lib/board/frame.js). BoardWidget provides it and draws the chip.
+export const CARD_STATUS = Symbol('board-card-status')
+
 const BOARD_KEYS = ['websiteId', 'open', 'close', 'invalidate', 'revalidate']
 
 /** The board's setup pointer, or null outside a board page. */
 export function useSetupPointer() {
     return inject(SETUP_POINTER, null)
+}
+
+/**
+ * Tell the card's frame what the body shows: `status` is a ref, getter or
+ * value of 'live' | 'stale' | 'empty' | 'setup' | 'error' | 'loading' |
+ * 'ready' (lib/board/frame.js). The chip in the card's corner follows it,
+ * and reads "Live" only for 'live'. Outside a board card this does nothing.
+ */
+export function useCardStatus(status) {
+    const report = inject(CARD_STATUS, null)
+    if (typeof report !== 'function') return
+    watchEffect(() => report(toValue(status) || null))
+    onScopeDispose(() => report(null))
 }
 
 /** True inside the board's side panel. */

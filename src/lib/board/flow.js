@@ -1,34 +1,53 @@
 // Where board cards sit and where a moved card lands (frame_board.md B2b,
 // B3c, B4 and B10a). Pure: no Vue, no DOM. The column rules mirror the
-// container queries in BoardWidget.vue (a test keeps the two equal); the
-// boxes a drop reads are measured by the caller.
+// spans and container queries in BoardGrid.vue (a test keeps the two
+// equal); the boxes a drop reads are measured by the caller.
 import { placeWidget } from './layout'
 
 export const COLUMNS = 12
-export const WIDE_MIN_PX = 1040 // @container board (max-width: 1039px) in BoardWidget.vue
+
+// The board's density: how many one-third cards make a row.
+export const DENSITIES = Object.freeze([2, 3, 4])
+export const DEFAULT_DENSITY = 4
+
+/** A stored, typed or missing value as a density, else the default. */
+export function cleanDensity(value) {
+    const n = Number(value)
+    return DENSITIES.includes(n) ? n : DEFAULT_DENSITY
+}
+
+// The widths under which a board drops a column, whatever its density (a
+// card under about 300px is no card).
+export const DENSE_MIN_PX = 1240 // @container board (max-width: 1239px) in BoardGrid.vue
+export const WIDE_MIN_PX = 920 // @container board (max-width: 919px)
 export const SPLIT_MIN_PX = 640 // @container board (max-width: 639px)
 
 const SPANS = {
+    dense: { third: 3, half: 6, full: 12 },
     wide: { third: 4, half: 6, full: 12 },
     medium: { third: 6, half: 6, full: 12 },
 }
 
 /**
  * The column mode of a board `width` px wide (the content width of
- * .bd-body): 'wide', 'medium' or 'single'. 0 (not measured) is 'wide'. As
- * in the container queries, a width just over 1039px or 639px is the wider
- * mode.
+ * .bd-body) at a density of `columns`: 'dense' (four thirds to a row),
+ * 'wide' (three), 'medium' (two) or 'single'. The board shows as many
+ * columns as its density asks for and its width allows; 0 (not measured)
+ * allows them all. As in the container queries, a width just over 1239px,
+ * 919px or 639px is the wider mode.
  */
-export function boardMode(width) {
+export function boardMode(width, columns = DEFAULT_DENSITY) {
     const w = Number(width) || 0
-    if (w <= 0 || w > WIDE_MIN_PX - 1) return 'wide'
-    return w > SPLIT_MIN_PX - 1 ? 'medium' : 'single'
+    if (w > 0 && w <= SPLIT_MIN_PX - 1) return 'single'
+    const room = w <= 0 || w > DENSE_MIN_PX - 1 ? 4 : w > WIDE_MIN_PX - 1 ? 3 : 2
+    const shown = Math.min(cleanDensity(columns), room)
+    return shown === 4 ? 'dense' : shown === 3 ? 'wide' : 'medium'
 }
 
 /** The columns a widget of `size` spans in `mode`. */
 export function spanOf(size, mode) {
     if (mode === 'single') return COLUMNS
-    return SPANS[mode === 'medium' ? 'medium' : 'wide'][size] || COLUMNS
+    return (SPANS[mode] || SPANS.wide)[size] || COLUMNS
 }
 
 /**

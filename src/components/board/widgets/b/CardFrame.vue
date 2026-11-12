@@ -3,8 +3,11 @@
 // until the source first answers, the load failure (or Insights off) while
 // there is no data, the card's own state, else its lead and body; then the
 // foot, where a refetch that failed adds "Couldn't refresh." to the last
-// numbers. The lead sits beside the body once the card is wide enough.
+// numbers. The lead sits beside the body once the card is wide enough. It
+// tells the board's frame which of these the body shows (the chip).
 import { computed } from 'vue'
+import { useCardStatus } from '@/lib/board/context'
+import { cardStatus } from '@/lib/board/frame'
 import { widgetMeta } from '@/lib/board/widgets'
 import CardFoot from '@/components/board/CardFoot.vue'
 import CardSkeleton from '@/components/board/CardSkeleton.vue'
@@ -30,6 +33,15 @@ const emit = defineEmits(['retry'])
 
 const title = computed(() => widgetMeta(props.widget)?.title || '')
 const failed = computed(() => loadFailure(props.failure, title.value))
+useCardStatus(() =>
+  cardStatus({
+    loading: !props.data && !props.error,
+    failed: !props.data,
+    failedKind: failed.value?.kind || 'error',
+    emptyKind: props.empty ? props.empty.kind || 'empty' : '',
+    stale: props.stale,
+  }),
+)
 const footText = computed(() =>
   [props.empty ? '' : props.foot, props.stale ? "Couldn't refresh." : ''].filter(Boolean).join(' '),
 )

@@ -1,8 +1,11 @@
 <script setup>
 // A short list of labelled bars for a board card (board_ownership.md 2):
-// label and value text on one line, a 6px bar under them. The bar is the
-// accent for you (`emphasis`) and gray for everything else; a row with no
-// measured value draws no bar and reads its state word in the muted ink.
+// label and value text on one line, a 6px bar under them. The bar is ink
+// for you (`emphasis`) and gray for everything else. In a list that mixes
+// the two, your row also wears the orange square, the board's one accent,
+// so it is found at a glance; a list that is all yours needs no mark. A row
+// with no measured value draws no bar and reads its state word in the
+// muted ink.
 // Rows are buttons only when the parent listens to `select`.
 import { computed } from 'vue'
 
@@ -32,9 +35,13 @@ function width(value) {
   return `${Math.min(100, (value / full.value) * 100)}%`
 }
 
+// Yours among others: some rows are emphasised and some are not.
+const mixed = computed(() => props.items.some((item) => item?.emphasis) && props.items.some((item) => !item?.emphasis))
+
 const rows = computed(() =>
   props.items.map((item) => ({
     ...item,
+    you: mixed.value && Boolean(item?.emphasis),
     measured: measured(item?.value),
     width: measured(item?.value) ? width(item.value) : '0%',
   })),
@@ -53,7 +60,9 @@ const rows = computed(() =>
       >
         <span class="bd-bars-line">
           <span class="bd-bars-text">
-            <span class="bd-bars-label">{{ row.label }}</span>
+            <span class="bd-bars-label">
+              <span v-if="row.you" class="bd-bars-mark cs-mark" aria-hidden="true"></span>{{ row.label }}
+            </span>
             <span v-if="row.hint" class="bd-bars-hint">{{ row.hint }}</span>
           </span>
           <span class="bd-bars-value" :class="{ 'is-none': !row.measured }">{{ row.text }}</span>
@@ -133,6 +142,11 @@ const rows = computed(() =>
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.bd-bars-mark {
+  margin-right: 7px;
+  vertical-align: 2px;
 }
 
 .bd-bars-hint {

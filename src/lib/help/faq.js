@@ -51,7 +51,7 @@ export const FAQ_GROUPS = Object.freeze([
         item(
             'gs-board',
             'How do I change what is on my Analytics board?',
-            'The board starts with Ask AI and Prompt ranking. Use Add widget to add Summary, Prompts, Citations, Countries and more. Drag a card by its top to move it, or use its menu to resize or remove it. Open a card\'s title, or choose Expand, to see its detail in a side panel. Your layout is saved.',
+            'The board starts with a row of four small cards (Watch, Asked and answered, Rank in AI answers and Visibility score), then Ask AI and Prompt ranking. Use the plus beside the board\'s name (Add widget) to add Summary, Prompts, Citations, Countries and more. The bars at the top right set how many columns the board has. Drag a card by its top to move it, or use its menu to resize or remove it. Open a card\'s title, or choose Expand, to see its detail in a side panel. Your layout is saved.',
             { tags: ['widget', 'dashboard', 'layout', 'analytics'], docs: 'overview' },
         ),
         item(

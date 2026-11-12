@@ -2,6 +2,7 @@
 // through the existing API clients. SOURCES[key](wid) resolves with the
 // payload. Cards read fixed windows (30 days, the latest checks); filters
 // live in the expanded views. useBoardSource caches and shares the answers.
+import agentApi from '@/api/agent'
 import api from '@/api/client'
 import countriesApi from '@/api/countries'
 import insightsApi from '@/api/insights'
@@ -27,6 +28,9 @@ export const SOURCES = Object.freeze({
     promptIdeas: (wid) => insightsApi.promptIdeas(wid, { status: 'new' }).then(payload),
     // Prompt ranking (autopilot_contract.md 3c): the last 7 UTC days.
     ranking: (wid) => api.get(`/autopilot/websites/${wid}/ranking/`, { _silentError: true }).then(payload),
+    // The project's saved reports, as the Reports page lists them (the
+    // Latest report block reads the newest).
+    reports: (wid) => agentApi.listArtifacts(wid, { kinds: ['report'] }, { _silentError: true }).then(payload),
 })
 
 export const SOURCE_KEYS = Object.freeze(Object.keys(SOURCES))

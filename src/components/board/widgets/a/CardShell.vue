@@ -3,7 +3,10 @@
 // source first answers, the load failure (or Insights off) while there is
 // nothing to show, the card's own state, else its content; then the foot,
 // where a refetch that failed adds "Couldn't refresh." to the last numbers.
+// It tells the board's frame which of these the body shows (the chip).
 import { computed } from 'vue'
+import { useCardStatus } from '@/lib/board/context'
+import { cardStatus } from '@/lib/board/frame'
 import CardFoot from '@/components/board/CardFoot.vue'
 import CardSkeleton from '@/components/board/CardSkeleton.vue'
 import CardState from './CardState.vue'
@@ -26,6 +29,15 @@ const props = defineProps({
 const emit = defineEmits(['retry', 'action'])
 
 const failed = computed(() => failureState(props.widget, props.failure))
+useCardStatus(() =>
+  cardStatus({
+    loading: props.phase === 'loading',
+    failed: props.phase === 'failed',
+    failedKind: failed.value?.kind || 'error',
+    emptyKind: props.empty ? props.empty.kind || 'empty' : '',
+    stale: props.stale,
+  }),
+)
 const footText = computed(() => [...props.notes, props.stale ? STALE_NOTE : ''].filter(Boolean).join(' '))
 </script>
 

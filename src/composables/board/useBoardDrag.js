@@ -434,7 +434,7 @@ export function provideBoardDrag({ grid, items, enabled }) {
     function step(keyName) {
         const m = move
         const el = gridEl()
-        const mode = boardMode(el ? gridBox(el).width : 0)
+        const mode = boardMode(el ? gridBox(el).width : 0, el?.dataset?.columns)
         const { index, edge } = keyTarget(draft.value, m.key, keyName, mode)
         if (edge) {
             ui.announce(EDGES[edge](titleOf(m.key)))

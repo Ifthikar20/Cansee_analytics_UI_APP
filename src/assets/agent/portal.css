@@ -208,6 +208,11 @@
   width: min(560px, calc(100vw - 32px));
 }
 
+.ag-portal.ag-dialog.is-gallery {
+  width: min(1120px, calc(100vw - 32px));
+  padding: 24px;
+}
+
 .ag-dialog .ag-dialog-title {
   margin: 0;
   color: var(--ag-fg-1);

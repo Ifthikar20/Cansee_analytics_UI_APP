@@ -136,7 +136,7 @@ import { useImeSafeEnter } from '@/composables/agent/useImeSafeEnter'
 import { useBoardSource } from '@/composables/board/useBoardSource'
 import { askAgent } from '@/lib/agent/askAgent'
 import { isAgentRequest } from '@/lib/analytics/promptIntent'
-import { useBoard } from '@/lib/board/context'
+import { useBoard, useCardStatus } from '@/lib/board/context'
 import { engineMeta } from '@/lib/engines'
 import { TIPS } from '@/lib/help/tips'
 import TrackPrompt from './TrackPrompt.vue'
@@ -184,6 +184,9 @@ const inputEl = ref(null)
 // 'loading' until the project's runs first answer, 'failed', or 'ready'.
 const listState = ref('loading')
 const phase = computed(() => listState.value)
+// The chip in the card's corner. Ask AI is a tool: it is ready, and claims
+// no numbers of its own.
+useCardStatus(() => (phase.value === 'loading' ? 'loading' : phase.value === 'failed' ? 'error' : 'ready'))
 
 async function loadRuns() {
   const wid = props.websiteId

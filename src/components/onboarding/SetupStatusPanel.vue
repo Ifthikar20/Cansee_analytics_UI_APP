@@ -258,45 +258,51 @@ defineExpose({ show })
 </template>
 
 <style scoped>
+/* A flat card on the board's paper, in the cards' own language: a chip in
+   the corner, the state in one line of display type with a square mark
+   (orange when something needs attention, ink when all is set up), then
+   the details under a hairline. Fills that would be the card's own colour
+   step one tone away from it, as on a board card. */
 .ss {
-  --ss-tone: var(--ag-fg-4);
+  --ss-tone: var(--subtle-foreground);
+  --ag-row-hover: var(--muted);
+  --ag-ghost-hover: var(--muted);
+  --ag-btn-hover: var(--muted);
   box-sizing: border-box;
-  margin: 0 0 16px;
-  padding: 12px 16px 14px;
-  border: 1px solid var(--ag-card-border);
+  margin: 0 0 20px;
+  padding: 12px 12px 20px;
   border-radius: var(--radius);
-  background: var(--ag-pane-bg);
-  color: var(--ag-fg-1);
+  background: var(--card);
+  color: var(--card-foreground);
 }
 
 .ss.is-live {
-  --ss-tone: var(--ag-fg-2);
+  --ss-tone: var(--muted-foreground);
 }
 
 .ss.is-good {
-  --ss-tone: var(--ag-accent);
+  --ss-tone: var(--foreground);
 }
 
-.ss.is-warn {
-  --ss-tone: var(--ag-warning);
-}
-
+.ss.is-warn,
 .ss.is-bad {
-  --ss-tone: var(--ag-danger);
+  --ss-tone: var(--signal);
 }
 
 .ss-head {
+  position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
 }
 
+/* The mark sits in front of the summary line, under the chip. */
 .ss-mark {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  margin-top: 8px;
-  border-radius: 50%;
+  position: absolute;
+  top: 45px;
+  left: 8px;
+  width: 6px;
+  height: 6px;
   background: var(--ss-tone);
 }
 
@@ -309,29 +315,42 @@ defineExpose({ show })
   flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px 6px;
+  gap: 0 8px;
   min-width: 0;
 }
 
+/* The chip: the panel's name, as on a card's corner. */
 .ss-title {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
   margin: 0;
-  font-size: 14px;
+  padding: 0 8px;
+  background: var(--foreground);
+  color: var(--background);
+  font-family: var(--font-mono);
+  font-size: 12px;
   font-weight: 600;
-  line-height: 24px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .ss-title:focus-visible {
-  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
 
 .ss-summary {
   flex: 1 0 100%;
-  margin: 0;
-  color: var(--ag-fg-2);
-  font-size: 13px;
-  line-height: 18px;
+  margin: 12px 0 0;
+  padding-left: 24px;
+  color: var(--foreground);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 24px;
+  letter-spacing: -0.01em;
 }
 
 .ss-head-actions {
@@ -344,10 +363,10 @@ defineExpose({ show })
 .ss-body {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
-  gap: 16px 24px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--ag-divider-subtle);
+  gap: 20px 32px;
+  margin-top: 16px;
+  padding: 16px 8px 0;
+  border-top: 1px solid var(--rule);
 }
 
 .ss-block {
@@ -359,11 +378,14 @@ defineExpose({ show })
 }
 
 .ss-block-title {
-  margin: 0;
+  margin: 0 0 2px;
   color: var(--ag-fg-3);
+  font-family: var(--font-mono);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .ss-state {
@@ -559,8 +581,8 @@ defineExpose({ show })
 .ss-issue-action,
 .ss-issue-setting {
   margin: 0;
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 13px;
+  line-height: 18px;
 }
 
 .ss-issue-title {
