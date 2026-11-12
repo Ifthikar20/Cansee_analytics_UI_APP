@@ -17,12 +17,23 @@
           </span>
         </button>
       </div>
+      <div v-if="hasProject" class="ag-newtab-quick">
+        <p class="ag-newtab-label">Your keywords</p>
+        <button type="button" class="ag-newtab-site" @click="openKeywords">
+          <span class="ag-newtab-avatar" aria-hidden="true"><ListOrdered :size="16" /></span>
+          <span class="ag-newtab-site-text">
+            <span class="ag-newtab-site-name">Tracked keywords</span>
+            <span class="ag-newtab-site-host">Ranked by the Google vs AI gap, with what changed</span>
+          </span>
+        </button>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { ListOrdered } from '@lucide/vue'
 import { useAgentPaneStore } from '@/stores/agentPane'
 import { useAgentStore } from '@/stores/agent'
 import { useAppStore } from '@/stores/app'
@@ -48,6 +59,17 @@ const site = computed(() => {
 
 function open(url) {
   pane.navigateTab(props.tab.id, url)
+}
+
+const hasProject = computed(() => {
+  const wid = agent.websiteId
+  return wid !== undefined && wid !== null && wid !== ''
+})
+
+// The keywords tab takes over from this blank tab.
+function openKeywords() {
+  const blank = props.tab.id
+  if (pane.openKeywords()) pane.closeTab(blank)
 }
 </script>
 

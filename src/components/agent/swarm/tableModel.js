@@ -133,6 +133,89 @@ export function isCarried(cell, tableVersion) {
   return Number.isFinite(v) && Number.isFinite(t) && v > 0 && v < t
 }
 
+// ── Changes since the previous version ──
+// The server lists the most significant changed cells in `changes` (at most
+// 30, most significant first). Every changed cell, listed or not, carries
+// `previous` ({text, version}); a carried cell has none. A row the previous
+// version did not have is marked `added` (never listed: nothing to compare).
+
+/** The cell's text changed since the previous version. */
+export function hasPrevious(cell) {
+  const previous = cell && cell.previous
+  return Boolean(
+    previous && typeof previous === 'object' && previous.text !== undefined && previous.text !== null
+  )
+}
+
+function changeKey(sheetKey, rowKey) {
+  return `${sheetKey}\u0000${rowKey}`
+}
+
+/** The listed changes, as sheet and row key to the set of changed column keys. */
+export function changeIndex(table) {
+  const index = new Map()
+  for (const change of list(table && table.changes)) {
+    if (change.sheet == null || change.row == null || change.column == null) continue
+    const key = changeKey(String(change.sheet), String(change.row))
+    if (!index.has(key)) index.set(key, new Set())
+    index.get(key).add(String(change.column))
+  }
+  return index
+}
+
+/** The keys of the row's changed cells. */
+export function changedColumns(row) {
+  const cells = row && row.cells && typeof row.cells === 'object' ? row.cells : {}
+  return Object.keys(cells).filter((key) => hasPrevious(cells[key]))
+}
+
+/** Some cell of the row changed since the previous version. */
+export function isChangedRow(row) {
+  return changedColumns(row).length > 0
+}
+
+/** The row is new since the previous version. */
+export function isAddedRow(row) {
+  return Boolean(row && row.added === true)
+}
+
+/** The table has a previous version and something changed since it. */
+export function hasChanges(table) {
+  if (!table || table.previous_version === null || table.previous_version === undefined) return false
+  if (list(table.changes).length) return true
+  return tableSheets(table).some((sheet) =>
+    sheetRows(sheet).some((row) => isChangedRow(row) || isAddedRow(row))
+  )
+}
+
+/**
+ * The `rows` (in their order) the change list names, and the new rows. With
+ * `unlisted`, also every other changed row: the ones past the list's cap.
+ */
+export function filterChangedRows(table, sheet, rows, { unlisted = false } = {}) {
+  const index = changeIndex(table)
+  const sheetKey = String(sheet && sheet.key)
+  return list(rows).filter(
+    (row) =>
+      index.has(changeKey(sheetKey, String(row.key))) ||
+      isAddedRow(row) ||
+      (unlisted && isChangedRow(row))
+  )
+}
+
+/**
+ * Changed rows of the sheet that the change list leaves out entirely (the
+ * rows "show more" adds). A listed row shows all its changed cells already.
+ */
+export function unlistedChangedRows(table, sheet) {
+  const index = changeIndex(table)
+  const sheetKey = String(sheet && sheet.key)
+  return sheetRows(sheet).filter(
+    (row) =>
+      isChangedRow(row) && !isAddedRow(row) && !index.has(changeKey(sheetKey, String(row.key)))
+  ).length
+}
+
 /** Classes for a cell's state and tone. */
 export function cellClasses(cell) {
   if (!cell) return ['is-empty']

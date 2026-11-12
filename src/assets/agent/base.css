@@ -31,6 +31,66 @@
   border: 0 !important;
 }
 
+/* Highlighted terms in the browser pane (lib/agent/highlight.js). Unscoped:
+   the marks come from a functional component that carries no scope id. Each
+   kind has its own colour and its own underline (keyword solid, brand
+   double, competitor dashed), so they stay apart without colour. */
+.ag-hl {
+  padding: 0 1px;
+  border-radius: 2px;
+  background: var(--ag-hl-find-bg);
+  color: var(--ag-hl-fg);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.ag-hl.is-keyword {
+  background: var(--ag-hl-keyword-bg);
+  text-decoration-line: underline;
+  text-decoration-style: solid;
+  text-decoration-color: var(--ag-hl-keyword-line);
+}
+
+.ag-hl.is-brand {
+  background: var(--ag-hl-brand-bg);
+  text-decoration-line: underline;
+  text-decoration-style: double;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--ag-hl-brand-line);
+}
+
+.ag-hl.is-competitor {
+  background: var(--ag-hl-competitor-bg);
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-color: var(--ag-hl-competitor-line);
+}
+
+.ag-hl.is-current {
+  background: var(--ag-hl-current-bg);
+  outline: 2px solid var(--ag-hl-current-ring);
+  outline-offset: 1px;
+}
+
+/* Listed per kind so these beat the two-class kind rules above. */
+@media (forced-colors: active) {
+  .ag-hl,
+  .ag-hl.is-keyword,
+  .ag-hl.is-brand,
+  .ag-hl.is-competitor {
+    background: Mark;
+    color: MarkText;
+  }
+
+  .ag-hl.is-current {
+    background: Highlight;
+    color: HighlightText;
+    outline-color: CanvasText;
+  }
+}
+
 /* base.css gives every link the app's ink, weight 500 and a fading hover. */
 :where(.ag-root, .ag-portal) a {
   color: inherit;

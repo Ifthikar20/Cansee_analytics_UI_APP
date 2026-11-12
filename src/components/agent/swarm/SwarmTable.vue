@@ -32,6 +32,15 @@
             <span>{{ s.title || s.key }}</span>{{ ' ' }}<span class="ag-st-seg-count ag-tnum">{{ sheetRows(s).length }}</span>
           </button>
         </div>
+        <button
+          v-if="canFilterChanges"
+          type="button"
+          class="ag-st-toggle"
+          :aria-pressed="changedOnly ? 'true' : 'false'"
+          @click="toggleChangedOnly"
+        >
+          Changed only
+        </button>
       </div>
       <div class="ag-st-bar-end">
         <AgIconButton v-if="mode === 'inline'" label="Open in browser pane" :size="28" :icon-size="15" @click="openInPane">
@@ -80,7 +89,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in rows" :key="row.key">
+          <tr v-for="row in rows" :key="row.key" :class="{ 'is-changed': isChangedRow(row) || isAddedRow(row) }">
             <td v-if="selectable" class="ag-st-sel">
               <span v-if="hasDraft(row) && isAdded(row.key)" class="ag-st-added">In findings</span>
               <input
@@ -119,6 +128,14 @@
                   <span v-if="noteOf(row, col)" class="ag-st-sr">. {{ noteOf(row, col) }}</span>
                 </span>
                 <span v-if="previousOf(row, col)" class="ag-st-prev">was {{ previousOf(row, col) }}</span>
+                <span v-if="i === 0 && isAddedRow(row)" class="ag-st-badge is-new"
+                  >New<span class="ag-st-sr"> since version {{ data.previous_version }}</span></span
+                >
+                <span v-else-if="i === 0 && isChangedRow(row)" class="ag-st-badge"
+                  >Changed<span class="ag-st-sr">
+                    since version {{ data.previous_version }}: {{ changedLabel(row) }}</span
+                  ></span
+                >
                 <span v-if="i === 0 && rowLinks(row).length" class="ag-st-links">
                   <template v-for="(ev, j) in rowLinks(row)" :key="`${ev.label}-${j}`">
                     <button v-if="ev.tab_id" type="button" class="ag-st-ev" @click="openCapture($event, ev.tab_id)">
@@ -139,7 +156,15 @@
           </tr>
         </tbody>
       </table>
-      <p v-if="!rows.length" class="ag-st-empty">No rows in this sheet.</p>
+      <p v-if="!rows.length" class="ag-st-empty">
+        {{ emptyText }}
+      </p>
+      <p v-if="unlisted > 0" class="ag-st-more">
+        Only the most significant changes are listed.
+        <button type="button" class="ag-st-more-btn" @click="revealUnlisted">
+          Show {{ unlisted }} more changed {{ unlisted === 1 ? 'row' : 'rows' }}
+        </button>
+      </p>
     </div>
 
     <SwarmTableActions
@@ -149,8 +174,9 @@
       :mode="mode"
       :busy="busy"
       :chat-id="resolvedChatId"
-      :selected-keys="selected"
-      @added="clearSelection"
+      :selected-keys="shownSelected"
+      :row-keys="shownKeys"
+      @added="dropFromSelection"
       @download="download"
     />
   </section>
@@ -163,7 +189,7 @@
 // Inline in the chat, full height in the pane (mode "pane"), or read-only
 // (mode "report"). Every value shown is a cell's own text; a state such as
 // "Not configured" is always a word, never a number.
-import { computed, ref, useId, watch } from 'vue'
+import { computed, nextTick, ref, useId, watch } from 'vue'
 import { ArrowDown, ArrowUp, Download, PanelRight } from '@lucide/vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
 import HelpTip from '@/components/ui/help/HelpTip.vue'
@@ -177,8 +203,14 @@ import {
   cellText,
   csvFilename,
   csvRows,
+  changedColumns,
+  filterChangedRows,
+  hasChanges,
   hasDraft,
+  hasPrevious,
+  isAddedRow,
   isCarried,
+  isChangedRow,
   nextSort,
   rowLabel,
   sheetColumns,
@@ -186,6 +218,7 @@ import {
   sortRows,
   tableDomId,
   tableSheets,
+  unlistedChangedRows,
 } from './tableModel'
 import { toCsv } from '@/lib/agent/csv'
 import { downloadText } from '@/lib/agent/download'
@@ -205,10 +238,12 @@ const props = defineProps({
   busy: { type: Boolean, default: false },
   // The chat of the research, when there is no message to read it from.
   chatId: { type: [String, Number], default: null },
+  // "Changed only" held by the caller (the pane tab); null keeps it here.
+  changedOnly: { type: Boolean, default: null },
 })
 
 // version: null asks the pane to show the latest version.
-const emit = defineEmits(['version'])
+const emit = defineEmits(['version', 'update:changedOnly'])
 
 const agent = useAgentStore()
 const findings = useAgentFindingsStore()
@@ -273,7 +308,69 @@ function onSheetKey(event) {
 
 const sorts = ref({})
 const sort = computed(() => sorts.value[sheetKey.value] || { key: null, dir: null })
-const rows = computed(() => sortRows(sheetRows(sheet.value), sort.value.key, sort.value.dir))
+
+// ── Changes since the previous version (table-wide) ──
+
+// Rows the change list names and new rows; showUnlisted adds the changed rows
+// past the list's cap. The pane keeps "Changed only" on its tab (the
+// changedOnly prop), so it outlives a remount while a version loads.
+const ownChangedOnly = ref(false)
+const changedOnly = computed({
+  get: () => (typeof props.changedOnly === 'boolean' ? props.changedOnly : ownChangedOnly.value),
+  set: (value) => {
+    ownChangedOnly.value = value
+    emit('update:changedOnly', value)
+  },
+})
+const showUnlisted = ref(false)
+// A first version (or one where nothing changed) offers no filter.
+const canFilterChanges = computed(() => hasChanges(data.value))
+const filtering = computed(() => changedOnly.value && canFilterChanges.value)
+
+function visibleRows(target) {
+  const base = sheetRows(target)
+  return filtering.value ? filterChangedRows(data.value, target, base, { unlisted: showUnlisted.value }) : base
+}
+
+const rows = computed(() => sortRows(visibleRows(sheet.value), sort.value.key, sort.value.dir))
+const unlisted = computed(() =>
+  filtering.value && !showUnlisted.value ? unlistedChangedRows(data.value, sheet.value) : 0
+)
+const emptyText = computed(() => {
+  if (!filtering.value) return 'No rows in this sheet.'
+  if (unlisted.value > 0) return 'None of the most significant changes are in this sheet.'
+  return `No changes since version ${data.value.previous_version} in this sheet.`
+})
+
+// The rows shown while filtering (null when every row shows). Findings take
+// only these: a checked row the filter hides is never added unseen, and it is
+// checked again once the filter is off.
+const shownKeys = computed(() =>
+  filtering.value ? visibleRows(sheet.value).map((row) => String(row.key)) : null
+)
+const shownSelected = computed(() => {
+  if (!shownKeys.value) return selected.value
+  const shown = new Set(shownKeys.value)
+  return selected.value.filter((key) => shown.has(key))
+})
+
+function toggleChangedOnly() {
+  changedOnly.value = !changedOnly.value
+}
+
+// The button goes once its rows show; focus moves to the table, not the page.
+function revealUnlisted() {
+  showUnlisted.value = true
+  nextTick(() => document.getElementById(`${uid}-panel`)?.focus())
+}
+
+function changedLabel(row) {
+  const changed = new Set(changedColumns(row))
+  return columns.value
+    .filter((col) => changed.has(col.key))
+    .map((col) => col.label)
+    .join(', ')
+}
 // A row can still be ticked: the findings hint points at the column then.
 const hasDrafts = computed(() => rows.value.some((row) => hasDraft(row) && !isAdded(row.key)))
 
@@ -299,16 +396,23 @@ function toggleRow(rowKey, on) {
   selection.value = { ...selection.value, [sheetKey.value]: [...next] }
 }
 
-function clearSelection(key) {
-  selection.value = { ...selection.value, [key || sheetKey.value]: [] }
+// The rows just added leave the selection; a checked row the filter hid
+// was not added and stays checked.
+function dropFromSelection(key, rowKeys) {
+  const sheet = key || sheetKey.value
+  const gone = new Set((Array.isArray(rowKeys) ? rowKeys : []).map(String))
+  selection.value = { ...selection.value, [sheet]: (selection.value[sheet] || []).filter((k) => !gone.has(k)) }
 }
 
-// A different table (a newer version in the pane) starts unsorted and unselected.
+// A different table (a newer version in the pane) starts unsorted and
+// unselected. "Changed only" stays as chosen; the cells past the change
+// list's cap are folded away again.
 watch(
   () => `${swarmId.value}:${version.value}`,
   () => {
     sorts.value = {}
     selection.value = {}
+    showUnlisted.value = false
   }
 )
 
@@ -325,8 +429,7 @@ function noteOf(row, col) {
 
 function previousOf(row, col) {
   const cell = cellOf(row, col.key)
-  const previous = cell && cell.previous
-  return previous && typeof previous === 'object' && previous.text !== undefined ? String(previous.text) : ''
+  return hasPrevious(cell) ? String(cell.previous.text) : ''
 }
 
 function linkOf(row, col) {
@@ -484,6 +587,37 @@ function download() {
   outline-offset: 1px;
 }
 
+.ag-st-toggle {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  padding: 0 6px;
+  border: 1px solid var(--ag-btn-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ag-fg-3);
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.ag-st-toggle:hover {
+  background: var(--ag-ghost-hover);
+  color: var(--ag-fg-1);
+}
+
+.ag-st-toggle[aria-pressed='true'] {
+  border-color: var(--ag-changed-line);
+  background: var(--ag-changed-bg);
+  color: var(--ag-fg-1);
+}
+
+.ag-st-toggle:focus-visible {
+  outline: 2px solid var(--ag-ring);
+  outline-offset: 1px;
+}
+
 .ag-st-seg {
   display: inline-flex;
   align-items: center;
@@ -533,6 +667,8 @@ function download() {
 }
 
 .ag-st-scroll {
+  /* Keeps the screen-reader text of far columns inside the scroll box. */
+  position: relative;
   min-width: 0;
   overflow-x: auto;
   border-top: 1px solid var(--ag-divider-subtle);
@@ -624,6 +760,18 @@ function download() {
 .ag-st-table thead .ag-st-sel {
   z-index: 3;
   background: var(--ag-tab-bg);
+}
+
+/* A row changed since the previous version: a tint on every cell (the sticky
+   first and select cells paint their own background, so the tint is opaque)
+   and a line on the left, drawn inset so the columns do not shift. Kept apart
+   from the <mark> highlights, which stay inside cell text. */
+.ag-st-table tbody tr.is-changed > :is(th, td) {
+  background: var(--ag-changed-bg);
+}
+
+.ag-st-table tbody tr.is-changed > :first-child {
+  box-shadow: inset 2px 0 0 var(--ag-changed-line);
 }
 
 /* The help icon, centred over the row checkboxes (14px at 10px). */
@@ -751,6 +899,19 @@ function download() {
   line-height: 16px;
 }
 
+.ag-st-badge {
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 0 4px;
+  border: 1px solid var(--ag-changed-line);
+  border-radius: 4px;
+  color: var(--ag-changed-line);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
 .ag-st-link,
 .ag-st-ev {
   color: inherit;
@@ -798,6 +959,34 @@ function download() {
   color: var(--ag-fg-3);
   font-size: 13px;
   line-height: 18px;
+}
+
+.ag-st-more {
+  margin: 0;
+  padding: 10px 12px 14px;
+  color: var(--ag-fg-3);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.ag-st-more-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ag-serp-title);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ag-st-more-btn:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ag-st-more-btn:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--ag-ring);
+  outline-offset: 2px;
 }
 
 .ag-st-sr {

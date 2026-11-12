@@ -13,6 +13,18 @@
         </AgIconButton>
       </div>
       <UrlBar class="ag-ph-url" compact :value="pageAddress" @submit="go" />
+      <AgIconButton
+        :id="findToggleId(tab.id)"
+        label="Find on page"
+        :size="28"
+        muted
+        :active="findOpen"
+        :aria-expanded="findOpen ? 'true' : 'false'"
+        :aria-controls="findOpen ? findBarId(tab.id) : undefined"
+        @click="toggleFind"
+      >
+        <Search :size="15" aria-hidden="true" />
+      </AgIconButton>
       <div class="ag-ph-mode" role="group" aria-label="View">
         <AgTooltip :text="liveReason" :disabled="liveOk">
           <button
@@ -101,6 +113,49 @@
       </div>
     </template>
 
+    <template v-else-if="tab.kind === 'keywords'">
+      <h2 class="ag-ph-title">
+        <span class="ag-ph-title-text">Keywords</span>
+        <span v-if="keywordsSub" class="ag-ph-sub">{{ keywordsSub }}</span>
+      </h2>
+      <div class="ag-ph-actions">
+        <button
+          type="button"
+          class="ag-ph-toggle"
+          :aria-pressed="tab.changedOnly ? 'true' : 'false'"
+          @click="pane.updateTab(tab.id, { changedOnly: !tab.changedOnly })"
+        >
+          Changed only
+        </button>
+        <DropdownMenuRoot :modal="false">
+          <DropdownMenuTrigger as-child>
+            <button type="button" class="ag-ph-ver" :aria-label="`Sorted by ${keywordSortName}. Change the sort`">
+              <span>{{ keywordSortName }}</span>
+              <ChevronDown :size="14" aria-hidden="true" />
+            </button>
+          </DropdownMenuTrigger>
+          <AgMenuContent align="end" :width="220">
+            <AgMenuLabel>Sort by</AgMenuLabel>
+            <AgMenuItem v-for="option in SORT_OPTIONS" :key="option.key" @select="setKeywordSort(option.key)">
+              <span class="ag-menu-text">{{ option.label }}</span>
+              <template #trail>
+                <Check v-if="option.key === keywordSort" :size="16" aria-hidden="true" />
+              </template>
+            </AgMenuItem>
+          </AgMenuContent>
+        </DropdownMenuRoot>
+        <AgIconButton
+          label="Refresh"
+          :size="28"
+          muted
+          :disabled="tab.status === 'loading'"
+          @click="pane.updateTab(tab.id, { nonce: (tab.nonce || 0) + 1 })"
+        >
+          <RotateCw :size="15" aria-hidden="true" />
+        </AgIconButton>
+      </div>
+    </template>
+
     <template v-else>
       <h2 class="ag-ph-title">
         <span class="ag-ph-title-text">{{ heading }}</span>
@@ -111,6 +166,16 @@
       </h2>
       <div class="ag-ph-actions">
         <template v-if="tab.kind === 'serp'">
+          <AgIconButton
+            v-if="serpTerms.keyword"
+            label="Highlight this keyword in pages"
+            :size="28"
+            muted
+            :pressed="serpHighlighting"
+            @click="toggleSerpHighlight"
+          >
+            <Highlighter :size="15" aria-hidden="true" />
+          </AgIconButton>
           <AgTooltip v-if="googleHref" text="Open in Google">
             <a class="ag-ph-ext" :href="googleHref" target="_blank" rel="noopener noreferrer nofollow" aria-label="Open in Google">
               <ExternalLink :size="15" aria-hidden="true" />
@@ -152,7 +217,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick } from 'vue'
 import { DropdownMenuRoot, DropdownMenuTrigger } from 'reka-ui'
 import {
   ArrowLeft,
@@ -163,9 +228,11 @@ import {
   Download,
   ExternalLink,
   FileDown,
+  Highlighter,
   History,
   Monitor,
   RotateCw,
+  Search,
 } from '@lucide/vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
 import AgMenuContent from '@/components/agent/common/AgMenuContent.vue'
@@ -182,12 +249,15 @@ import { approvalLine } from '@/lib/agent/review'
 import { structuredType } from '@/lib/agent/structured'
 import ReviewChip from '@/components/agent/review/ReviewChip.vue'
 import { downloadText } from '@/lib/agent/download'
+import { captureTerms } from '@/lib/agent/highlight'
 import { googleSearchUrl } from '@/lib/agent/url'
 import { safeHref } from '@/utils/safeHref'
 import ExportMenu from './ExportMenu.vue'
 import UrlBar from './UrlBar.vue'
 import VersionMenu from './VersionMenu.vue'
 import { formatCapturedAt } from './format'
+import { findBarId, findToggleId } from './ids'
+import { SORT_OPTIONS, sortLabel } from './keywordsModel'
 import { liveAllowed, liveUnavailableReason, pageMode, pageUrl } from './pageMode'
 
 // The row under the tab strip: a title with Export (and versions) for
@@ -283,6 +353,15 @@ function setMode(next) {
   pane.updateTab(props.tab.id, { mode: next })
 }
 
+const findOpen = computed(() => Boolean(pane.findOf(props.tab.id)?.open))
+
+function toggleFind() {
+  const opening = !findOpen.value
+  const id = props.tab.id
+  pane.toggleFind(id)
+  if (opening) nextTick(() => document.querySelector(`#${findBarId(id)} input`)?.focus())
+}
+
 // ── Google results ──
 
 const capture = computed(() => props.tab.data || {})
@@ -291,6 +370,40 @@ const googleHref = computed(() => googleSearchUrl(capture.value.query, capture.v
 
 function serpContext() {
   return { title: pane.titleOf(props.tab), capture: capture.value }
+}
+
+// Marks this search's keyword, with its brand and competitor names, in every
+// reader and Google results view of the pane.
+const serpTerms = computed(() =>
+  props.tab.kind === 'serp' ? captureTerms(capture.value) : { keyword: '', brand: [], competitors: [] }
+)
+const serpHighlighting = computed(() => {
+  const k = pane.keywordHighlight
+  return Boolean(k && serpTerms.value.keyword && k.keyword.toLowerCase() === serpTerms.value.keyword.toLowerCase())
+})
+
+// ── Keywords ──
+
+const keywordSort = computed(() => props.tab.sort || 'gap')
+const keywordSortName = computed(() => sortLabel(keywordSort.value))
+// "12 tracked · changes over 90 days", from what the view loaded.
+const keywordsSub = computed(() => {
+  if (props.tab.kind !== 'keywords') return ''
+  const data = props.tab.data || {}
+  const count = data.overview && data.overview.kpis ? data.overview.kpis.prompts : null
+  if (!Number.isFinite(count)) return ''
+  const parts = [`${count} tracked`]
+  if (data.changes && Number(data.changes.window_days)) parts.push(`changes over ${data.changes.window_days} days`)
+  return parts.join(' · ')
+})
+
+function setKeywordSort(key) {
+  pane.updateTab(props.tab.id, { sort: key === 'gap' ? null : key })
+}
+
+function toggleSerpHighlight() {
+  if (serpHighlighting.value) pane.clearKeywordHighlight()
+  else pane.setKeywordHighlight({ ...serpTerms.value, sourceTabId: props.tab.id })
 }
 
 // ── Research results tables ──
@@ -482,6 +595,37 @@ function artifactContext() {
 
 .ag-ph-export:focus-visible {
   border-radius: var(--radius);
+  outline: 2px solid var(--ag-ring);
+  outline-offset: 2px;
+}
+
+.ag-ph-toggle {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ag-export-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ag-fg-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ag-ph-toggle:hover {
+  background: var(--ag-btn-hover);
+}
+
+.ag-ph-toggle[aria-pressed='true'] {
+  border-color: var(--ag-changed-line);
+  background: var(--ag-changed-bg);
+  color: var(--ag-fg-1);
+}
+
+.ag-ph-toggle:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

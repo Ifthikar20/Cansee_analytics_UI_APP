@@ -91,6 +91,24 @@
   --ag-scroll-thumb: var(--bar);
   --ag-menu-hover: var(--accent);
 
+  /* Highlighted terms in the browser pane (find, keyword, brand,
+     competitor). The underline tells the kinds apart (assets/agent/base.css);
+     only your brand and the current find match wear the accent. */
+  --ag-hl-fg: var(--foreground);
+  --ag-hl-find-bg: var(--bar);
+  --ag-hl-current-bg: var(--signal-soft);
+  --ag-hl-current-ring: var(--signal);
+  --ag-hl-keyword-bg: var(--muted);
+  --ag-hl-keyword-line: var(--foreground);
+  --ag-hl-brand-bg: var(--signal-soft);
+  --ag-hl-brand-line: var(--signal);
+  --ag-hl-competitor-bg: var(--muted);
+  --ag-hl-competitor-line: var(--muted-foreground);
+  /* A research results row that changed since the previous version. The
+     tint is opaque: sticky cells paint over it. */
+  --ag-changed-line: var(--foreground);
+  --ag-changed-bg: var(--card);
+
   /* Tooltips invert the surface they float over. */
   --ag-tooltip-bg: var(--foreground);
   --ag-tooltip-fg: var(--background);

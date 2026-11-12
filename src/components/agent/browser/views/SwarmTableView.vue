@@ -7,7 +7,9 @@
       mode="pane"
       :busy="busy"
       :chat-id="chatId"
+      :changed-only="Boolean(tab.changedOnly)"
       @version="setVersion"
+      @update:changed-only="(value) => pane.updateTab(tab.id, { changedOnly: value })"
     />
     <div v-else-if="state === 'gone'" class="ag-stv-note">
       <p class="ag-stv-text">This table is no longer available.</p>

@@ -81,6 +81,8 @@ const props = defineProps({
   chatId: { type: [String, Number], default: null },
   // Row keys checked on this sheet.
   selectedKeys: { type: Array, default: () => [] },
+  // The row keys shown (the table's "Changed only" filter); null when all show.
+  rowKeys: { type: Array, default: null },
 })
 
 const emit = defineEmits(['added', 'download'])
@@ -159,12 +161,19 @@ function isAdded(rowKey) {
   return Boolean(findings.isAdded(swarmId.value, sheetKey.value, rowKey))
 }
 
-const addable = computed(() => addableRowKeys(props.sheet, isAdded))
+const addable = computed(() => {
+  const keys = addableRowKeys(props.sheet, isAdded)
+  if (!Array.isArray(props.rowKeys)) return keys
+  const shown = new Set(props.rowKeys.map(String))
+  return keys.filter((key) => shown.has(key))
+})
 const chosen = computed(() => (props.selectedKeys || []).map(String).filter((key) => addable.value.includes(key)))
 const addKeys = computed(() => (chosen.value.length ? chosen.value : addable.value))
-const addLabel = computed(() =>
-  chosen.value.length ? `Add ${chosen.value.length} to findings` : `Add all to findings (${addable.value.length})`
-)
+const addLabel = computed(() => {
+  if (chosen.value.length) return `Add ${chosen.value.length} to findings`
+  const all = Array.isArray(props.rowKeys) ? 'Add all shown to findings' : 'Add all to findings'
+  return `${all} (${addable.value.length})`
+})
 
 const viewFindings = computed(() => {
   const wid = agent.websiteId
@@ -182,6 +191,7 @@ function addedText(created, duplicates) {
 async function addFindings() {
   if (adding.value || !addKeys.value.length) return
   adding.value = true
+  const rowKeys = addKeys.value.slice()
   try {
     const wid = agent.websiteId
     if (wid !== null && wid !== undefined && wid !== '') findings.init(wid)
@@ -189,7 +199,7 @@ async function addFindings() {
       swarmId: swarmId.value,
       version: version.value,
       sheet: sheetKey.value,
-      rowKeys: addKeys.value.slice(),
+      rowKeys: rowKeys.slice(),
     })
     const created = Array.isArray(result && result.created) ? result.created.length : 0
     const duplicates = Array.isArray(result && result.duplicates) ? result.duplicates.length : 0
@@ -197,7 +207,7 @@ async function addFindings() {
     toast.success(text)
     ui.announce(text)
     addedHere.value = true
-    emit('added', sheetKey.value)
+    emit('added', sheetKey.value, rowKeys)
   } catch (error) {
     const text = errorInfo(error).message || 'These rows could not be added to Findings. Try again.'
     toast.error(text)

@@ -15,6 +15,7 @@
           <PageView v-else-if="tab.kind === 'page' || tab.kind === 'url'" :key="tab.id" :tab="tab" />
           <NewTabView v-else-if="tab.kind === 'newtab'" :key="tab.id" :tab="tab" />
           <SwarmTableView v-else-if="tab.kind === 'table'" :key="tab.id" :tab="tab" />
+          <KeywordsView v-else-if="tab.kind === 'keywords'" :key="tab.id" :tab="tab" />
           <ArtifactView v-else-if="tab.kind === 'artifact'" :key="tab.id" :source="source" @version="setVersion" />
         </div>
       </div>
@@ -32,6 +33,7 @@ import PaneHeader from './PaneHeader.vue'
 import TabStrip from './TabStrip.vue'
 import { useArtifactSource } from './useArtifactSource'
 import ArtifactView from './views/ArtifactView.vue'
+import KeywordsView from './views/KeywordsView.vue'
 import NewTabView from './views/NewTabView.vue'
 import PageView from './views/PageView.vue'
 import SerpView from './views/SerpView.vue'

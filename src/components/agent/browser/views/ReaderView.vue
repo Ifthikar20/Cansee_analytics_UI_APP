@@ -1,7 +1,9 @@
 <template>
-  <article class="ag-reader" :aria-label="title ? `Reader view: ${title}` : 'Reader view'">
+  <article ref="root" class="ag-reader" :aria-label="title ? `Reader view: ${title}` : 'Reader view'">
     <header v-if="title || sourceLabel" class="ag-rd-head">
-      <h1 v-if="showTitle" class="ag-rd-title">{{ title }}</h1>
+      <h1 v-if="showTitle" class="ag-rd-title">
+        <HighlightedText :text="title" :segments="marked?.title" :current="current" />
+      </h1>
       <p v-if="sourceLabel" class="ag-rd-source">{{ sourceLabel }}</p>
     </header>
 
@@ -12,24 +14,39 @@
         class="ag-rd-heading"
         :class="`is-l${headingLevel(block.level)}`"
       >
-        {{ block.text }}
+        <HighlightedText :text="textOf(block)" :segments="marked?.blocks[i]?.text" :current="current" />
       </component>
-      <p v-else-if="block.type === 'paragraph'" class="ag-rd-p">{{ block.text }}</p>
+      <p v-else-if="block.type === 'paragraph'" class="ag-rd-p">
+        <HighlightedText :text="textOf(block)" :segments="marked?.blocks[i]?.text" :current="current" />
+      </p>
       <ol v-else-if="block.type === 'list' && block.ordered" class="ag-rd-list">
-        <li v-for="(item, j) in listItems(block)" :key="j">{{ item }}</li>
+        <li v-for="(item, j) in listItems(block)" :key="j">
+          <HighlightedText :text="item" :segments="marked?.blocks[i]?.items?.[j]" :current="current" />
+        </li>
       </ol>
       <ul v-else-if="block.type === 'list'" class="ag-rd-list">
-        <li v-for="(item, j) in listItems(block)" :key="j">{{ item }}</li>
+        <li v-for="(item, j) in listItems(block)" :key="j">
+          <HighlightedText :text="item" :segments="marked?.blocks[i]?.items?.[j]" :current="current" />
+        </li>
       </ul>
-      <blockquote v-else-if="block.type === 'quote'" class="ag-rd-quote">{{ block.text }}</blockquote>
-      <pre v-else-if="block.type === 'code'" class="ag-rd-code"><code>{{ block.text }}</code></pre>
+      <blockquote v-else-if="block.type === 'quote'" class="ag-rd-quote">
+        <HighlightedText :text="textOf(block)" :segments="marked?.blocks[i]?.text" :current="current" />
+      </blockquote>
+      <pre
+        v-else-if="block.type === 'code'"
+        class="ag-rd-code"
+      ><code><HighlightedText :text="textOf(block)" :segments="marked?.blocks[i]?.text" :current="current" /></code></pre>
       <div v-else-if="block.type === 'table' && tableRows(block).length" class="ag-rd-table">
         <table>
           <tbody>
             <tr v-for="(row, r) in tableRows(block)" :key="r">
               <template v-for="(cell, c) in row" :key="c">
-                <th v-if="r === 0 && tableRows(block).length > 1" scope="col">{{ cell }}</th>
-                <td v-else>{{ cell }}</td>
+                <th v-if="r === 0 && tableRows(block).length > 1" scope="col">
+                  <HighlightedText :text="cell" :segments="marked?.blocks[i]?.rows?.[r]?.[c]" :current="current" />
+                </th>
+                <td v-else>
+                  <HighlightedText :text="cell" :segments="marked?.blocks[i]?.rows?.[r]?.[c]" :current="current" />
+                </td>
               </template>
             </tr>
           </tbody>
@@ -50,7 +67,7 @@
             class="ag-rd-link"
             @click="onLinkClick($event, link.url)"
           >
-            {{ link.text }}
+            <HighlightedText :text="link.text" :segments="marked?.links[i]" :current="current" />
           </a>
           <span class="ag-rd-link-host">{{ link.host }}</span>
         </li>
@@ -60,19 +77,33 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { createMarker } from '@/lib/agent/highlight'
 import { displayUrl, hostOf, resolveHref } from '@/lib/agent/url'
+import HighlightedText from '../HighlightedText.js'
 
 // Renders captured page text as Vue elements only: every string is a text
 // node, so markup inside the captured page can never become live HTML.
+// Highlighting keeps that contract: it only splits strings into more text
+// nodes, some of them inside <mark>.
 
 const props = defineProps({
   reader: { type: Object, default: null },
   baseUrl: { type: String, default: '' },
   sourceLabel: { type: String, default: '' },
+  // Terms to mark, from lib/agent/highlight compileTerms; empty marks nothing.
+  terms: { type: Array, default: () => [] },
+  // The match next/previous points at, and a counter that changes on every
+  // jump (the view scrolls the match into view then).
+  current: { type: Number, default: -1 },
+  navToken: { type: Number, default: 0 },
 })
 
-const emit = defineEmits(['navigate'])
+// matches: {count, total, capped}, whenever the marks change. count is what
+// next/previous steps through; total counts every mark.
+const emit = defineEmits(['navigate', 'matches'])
+
+const root = ref(null)
 
 const title = computed(() => (typeof props.reader?.title === 'string' ? props.reader.title.trim() : ''))
 
@@ -98,6 +129,56 @@ const links = computed(() => {
   }
   return out
 })
+
+// Marks for every string the template renders, in reading order (title,
+// blocks, links) so match indexes follow the page; null when no terms.
+const marked = computed(() => {
+  if (!props.terms.length) return null
+  const marker = createMarker(props.terms)
+  const titleMarks = showTitle.value ? marker.mark(title.value) : null
+  const blockMarks = blocks.value.map((block) => {
+    if (block.type === 'list') return { items: listItems(block).map((item) => marker.mark(item)) }
+    if (block.type === 'table') {
+      return { rows: tableRows(block).map((row) => row.map((cell) => marker.mark(cell))) }
+    }
+    return { text: marker.mark(textOf(block)) }
+  })
+  const linkMarks = links.value.map((link) => marker.mark(link.text))
+  return {
+    title: titleMarks,
+    blocks: blockMarks,
+    links: linkMarks,
+    count: marker.count,
+    total: marker.total,
+    capped: marker.capped,
+  }
+})
+
+watch(
+  () => {
+    const m = marked.value
+    return m ? `${m.count}|${m.total}|${m.capped}` : ''
+  },
+  () => {
+    const m = marked.value
+    emit('matches', { count: m ? m.count : 0, total: m ? m.total : 0, capped: Boolean(m && m.capped) })
+  },
+  { immediate: true }
+)
+
+watch(
+  () => props.navToken,
+  () => {
+    if (props.current < 0 || !root.value) return
+    const el = root.value.querySelector(`mark[data-hl-index="${props.current}"]`)
+    if (el) el.scrollIntoView({ block: 'center', inline: 'nearest' })
+  },
+  { flush: 'post' }
+)
+
+function textOf(block) {
+  return block.text === undefined || block.text === null ? '' : String(block.text)
+}
 
 function headingLevel(level) {
   const n = Number(level)
