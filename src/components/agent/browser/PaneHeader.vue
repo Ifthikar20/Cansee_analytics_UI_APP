@@ -605,7 +605,7 @@ function artifactContext() {
   height: 32px;
   padding: 0 10px;
   border: 1px solid var(--ag-export-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-2);
   font: inherit;

@@ -593,7 +593,7 @@ function download() {
   box-sizing: border-box;
   padding: 0 6px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-3);
   font: inherit;
@@ -905,7 +905,7 @@ function download() {
   margin-top: 2px;
   padding: 0 4px;
   border: 1px solid var(--ag-changed-line);
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--ag-changed-line);
   font-size: 11px;
   line-height: 16px;
@@ -984,7 +984,7 @@ function download() {
 }
 
 .ag-st-more-btn:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

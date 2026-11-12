@@ -389,7 +389,7 @@ watch(
 }
 
 .ag-kw-cta:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -398,7 +398,7 @@ watch(
   margin: 0 16px 10px;
   padding: 8px 12px;
   border: 1px solid var(--ag-divider);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
   font-size: 12px;
   line-height: 18px;
@@ -413,7 +413,7 @@ watch(
 .ag-kw-bar {
   display: block;
   height: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-row-hover);
 }
 
@@ -502,7 +502,7 @@ watch(
 
 .ag-kw-key:focus-visible,
 .ag-kw-chat:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -552,7 +552,7 @@ watch(
   display: inline-block;
   padding: 0 5px;
   border: 1px solid var(--ag-divider);
-  border-radius: 4px;
+  border-radius: var(--radius);
   font-size: 12px;
   line-height: 18px;
   white-space: nowrap;

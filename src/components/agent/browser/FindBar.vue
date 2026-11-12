@@ -344,7 +344,7 @@ function clearKeyword() {
   height: 30px;
   padding: 0 10px 0 30px;
   border: 1px solid var(--ag-seg-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-seg-track);
   color: var(--ag-fg-1);
   font: inherit;
@@ -397,7 +397,7 @@ function clearKeyword() {
 
 .ag-find-link:focus-visible,
 .ag-find-pick:focus-visible {
-  border-radius: 6px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -410,7 +410,7 @@ function clearKeyword() {
   height: 28px;
   padding: 0 6px 0 8px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-2);
   font: inherit;
