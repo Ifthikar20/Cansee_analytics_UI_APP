@@ -409,7 +409,7 @@ onBeforeUnmount(() => {
   margin: 0 16px 8px;
   padding: 10px 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   font-size: 13px;
   line-height: 18px;

@@ -114,7 +114,7 @@ defineExpose({ focus: () => input.value?.focus() })
   height: 44px;
   padding: 0 14px 0 42px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   box-shadow: var(--ag-composer-shadow);
   color: var(--ag-fg-1);
@@ -142,7 +142,7 @@ defineExpose({ focus: () => input.value?.focus() })
   height: 44px;
   padding: 0 16px;
   border: 1px solid var(--ag-send-bg);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-send-bg);
   color: var(--ag-send-fg);
   font: inherit;
@@ -159,7 +159,7 @@ defineExpose({ focus: () => input.value?.focus() })
 }
 
 .ag-urlbar-go:focus-visible {
-  border-radius: 12px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -186,7 +186,7 @@ defineExpose({ focus: () => input.value?.focus() })
   height: 32px;
   padding: 0 10px 0 30px;
   border-color: var(--ag-btn-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-tab-bg);
   box-shadow: none;
   font-size: 13px;
@@ -205,7 +205,7 @@ defineExpose({ focus: () => input.value?.focus() })
   z-index: 2;
   padding: 6px 10px;
   border: 1px solid var(--ag-menu-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-menu-bg);
   box-shadow: var(--ag-shadow-pop);
   font-size: 12px;

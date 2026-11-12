@@ -26,7 +26,7 @@ function alignmentBandClass(score) {
 }
 
 function modelStyle(key) {
-  if (!key) return { label: 'Model', abbr: '', color: '#8b8b93' }
+  if (!key) return { label: 'Model', abbr: '', color: 'var(--viz-other)' }
   const meta = engineMeta(key)
   return { label: meta.label, abbr: meta.label.slice(0, 2), color: meta.color }
 }
@@ -187,15 +187,15 @@ useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
       <div class="flex min-w-0 flex-1 flex-col">
         <header class="flex items-center justify-between border-b border-border px-5 py-3">
           <div class="flex items-center gap-2 text-sm font-medium text-foreground">
-            <span class="flex size-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
+            <span class="flex size-5 items-center justify-center text-[10px] font-bold text-white"
               :style="{ background: modelStyle(detail?.model).color }">{{ modelStyle(detail?.model).abbr }}</span>
             {{ modelLabel }}
             <!-- The exact submodel that answered, when the row carries it
                  (per-prompt model selection). -->
-            <span v-if="detail?.model_id" class="rounded-full bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">{{ detail.model_id }}</span>
+            <span v-if="detail?.model_id" class="bg-secondary px-2 py-0.5 font-mono text-[10px] text-muted-foreground">{{ detail.model_id }}</span>
             <span v-if="detail?.country" class="ml-1 text-xs text-muted-foreground">{{ detail.country.toUpperCase() }}</span>
           </div>
-          <button type="button" class="rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close" @click="emit('close')"><X :size="18" aria-hidden="true" /></button>
+          <button type="button" class="rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Close" @click="emit('close')"><X :size="18" aria-hidden="true" /></button>
         </header>
 
         <div class="flex-1 overflow-y-auto overscroll-contain px-6 py-5">
@@ -248,7 +248,7 @@ useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
         <template v-if="detail">
           <!-- Brands (ordered by the rank the model returned) -->
           <div class="mb-5">
-            <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brands</div>
+            <div class="mb-2 text-xs font-medium font-mono uppercase tracking-wide text-muted-foreground">Brands</div>
             <div v-for="(b, i) in brandRows" :key="i"
               class="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm"
               :class="b.name === detail.brand ? 'bg-secondary' : ''">
@@ -258,7 +258,7 @@ useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
                      color alone says which highlight is which brand. -->
                 <span class="cdm-mark truncate" :class="brandMarkClass(b.name)">{{ b.name }}</span>
                 <span v-if="b.name === detail.brand"
-                  class="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">you</span>
+                  class="shrink-0 bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">you</span>
               </span>
               <span class="shrink-0 text-xs font-medium text-muted-foreground">
                 {{ b.position != null ? '#' + b.position : '—' }}
@@ -269,7 +269,7 @@ useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
 
           <!-- Generic terms the answer highlighted: context, not competitors -->
           <div v-if="infoRows.length" class="mb-5">
-            <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Information</div>
+            <div class="mb-2 text-xs font-medium font-mono uppercase tracking-wide text-muted-foreground">Information</div>
             <div class="flex flex-wrap gap-1.5 px-2">
               <span v-for="(b, i) in infoRows" :key="i"
                 class="cdm-mark cdm-mark--info text-sm">{{ b.name }}</span>
@@ -282,13 +282,13 @@ useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
 
           <!-- Similar queries (backend name: fanout) -->
           <div v-if="detail.fanout_queries?.length" class="mb-5">
-            <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Similar queries</div>
+            <div class="mb-2 text-xs font-medium font-mono uppercase tracking-wide text-muted-foreground">Similar queries</div>
             <p class="text-sm leading-relaxed text-foreground">{{ detail.fanout_queries.join('  ·  ') }}</p>
           </div>
 
           <!-- Sources -->
           <div class="mb-5">
-            <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sources</div>
+            <div class="mb-2 text-xs font-medium font-mono uppercase tracking-wide text-muted-foreground">Sources</div>
             <a v-for="(s, i) in detail.sources" :key="i" :href="safeHref(s.url)" target="_blank" rel="noopener"
               class="mb-2 flex items-start gap-2 rounded-lg px-1 py-1 hover:bg-secondary">
               <img :src="faviconFor(s.apex_domain)" alt="" class="mt-0.5 size-4 shrink-0 rounded-sm" @error="onFaviconError" />
@@ -304,9 +304,9 @@ useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
           <!-- Brand alignment: how closely this answer reflects the
                brand's own material -->
           <div>
-            <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Brand alignment</div>
+            <div class="mb-2 text-xs font-medium font-mono uppercase tracking-wide text-muted-foreground">Brand alignment</div>
             <template v-if="detail.alignment && detail.alignment.status === 'scored'">
-              <div class="mb-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-sm font-bold"
+              <div class="mb-2 inline-flex items-center gap-1.5 px-2.5 py-1 text-sm font-bold"
                 :class="alignmentBandClass(detail.alignment.score)">
                 {{ Math.round(detail.alignment.score) }} / 100
               </div>
@@ -357,52 +357,30 @@ useDialogFocus(dialogRef, () => props.open, { onEscape: () => emit('close') })
 <style>
 .cdm-mark {
   padding: 0 2px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   font-weight: 600;
 }
-.cdm-mark--own { --cdm-a: rgba(34, 197, 94, 0.55);  background: rgba(34, 197, 94, 0.18);  color: #15803d; }
-.cdm-mark--c0  { --cdm-a: rgba(245, 158, 11, 0.60); background: rgba(245, 158, 11, 0.18); color: #b45309; }
-.cdm-mark--c1  { --cdm-a: rgba(139, 92, 246, 0.55); background: rgba(139, 92, 246, 0.16); color: #6d28d9; }
-.cdm-mark--c2  { --cdm-a: rgba(14, 165, 233, 0.55); background: rgba(14, 165, 233, 0.16); color: #0369a1; }
-.cdm-mark--c3  { --cdm-a: rgba(244, 63, 94, 0.50);  background: rgba(244, 63, 94, 0.14);  color: #be123c; }
-.cdm-mark--c4  { --cdm-a: rgba(20, 184, 166, 0.55); background: rgba(20, 184, 166, 0.16); color: #0f766e; }
-.cdm-mark--c5  { --cdm-a: rgba(99, 102, 241, 0.55); background: rgba(99, 102, 241, 0.16); color: #4338ca; }
-.cdm-mark--c6  { --cdm-a: rgba(249, 115, 22, 0.55); background: rgba(249, 115, 22, 0.16); color: #c2410c; }
-.cdm-mark--c7  { --cdm-a: rgba(217, 70, 239, 0.50); background: rgba(217, 70, 239, 0.14); color: #a21caf; }
+/* Your brand wears the accent; competitors are gray fills told apart by
+   the legend swatch (a weight ramp) and by their names. */
+.cdm-mark--own { --cdm-a: var(--signal); background: var(--signal-soft); color: var(--signal-text); }
+.cdm-mark--c0, .cdm-mark--c1, .cdm-mark--c2, .cdm-mark--c3,
+.cdm-mark--c4, .cdm-mark--c5, .cdm-mark--c6, .cdm-mark--c7 { background: var(--muted); color: var(--foreground); }
+.cdm-mark--c0 { --cdm-a: var(--viz-cat-1); }
+.cdm-mark--c1 { --cdm-a: var(--viz-cat-2); }
+.cdm-mark--c2 { --cdm-a: var(--viz-cat-3); }
+.cdm-mark--c3 { --cdm-a: var(--viz-cat-4); }
+.cdm-mark--c4 { --cdm-a: var(--viz-cat-5); }
+.cdm-mark--c5 { --cdm-a: var(--viz-cat-6); }
+.cdm-mark--c6 { --cdm-a: var(--viz-cat-7); }
+.cdm-mark--c7 { --cdm-a: var(--viz-cat-8); }
 /* Informational terms: neutral dotted underline, no colored fill — they
    must never read as competitor brands. */
 .cdm-mark--info {
-  --cdm-a: rgba(113, 113, 122, 0.6);
+  --cdm-a: var(--bar);
   background: transparent;
-  border-bottom: 1px dotted rgba(113, 113, 122, 0.75);
+  border-bottom: 1px dotted var(--muted-foreground);
   border-radius: 0;
-  color: #52525b;
+  color: var(--muted-foreground);
   font-weight: 500;
-}
-
-[data-theme='dark'] .cdm-mark--own { background: rgba(34, 197, 94, 0.24);  color: #86efac; }
-[data-theme='dark'] .cdm-mark--c0  { background: rgba(245, 158, 11, 0.24); color: #fcd34d; }
-[data-theme='dark'] .cdm-mark--c1  { background: rgba(139, 92, 246, 0.26); color: #c4b5fd; }
-[data-theme='dark'] .cdm-mark--c2  { background: rgba(14, 165, 233, 0.24); color: #7dd3fc; }
-[data-theme='dark'] .cdm-mark--c3  { background: rgba(244, 63, 94, 0.24);  color: #fda4af; }
-[data-theme='dark'] .cdm-mark--c4  { background: rgba(20, 184, 166, 0.24); color: #5eead4; }
-[data-theme='dark'] .cdm-mark--c5  { background: rgba(99, 102, 241, 0.26); color: #a5b4fc; }
-[data-theme='dark'] .cdm-mark--c6  { background: rgba(249, 115, 22, 0.24); color: #fdba74; }
-[data-theme='dark'] .cdm-mark--c7  { background: rgba(217, 70, 239, 0.24); color: #f0abfc; }
-[data-theme='dark'] .cdm-mark--info {
-  background: transparent;
-  border-bottom-color: rgba(161, 161, 170, 0.6);
-  color: #a1a1aa;
-}
-
-/* Legend swatches: solid version of the same palette. Declared last so
-   its background wins over the color classes at equal specificity; the
-   dark-scoped rule matches the dark overrides' higher specificity. */
-.cdm-swatch {
-  display: inline-block;
-  background: var(--cdm-a);
-}
-[data-theme='dark'] .cdm-swatch {
-  background: var(--cdm-a);
 }
 </style>

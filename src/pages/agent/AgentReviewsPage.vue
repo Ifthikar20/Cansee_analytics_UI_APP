@@ -163,7 +163,7 @@ const current = computed(() => REVIEW_BOXES.find((b) => b.key === box.value) || 
   height: 30px;
   padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-2);
   font: inherit;
@@ -185,7 +185,7 @@ const current = computed(() => REVIEW_BOXES.find((b) => b.key === box.value) || 
 }
 
 .ag-revs-tab:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 1px;
 }
@@ -197,7 +197,7 @@ const current = computed(() => REVIEW_BOXES.find((b) => b.key === box.value) || 
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   list-style: none;
 }
 
@@ -235,7 +235,7 @@ const current = computed(() => REVIEW_BOXES.find((b) => b.key === box.value) || 
 }
 
 .ag-rev-main:focus-visible {
-  border-radius: 10px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: -3px;
 }
@@ -248,7 +248,7 @@ const current = computed(() => REVIEW_BOXES.find((b) => b.key === box.value) || 
   width: 30px;
   height: 30px;
   border: 1px solid var(--ag-iconbox-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .ag-rev-text {
@@ -303,7 +303,7 @@ const current = computed(() => REVIEW_BOXES.find((b) => b.key === box.value) || 
 
 .ag-skel {
   display: block;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-row-hover);
   animation: ag-pulse 1.4s ease-in-out infinite;
 }

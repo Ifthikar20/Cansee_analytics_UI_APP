@@ -30,7 +30,7 @@ defineProps({
   gap: 6px;
   padding: 48px 24px;
   border: 1px dashed var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   text-align: center;
 }
 
@@ -41,7 +41,7 @@ defineProps({
   height: 36px;
   margin-bottom: 6px;
   border: 1px solid var(--ag-iconbox-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
 }
 

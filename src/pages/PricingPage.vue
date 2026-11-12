@@ -132,7 +132,7 @@ onMounted(() => {
   height: 36px;
   padding: 0 16px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--foreground);
   font-size: 14px;
   font-weight: 600;
@@ -143,7 +143,7 @@ onMounted(() => {
 }
 
 .pp-signin:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 .pp-main {

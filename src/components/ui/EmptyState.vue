@@ -29,7 +29,7 @@ function go() {
 <template>
   <div
     class="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center"
-    :class="variant === 'panel' ? 'rounded-2xl border border-dashed border-border bg-card' : ''"
+    :class="variant === 'panel' ? 'border border-dashed border-input' : ''"
   >
     <p class="text-sm font-semibold text-foreground">{{ title }}</p>
     <p v-if="body" class="max-w-md text-[12px] leading-relaxed text-muted-foreground">

@@ -83,7 +83,7 @@ defineExpose({ focus: () => inputEl.value?.focus() })
   height: 38px;
   padding: 0 36px 0 38px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -104,7 +104,7 @@ defineExpose({ focus: () => inputEl.value?.focus() })
 
 .ag-search-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 10px;
+  border-radius: var(--radius);
   outline: none;
 }
 
@@ -116,7 +116,7 @@ defineExpose({ focus: () => inputEl.value?.focus() })
   width: 26px;
   height: 26px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-3);
   cursor: pointer;
@@ -128,7 +128,7 @@ defineExpose({ focus: () => inputEl.value?.focus() })
 }
 
 .ag-search-clear:focus-visible {
-  border-radius: 6px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 0;
 }

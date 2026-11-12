@@ -116,9 +116,9 @@ function confirmStop() {
             <LoaderCircle class="irp-spin" aria-hidden="true" />
             Stopping...
           </span>
-          <Button v-else variant="outline" size="sm" class="rounded-full" @click="confirmOpen = true">Stop</Button>
+          <Button v-else variant="outline" size="sm" @click="confirmOpen = true">Stop</Button>
         </template>
-        <Button v-else variant="ghost" size="sm" class="rounded-full" @click="emit('dismiss')">Dismiss</Button>
+        <Button v-else variant="ghost" size="sm" @click="emit('dismiss')">Dismiss</Button>
       </div>
     </div>
 
@@ -156,10 +156,10 @@ function confirmStop() {
           </AlertDialogDescription>
           <div class="irp-confirm-actions">
             <AlertDialogCancel as-child>
-              <Button variant="outline" class="rounded-full">Keep running</Button>
+              <Button variant="outline">Keep running</Button>
             </AlertDialogCancel>
             <AlertDialogAction as-child>
-              <Button variant="destructive" class="rounded-full" @click="confirmStop">Stop</Button>
+              <Button variant="destructive" @click="confirmStop">Stop</Button>
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
@@ -174,7 +174,7 @@ function confirmStop() {
   gap: 10px;
   padding: 18px 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -240,14 +240,14 @@ function confirmStop() {
   position: relative;
   height: 8px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--muted);
 }
 
 .irp-fill {
   position: absolute;
   inset: 0 auto 0 0;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--gap-ai);
   transition: width 0.3s ease;
 }
@@ -283,7 +283,7 @@ function confirmStop() {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(10, 10, 12, 0.45);
+  background: var(--scrim);
 }
 
 .irp-confirm {
@@ -294,9 +294,9 @@ function confirmStop() {
   width: min(420px, calc(100vw - 32px));
   padding: 22px 24px 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--popover);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
   transform: translate(-50%, -50%);
   outline: none;
 }

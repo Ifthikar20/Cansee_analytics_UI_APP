@@ -139,7 +139,7 @@ onBeforeUnmount(() => clearTimeout(prefetchTimer))
   width: 6px;
   height: 6px;
   border: 1.5px solid var(--ag-sidebar-bg);
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--ag-accent);
   box-sizing: content-box;
   pointer-events: none;

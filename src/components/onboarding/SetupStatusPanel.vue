@@ -264,7 +264,7 @@ defineExpose({ show })
   margin: 0 0 16px;
   padding: 12px 16px 14px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-pane-bg);
   color: var(--ag-fg-1);
 }
@@ -321,7 +321,7 @@ defineExpose({ show })
 }
 
 .ss-title:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -508,7 +508,7 @@ defineExpose({ show })
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--ag-fg-1);
   font-size: 12px;
   font-weight: 500;
@@ -575,7 +575,7 @@ defineExpose({ show })
 .ss-issue-setting code {
   padding: 0 4px;
   border: 1px solid var(--ag-code-border);
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--ag-inline-code-bg);
   font-family: var(--ag-font-mono);
   font-size: 11px;

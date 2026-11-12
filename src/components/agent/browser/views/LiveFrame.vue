@@ -93,7 +93,7 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100%;
   height: 100%;
-  background: #ffffff;
+  background: var(--white);
 }
 
 .ag-live-frame {
@@ -101,7 +101,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   border: 0;
-  background: #ffffff;
+  background: var(--white);
 }
 
 .ag-live-veil {

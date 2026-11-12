@@ -77,7 +77,7 @@
 
     <main class="lp-main lp-wrap">
       <!-- ═══ Hero ═══ -->
-      <GradientCard class="lp-hero">
+      <div class="lp-hero cs-card cs-contrast">
         <div class="lp-hero-inner">
           <router-link to="/docs#engines" class="lp-pill">
             <span class="lp-pill-long">ChatGPT · Claude · Gemini · Grok · Perplexity</span>
@@ -104,7 +104,7 @@
             <router-link to="/docs" class="lp-btn lp-btn--ghost">Read the docs</router-link>
           </div>
         </div>
-      </GradientCard>
+      </div>
 
       <div class="lp-rule lp-rule--hero" aria-hidden="true"></div>
 
@@ -153,7 +153,6 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ArrowRight, ChevronsUpDown, Menu, X } from '@lucide/vue'
-import GradientCard from '@/components/GradientCard.vue'
 import { useForcedTheme } from '@/composables/useForcedTheme'
 
 useForcedTheme('dark')
@@ -260,13 +259,15 @@ function renewCookieConsent() {
 
 <style scoped>
 .lp {
-  --lp-bg: #0a0a0c;
-  --lp-ink: #f5f5f7;
-  --lp-muted: rgba(245, 245, 247, 0.6);
-  --lp-faint: rgba(245, 245, 247, 0.42);
-  --lp-line: rgba(255, 255, 255, 0.13);
-  --lp-panel: #121216;
-  --lp-lavender: #c4b5fd;
+  /* The page wears the app tokens (it is forced dark): black page, a
+     light hero card, ink and grays, the accent on the eyebrows only. */
+  --lp-bg: var(--background);
+  --lp-ink: var(--foreground);
+  --lp-muted: var(--muted-foreground);
+  --lp-faint: var(--subtle-foreground);
+  --lp-line: var(--border);
+  --lp-panel: var(--card);
+  --lp-accent: var(--signal-text);
 
   display: flex;
   flex-direction: column;
@@ -289,11 +290,11 @@ function renewCookieConsent() {
 .lp-burger:focus-visible,
 .lp-pill:focus-visible,
 .lp-btn:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 .lp-dd-item:focus-visible {
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .lp-wrap {
@@ -322,8 +323,8 @@ function renewCookieConsent() {
   display: block;
   height: 22px;
   width: auto;
-  /* The wordmark ships dark slate; render it white on the dark page. */
-  filter: brightness(0) invert(1);
+  /* The wordmark ships dark slate; the token renders it in the page ink. */
+  filter: var(--logo-filter);
 }
 
 .lp-links {
@@ -345,7 +346,7 @@ function renewCookieConsent() {
   gap: 6px;
   padding: 8px 14px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: none;
   color: var(--lp-ink);
   font: inherit;
@@ -357,8 +358,8 @@ function renewCookieConsent() {
 
 .lp-link:hover,
 .lp-link[aria-expanded='true'] {
-  background: rgba(255, 255, 255, 0.07);
-  color: #ffffff;
+  background: var(--muted);
+  color: var(--foreground);
 }
 
 .lp-link-caret {
@@ -383,10 +384,10 @@ function renewCookieConsent() {
   position: absolute;
   inset: 10px 0 0;
   z-index: -1;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   background: var(--lp-panel);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  box-shadow: none;
 }
 
 .lp-dd-item {
@@ -395,17 +396,17 @@ function renewCookieConsent() {
   gap: 2px;
   margin: 6px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   transition: background 0.15s ease;
 }
 
 .lp-dd-item:hover,
 .lp-dd-item:focus-visible {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--muted);
 }
 
 .lp-dd-label {
-  color: #ffffff;
+  color: var(--foreground);
   font-size: 14px;
   font-weight: 600;
 }
@@ -428,18 +429,18 @@ function renewCookieConsent() {
   align-items: center;
   height: 44px;
   padding: 0 22px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  background: #141418;
-  color: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--foreground);
   font-size: 15px;
   font-weight: 600;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .lp-start:hover {
-  background: #1d1d23;
-  border-color: rgba(255, 255, 255, 0.28);
+  background: var(--muted);
+  border-color: var(--input);
 }
 
 /* Pricing, beside Sign in: a plain text link. */
@@ -455,11 +456,11 @@ function renewCookieConsent() {
 }
 
 .lp-pricing:hover {
-  color: #ffffff;
+  color: var(--foreground);
 }
 
 .lp-pricing:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 .lp-burger {
@@ -467,10 +468,10 @@ function renewCookieConsent() {
   width: 44px;
   height: 44px;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  background: #141418;
-  color: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--foreground);
   cursor: pointer;
 }
 
@@ -487,10 +488,10 @@ function renewCookieConsent() {
   display: grid;
   gap: 4px;
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   background: var(--lp-panel);
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  box-shadow: none;
 }
 
 .lp-sheet-group {
@@ -499,34 +500,34 @@ function renewCookieConsent() {
 }
 
 .lp-sheet-group + .lp-sheet-group {
-  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-top: 1px solid var(--border);
 }
 
 .lp-sheet-label {
   padding: 6px 12px 4px;
   color: var(--lp-faint);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.08em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
 }
 
 .lp-sheet a {
   padding: 9px 12px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   color: var(--lp-ink);
   font-size: 15px;
 }
 
 .lp-sheet a:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--muted);
 }
 
-/* Dashed hairline: 12px dash, 20px gap. */
+/* Hairline rule. */
 .lp-rule {
   height: 1px;
-  background-image: linear-gradient(90deg, var(--lp-line) 0 12px, transparent 12px 32px);
-  background-size: 32px 1px;
+  background: var(--lp-line);
 }
 
 /* ── Hero ── */
@@ -553,20 +554,18 @@ function renewCookieConsent() {
   align-items: center;
   gap: 14px;
   padding: 5px 5px 5px 20px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
+  border: 1px solid var(--input);
+  border-radius: var(--radius);
+  background: var(--muted);
+  color: var(--foreground);
   font-size: 15px;
   font-weight: 500;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .lp-pill:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.7);
+  background: var(--muted);
+  border-color: var(--input);
 }
 
 .lp-pill-short {
@@ -578,9 +577,9 @@ function renewCookieConsent() {
   place-items: center;
   width: 32px;
   height: 32px;
-  border-radius: 50%;
-  background: #ffffff;
-  color: #4b3bb4;
+  border-radius: 0;
+  background: var(--signal);
+  color: var(--signal-foreground);
   transition: transform 0.2s ease;
 }
 
@@ -596,9 +595,10 @@ function renewCookieConsent() {
 .lp-title {
   max-width: 1120px;
   margin: 28px auto 0;
-  color: #ffffff;
+  color: var(--foreground);
   font-size: clamp(2.3rem, 4.5vw, 4.25rem);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 500;
   line-height: 1.04;
   letter-spacing: -0.04em;
   text-wrap: balance;
@@ -607,7 +607,7 @@ function renewCookieConsent() {
 .lp-sub {
   max-width: 47rem;
   margin: 20px auto 0;
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--foreground);
   font-size: clamp(1.02rem, 1.3vw, 1.2rem);
   line-height: 1.65;
   text-wrap: pretty;
@@ -628,7 +628,7 @@ function renewCookieConsent() {
   gap: 10px;
   height: 54px;
   padding: 0 28px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-size: 17px;
   font-weight: 600;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
@@ -639,24 +639,25 @@ function renewCookieConsent() {
 }
 
 .lp-btn--solid {
-  background: #ffffff;
-  color: #111114;
+  border: 1px solid var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
 .lp-btn--solid:hover {
-  background: #ececf0;
-  color: #111114;
+  background: transparent;
+  color: var(--primary);
 }
 
 .lp-btn--ghost {
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  color: #ffffff;
+  border: 1px solid var(--input);
+  color: var(--foreground);
 }
 
 .lp-btn--ghost:hover {
-  border-color: #ffffff;
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  border-color: var(--foreground);
+  background: var(--muted);
+  color: var(--foreground);
 }
 
 .lp-btn-icon {
@@ -682,11 +683,9 @@ function renewCookieConsent() {
   padding-top: 18px;
 }
 
-/* Dot-grid corners, echoing the dashed rules. */
+/* Empty gutters either side of the pitch copy. */
 .lp-dots {
   height: 56px;
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.2) 1px, transparent 1.6px);
-  background-size: 14px 14px;
 }
 
 .lp-pitch-copy {
@@ -694,10 +693,11 @@ function renewCookieConsent() {
 }
 
 .lp-eyebrow {
-  color: var(--lp-lavender);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.12em;
+  color: var(--lp-accent);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -736,20 +736,19 @@ function renewCookieConsent() {
   bottom: 6px;
   left: 0;
   width: 1px;
-  background-image: linear-gradient(180deg, var(--lp-line) 0 6px, transparent 6px 14px);
-  background-size: 1px 14px;
+  background: var(--lp-line);
 }
 
 .lp-step-num {
-  color: var(--lp-lavender);
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  color: var(--lp-faint);
+  font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.08em;
 }
 
 .lp-step-title {
   margin-top: 8px;
-  color: #ffffff;
+  color: var(--foreground);
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -798,7 +797,7 @@ function renewCookieConsent() {
 
 .lp-foot-links a:hover,
 .lp-foot-btn:hover {
-  color: #ffffff;
+  color: var(--foreground);
 }
 
 /* ── Motion ── */

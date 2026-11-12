@@ -58,7 +58,7 @@ function analyze() {
   height: 30px;
   padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -74,6 +74,6 @@ function analyze() {
 }
 
 .cov-btn:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 </style>

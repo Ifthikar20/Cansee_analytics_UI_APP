@@ -140,7 +140,7 @@ defineExpose({ startRename })
   box-sizing: border-box;
   height: 34px;
   padding: 0 8px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
   font-size: 14px;
   font-weight: 500;
@@ -167,7 +167,7 @@ defineExpose({ startRename })
 }
 
 .ag-rc-link:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: -2px;
 }
@@ -201,7 +201,7 @@ defineExpose({ startRename })
   width: 6px;
   height: 6px;
   margin-right: 2px;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--ag-accent);
 }
 
@@ -225,7 +225,7 @@ defineExpose({ startRename })
   margin-right: -4px;
   padding: 0 6px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -236,7 +236,7 @@ defineExpose({ startRename })
 
 .ag-rc-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 6px;
+  border-radius: var(--radius);
   outline: none;
 }
 

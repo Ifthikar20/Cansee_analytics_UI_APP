@@ -103,7 +103,7 @@ const subtitle = computed(() => {
   min-height: 64px;
   padding: 10px 16px 10px 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: transparent;
 }
 
@@ -114,7 +114,7 @@ const subtitle = computed(() => {
   height: 30px;
   flex-shrink: 0;
   border: 1px solid var(--ag-iconbox-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .ag-card-icon :deep(svg) {
@@ -160,7 +160,7 @@ const subtitle = computed(() => {
   height: 30px;
   padding: 0 8px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-btn-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -178,6 +178,6 @@ const subtitle = computed(() => {
 .ag-card-open:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 </style>

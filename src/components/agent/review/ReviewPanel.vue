@@ -254,7 +254,7 @@ async function sendComment() {
   min-height: 56px;
   padding: 6px 10px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -266,7 +266,7 @@ async function sendComment() {
 
 .ag-rp-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: none;
 }
 

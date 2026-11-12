@@ -2,17 +2,20 @@ import { cva } from 'class-variance-authority'
 
 export { default as Badge } from './Badge.vue'
 
+// Badges are small monospace labels in a square box. State is carried by
+// weight and by the word, not by hue: "success" is an ink outline,
+// "warning" and "destructive" wear the accent.
 export const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors',
+  'inline-flex items-center border px-2 py-0.5 font-mono text-[11px] font-medium uppercase leading-4 tracking-[0.06em] transition-colors',
   {
     variants: {
       variant: {
-        default: 'border-transparent bg-primary text-primary-foreground',
+        default: 'border-primary bg-primary text-primary-foreground',
         secondary: 'border-transparent bg-secondary text-secondary-foreground',
-        destructive: 'border-transparent bg-destructive text-destructive-foreground',
-        outline: 'text-foreground',
-        success: 'border-transparent bg-[color:var(--chart-2)]/15 text-[color:var(--chart-2)]',
-        warning: 'border-transparent bg-[color:var(--chart-3)]/15 text-[color:var(--chart-3)]',
+        destructive: 'border-destructive bg-destructive text-destructive-foreground',
+        outline: 'border-input text-foreground',
+        success: 'border-foreground bg-transparent text-foreground',
+        warning: 'border-transparent bg-signal-soft text-signal-text',
       },
     },
     defaultVariants: {

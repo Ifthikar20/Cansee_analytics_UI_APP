@@ -5,13 +5,13 @@
   <div v-else class="an-entry">
     <section v-if="state === 'failed'" class="an-entry-state" role="alert">
       <p class="an-entry-title">We couldn't load your projects.</p>
-      <Button variant="outline" class="an-entry-btn rounded-full" @click="settle({ force: true })">Try again</Button>
+      <Button variant="outline" class="an-entry-btn" @click="settle({ force: true })">Try again</Button>
     </section>
 
     <section v-else-if="state === 'empty'" class="an-entry-state">
       <p class="an-entry-title">No project selected.</p>
       <p class="an-entry-sub">Add a project to start tracking prompts.</p>
-      <Button class="an-entry-btn rounded-full" @click="showAddProject = true">
+      <Button class="an-entry-btn" @click="showAddProject = true">
         <Plus class="size-4" />
         Add project
       </Button>
@@ -131,7 +131,7 @@ watch(
   gap: 6px;
   padding: 28px 30px;
   border: 1px dashed var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 

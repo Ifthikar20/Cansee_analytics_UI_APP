@@ -408,7 +408,7 @@ function submit() {
   min-height: 36px;
   padding: 7px 11px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -419,7 +419,7 @@ function submit() {
 
 .ag-rp-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: none;
 }
 
@@ -463,14 +463,14 @@ function submit() {
   padding: 4px;
   overflow-y: auto;
   border: 1px solid var(--ag-menu-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-menu-bg);
   list-style: none;
 }
 
 .ag-rp-option {
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   color: var(--ag-fg-1);
   font-size: 13px;
   line-height: 18px;

@@ -134,7 +134,7 @@ watch(
   padding: 12px 14px;
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--muted);
   color: var(--foreground);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -151,7 +151,7 @@ watch(
 }
 
 .px-btn {
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .px-error {

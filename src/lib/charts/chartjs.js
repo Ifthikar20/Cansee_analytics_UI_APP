@@ -1,7 +1,7 @@
 // Chart.js configuration for the canvas representations (line, area, bar,
 // hbar, stacked bar, donut), built from a normalized ChartSpec with the
 // house mark specs: 2px round lines with a ringed dot on the last point,
-// 10% area washes, bars at most 24px thick with a 4px rounded data end and
+// 10% area washes, bars at most 24px thick with square ends and
 // a 2px surface gap between touching marks, hairline solid gridlines on
 // the value axis only, at most five value ticks, no animation.
 //
@@ -356,7 +356,7 @@ export function buildChartConfig(
         borderColor: surfaceColor,
         hoverBorderColor: surfaceColor,
         borderWidth: gap,
-        borderRadius: 4,
+        borderRadius: 0,
         borderSkipped: 'start',
         maxBarThickness: 24,
         barPercentage: 1,

@@ -75,7 +75,7 @@ function choose(version) {
   height: 32px;
   padding: 0 6px 0 10px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-2);
   font: inherit;
@@ -97,7 +97,7 @@ function choose(version) {
 }
 
 .ag-ver:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

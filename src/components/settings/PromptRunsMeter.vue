@@ -77,7 +77,7 @@ const engines = computed(() => {
 .prm {
   margin-bottom: 16px;
   padding: 16px 18px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--muted);
 }
@@ -91,16 +91,15 @@ const engines = computed(() => {
 }
 .prm-title { font-size: 13px; font-weight: 600; color: var(--foreground); }
 .prm-amt { font-size: 13px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
-.prm-bar { height: 8px; overflow: hidden; border-radius: 999px; background: var(--border); }
+.prm-bar { height: 8px; overflow: hidden; border-radius: var(--radius); background: var(--border); }
 .prm-bar-fill { height: 100%; border-radius: inherit; background: var(--chart-2); transition: width 200ms ease; }
 .is-warn .prm-bar-fill { background: var(--chart-5); }
 .is-exceeded .prm-bar-fill { background: var(--destructive); }
 .prm-note { margin: 10px 0 0; font-size: 12px; color: var(--muted-foreground); }
 .prm-note + .prm-note { margin-top: 4px; }
 .prm-flag { margin: 8px 0 0; font-size: 12px; font-weight: 600; }
-.prm-flag.is-warn { color: #b25e09; }
+.prm-flag.is-warn { color: var(--signal-text); }
 .prm-flag.is-exceeded { color: var(--destructive); }
-:global([data-theme='dark']) .prm-flag.is-warn { color: #f0a54a; }
 @media (prefers-reduced-motion: reduce) {
   .prm-bar-fill { transition: none; }
 }

@@ -110,7 +110,7 @@ function sourceState(source) {
 }
 
 .ag-cmv-scroll:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

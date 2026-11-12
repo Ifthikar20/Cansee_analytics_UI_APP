@@ -39,7 +39,7 @@ const emit = defineEmits(['stop'])
   height: 30px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--ag-send-bg);
   color: var(--ag-send-fg);
   cursor: pointer;
@@ -77,6 +77,6 @@ const emit = defineEmits(['stop'])
 .ag-send:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 </style>

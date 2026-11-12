@@ -80,7 +80,7 @@ function onDocs(event, faq) {
   width: 100%;
   padding: 11px 2px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--foreground);
   font: inherit;

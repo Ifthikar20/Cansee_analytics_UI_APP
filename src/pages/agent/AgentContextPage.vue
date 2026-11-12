@@ -570,7 +570,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--ag-accent) 35%, transparent);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--ag-accent) 6%, transparent);
   color: var(--ag-fg-1);
   font-size: 14px;
@@ -590,7 +590,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
   height: 30px;
   padding: 0 8px;
   border: 1px solid var(--ag-send-bg);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-send-bg);
   color: var(--ag-send-fg);
   font: inherit;
@@ -603,7 +603,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload)
 }
 
 .ag-ctx-build-off:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

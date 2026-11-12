@@ -212,7 +212,7 @@ function retry() {
   height: 24px;
   padding: 0 8px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-btn-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -226,7 +226,7 @@ function retry() {
 }
 
 .ag-artv-notice-btn:focus-visible {
-  border-radius: 6px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

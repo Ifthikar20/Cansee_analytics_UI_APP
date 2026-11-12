@@ -192,19 +192,19 @@ const lastIngestedLabel = computed(
       <!-- Metadata grid -->
       <dl class="grid grid-cols-2 gap-4 text-sm">
         <div>
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Chunks</dt>
+          <dt class="text-[10px] font-medium font-mono uppercase tracking-wider text-muted-foreground">Chunks</dt>
           <dd class="mt-1 tabular-nums text-foreground">{{ source.chunk_count || 0 }}</dd>
         </div>
         <div>
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Last ingested</dt>
+          <dt class="text-[10px] font-medium font-mono uppercase tracking-wider text-muted-foreground">Last ingested</dt>
           <dd class="mt-1 text-foreground">{{ lastIngestedLabel }}</dd>
         </div>
         <div>
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Added</dt>
+          <dt class="text-[10px] font-medium font-mono uppercase tracking-wider text-muted-foreground">Added</dt>
           <dd class="mt-1 text-foreground">{{ timeAgo(source.created_at) }}</dd>
         </div>
         <div v-if="source.domain">
-          <dt class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Domain</dt>
+          <dt class="text-[10px] font-medium font-mono uppercase tracking-wider text-muted-foreground">Domain</dt>
           <dd class="mt-1 truncate text-foreground">{{ source.domain }}</dd>
         </div>
       </dl>

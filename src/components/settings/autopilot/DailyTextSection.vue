@@ -289,7 +289,7 @@ async function sendTest() {
   height: 22px;
   margin: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--input);
   cursor: pointer;
   transition: background-color 160ms ease;
@@ -302,14 +302,14 @@ async function sendTest() {
   left: 3px;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--background);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  box-shadow: none;
   transition: transform 160ms ease;
 }
 
 [data-theme='dark'] .dt-switch:not(:checked) {
-  background: rgba(255, 255, 255, 0.32);
+  background: var(--bar);
 }
 
 .dt-switch:checked {
@@ -326,7 +326,7 @@ async function sendTest() {
 }
 
 .dt-switch:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
@@ -348,7 +348,7 @@ async function sendTest() {
   max-width: 100%;
   padding: 0 10px;
   border: 1px solid var(--input);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -357,7 +357,7 @@ async function sendTest() {
 
 .dt-select:focus-visible {
   border-color: var(--ring);
-  border-radius: 10px;
+  border-radius: var(--radius);
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 16%, transparent);
 }
@@ -373,7 +373,7 @@ async function sendTest() {
   gap: 8px;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--muted);
 }
 
@@ -455,7 +455,7 @@ async function sendTest() {
   padding: 10px 14px;
   border-left: 3px solid var(--border);
   background: var(--muted);
-  border-radius: 0 10px 10px 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
   color: var(--foreground);
   font-size: 13.5px;
   line-height: 1.55;
@@ -473,7 +473,7 @@ async function sendTest() {
 .dt-btn {
   height: 36px;
   padding: 0 16px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13px;
 }
 </style>

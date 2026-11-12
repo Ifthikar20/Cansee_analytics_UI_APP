@@ -49,7 +49,7 @@ const columns = BENCHMARK_BOTS
 }
 
 .cbt-scroll:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .cbt-table {

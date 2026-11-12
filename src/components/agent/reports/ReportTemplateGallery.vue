@@ -192,7 +192,7 @@ const cardId = (t, part) => `ag-rtg-${uid}-${t.id}-${part}`
   height: 28px;
   padding: 0 8px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-2);
   font: inherit;
@@ -233,7 +233,7 @@ const cardId = (t, part) => `ag-rtg-${uid}-${t.id}-${part}`
   margin: 0 0 12px;
   padding: 8px 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
   font-size: 13px;
   line-height: 19px;
@@ -252,7 +252,7 @@ const cardId = (t, part) => `ag-rtg-${uid}-${t.id}-${part}`
 }
 
 .ag-rtg-retry:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -279,7 +279,7 @@ const cardId = (t, part) => `ag-rtg-${uid}-${t.id}-${part}`
   min-width: 0;
   padding: 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .ag-rtg-card:focus-within {
@@ -318,7 +318,7 @@ const cardId = (t, part) => `ag-rtg-${uid}-${t.id}-${part}`
 .ag-rtg-badge {
   padding: 1px 7px;
   border: 1px solid var(--ag-tab-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-tab-bg);
   color: var(--ag-fg-2);
   font-size: 12px;
@@ -358,7 +358,7 @@ const cardId = (t, part) => `ag-rtg-${uid}-${t.id}-${part}`
 
 .ag-rtg-skel {
   display: block;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-row-hover);
   animation: ag-pulse 1.4s ease-in-out infinite;
 }

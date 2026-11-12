@@ -64,7 +64,7 @@ const quote = computed(() => (props.reference.quote ? `"${props.reference.quote}
   box-sizing: border-box;
   padding: 2px 8px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: var(--ag-pane-bg);
   color: var(--ag-fg-2);
   font-size: 12.5px;
@@ -80,7 +80,7 @@ const quote = computed(() => (props.reference.quote ? `"${props.reference.quote}
 }
 
 .ag-ref-label[tabindex]:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -112,7 +112,7 @@ const quote = computed(() => (props.reference.quote ? `"${props.reference.quote}
 }
 
 .ag-ref-label.is-link:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -132,7 +132,7 @@ const quote = computed(() => (props.reference.quote ? `"${props.reference.quote}
   margin-right: -4px;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-3);
   cursor: pointer;

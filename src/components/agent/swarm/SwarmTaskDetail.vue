@@ -456,7 +456,7 @@ async function rerun() {
   margin: 2px 8px 6px 68px;
   padding: 10px 12px;
   border: 1px solid var(--ag-code-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-code-bg);
   color: var(--ag-fg-2);
 }
@@ -551,7 +551,7 @@ async function rerun() {
   align-items: center;
   padding: 0 6px;
   border: 1px solid currentColor;
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: 11px;
   font-weight: 500;
   line-height: 16px;
@@ -576,7 +576,7 @@ async function rerun() {
 .ag-swarm-chip {
   padding: 0 6px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   color: var(--ag-fg-3);
   font-size: 12px;
   line-height: 18px;
@@ -611,7 +611,7 @@ async function rerun() {
 }
 
 .ag-swarm-link:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -639,7 +639,7 @@ async function rerun() {
   flex-shrink: 0;
   padding: 0 6px;
   border: 1px solid currentColor;
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: 11px;
   font-weight: 500;
   line-height: 16px;

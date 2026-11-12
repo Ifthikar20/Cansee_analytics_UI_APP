@@ -190,7 +190,7 @@ function setVersion(next) {
 .ag-stv-bar {
   display: block;
   height: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-row-hover);
 }
 </style>

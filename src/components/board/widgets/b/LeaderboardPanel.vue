@@ -78,7 +78,7 @@ function openCompetitors(event) {
 }
 
 .lbp-link:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }

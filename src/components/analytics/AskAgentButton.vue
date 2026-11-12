@@ -59,7 +59,7 @@ async function ask() {
   height: 30px;
   padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--foreground);
   font: inherit;
@@ -80,7 +80,7 @@ async function ask() {
 }
 
 .ask-btn:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .ask-btn-icon {

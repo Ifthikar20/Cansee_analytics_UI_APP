@@ -393,7 +393,7 @@ watch(
 }
 
 .pbp-question:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -527,7 +527,7 @@ watch(
 }
 
 .pbp-link:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 1px;
 }
@@ -564,7 +564,7 @@ watch(
   width: 100%;
   padding: 8px 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: inherit;
   font: inherit;

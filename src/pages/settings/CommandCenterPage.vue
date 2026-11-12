@@ -229,7 +229,7 @@ function timeAgo(iso) {
 }
 
 .cc-alert {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .cc-retry {
@@ -249,7 +249,7 @@ function timeAgo(iso) {
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -264,7 +264,7 @@ function timeAgo(iso) {
 }
 
 .cc-table-wrap:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }

@@ -41,13 +41,13 @@ const kind = computed(() => (KINDS.has(props.status) ? props.status : 'queued'))
   width: 6px;
   height: 6px;
   border: 1px solid var(--ag-fg-disabled);
-  border-radius: 999px;
+  border-radius: 50%;
 }
 
 .ag-swarm-mark-dot {
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--ag-fg-4);
 }
 

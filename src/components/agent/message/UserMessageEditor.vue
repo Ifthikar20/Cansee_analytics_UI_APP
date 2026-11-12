@@ -80,7 +80,7 @@ onMounted(async () => {
   width: 100%;
   padding: 12px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
 }
 

@@ -262,7 +262,7 @@ watch(websiteId, loadStatus, { immediate: true })
 .cn-btn {
   height: 36px;
   padding: 0 16px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13px;
 }
 </style>

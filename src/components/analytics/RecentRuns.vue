@@ -144,7 +144,7 @@ const hideUsd = useHideUsd()
 .rr-chip {
   padding: 2px 9px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--foreground);
   font-size: 12px;
   font-weight: 500;

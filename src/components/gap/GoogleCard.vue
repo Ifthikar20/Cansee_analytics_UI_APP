@@ -119,7 +119,7 @@ function shortUrl(url) {
   gap: 16px;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -143,9 +143,9 @@ function shortUrl(url) {
   place-items: center;
   width: 22px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--gap-google);
-  color: #ffffff;
+  color: var(--background);
   font-size: 12px;
   font-weight: 700;
 }
@@ -207,8 +207,9 @@ function shortUrl(url) {
 .gc-sub {
   color: var(--muted-foreground);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.06em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
 }
 
@@ -225,7 +226,7 @@ function shortUrl(url) {
   align-items: center;
   gap: 10px;
   padding: 5px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-size: 13px;
 }
 
@@ -253,7 +254,7 @@ function shortUrl(url) {
   margin-left: auto;
   padding: 1px 7px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 600;
@@ -262,7 +263,7 @@ function shortUrl(url) {
 .gc-tag-you {
   border-color: transparent;
   background: var(--gap-google);
-  color: #ffffff;
+  color: var(--background);
 }
 
 .gc-gsc {

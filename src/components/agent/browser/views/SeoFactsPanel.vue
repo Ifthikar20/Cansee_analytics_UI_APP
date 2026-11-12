@@ -326,7 +326,7 @@ const responseLabel = computed(() =>
 
 .ag-fact dt {
   --cs-helptip-decoration: none;
-  --cs-helptip-radius: 5px;
+  --cs-helptip-radius: var(--radius);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -373,7 +373,7 @@ const responseLabel = computed(() =>
 
 .ag-fact-flag {
   padding: 0 6px;
-  border-radius: 5px;
+  border-radius: var(--radius);
   font-size: 11px;
   font-weight: 500;
   line-height: 16px;
@@ -412,7 +412,7 @@ const responseLabel = computed(() =>
 .ag-fact-chip {
   padding: 1px 7px;
   border: 1px solid var(--ag-tab-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-tab-bg);
   color: var(--ag-fg-2);
   font-size: 12px;

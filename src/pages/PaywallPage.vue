@@ -1,6 +1,5 @@
 <template>
   <div class="pw">
-    <WatercolorBackdrop src="/videos/watercolor-second.mp4" />
 
     <header class="pw-top">
       <div class="pw-brand">
@@ -93,7 +92,6 @@ import { useRouter } from 'vue-router'
 
 import billingApi from '@/api/billing'
 import PricingCards from '@/components/billing/PricingCards.vue'
-import WatercolorBackdrop from '@/components/onboarding/WatercolorBackdrop.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useToast } from '@/composables/useToast'
 import { isPolarUrl } from '@/utils/polarRedirect'
@@ -223,22 +221,23 @@ onMounted(() => {
 
 <style scoped>
 .pw {
-  --pw-bg: #ffffff;
-  --pw-fg: #0a0a0a;
-  --pw-muted: #5d5d5d;
-  --pw-border: rgba(10, 10, 10, 0.10);
-  --pw-surface: #fafafa;
-  --pw-accent: #ff6a2c;
-  --pw-accent-soft: rgba(255, 106, 44, 0.10);
+  --pw-bg: var(--card);
+  --pw-fg: var(--foreground);
+  --pw-muted: var(--muted-foreground);
+  --pw-border: var(--border);
+  --pw-surface: var(--muted);
+  --pw-accent: var(--signal-text);
+  --pw-accent-soft: var(--signal-soft);
   --pw-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --pw-spring-strong: cubic-bezier(0.16, 1, 0.3, 1);
   /* Framer-style back-out for entrances and pops. */
   --pw-spring-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --pw-label-font: 'Geist', 'Inter', system-ui, sans-serif;
+  --pw-label-font: var(--font-mono);
 
   position: relative;
   min-height: 100vh;
   color: var(--pw-fg);
+  background: var(--background);
   font-feature-settings: 'cv11', 'ss01';
   display: flex;
   flex-direction: column;
@@ -246,7 +245,7 @@ onMounted(() => {
 }
 .pw :focus-visible { outline-color: var(--pw-accent); }
 
-/* ── Topbar (white on the watercolor video) ──────────────── */
+/* ── Topbar ── */
 .pw-top {
   position: relative;
   z-index: 2;
@@ -255,8 +254,8 @@ onMounted(() => {
   justify-content: space-between;
   gap: 16px;
   padding: 20px 28px;
-  color: #fff;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+  color: var(--foreground);
+  text-shadow: none;
   animation: pw-drop 450ms var(--pw-spring) 80ms both;
 }
 .pw-brand {
@@ -272,12 +271,12 @@ onMounted(() => {
   height: 17px;
   object-fit: contain;
   flex-shrink: 0;
-  filter: brightness(0) invert(1);
+  filter: var(--logo-filter);
 }
 .pw-top-right { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .pw-top-email {
   font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--muted-foreground);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -286,16 +285,16 @@ onMounted(() => {
   background: transparent;
   border: none;
   font: inherit;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--foreground);
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   flex-shrink: 0;
   transition: color 0.15s;
 }
-.pw-signout:hover { color: #fff; text-decoration: underline; }
+.pw-signout:hover { color: var(--foreground); text-decoration: underline; }
 @keyframes pw-drop {
   from { opacity: 0; transform: translateY(-10px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -314,10 +313,8 @@ onMounted(() => {
 .pw-content {
   width: min(760px, 100%);
   background: var(--pw-bg);
-  border-radius: 24px;
-  box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.35),
-    0 8px 24px rgba(0, 0, 0, 0.18);
+  border-radius: var(--radius);
+  box-shadow: none;
   padding: 38px 40px 30px;
   animation: pw-card-in 0.65s var(--pw-spring-pop) both;
 }
@@ -336,7 +333,7 @@ onMounted(() => {
   display: inline-block;
   font-family: var(--pw-label-font);
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--pw-muted);
@@ -438,7 +435,7 @@ onMounted(() => {
   color: var(--pw-muted);
   cursor: pointer;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   transition: color 0.2s;
 }
 .pw-free-link svg { transition: transform 0.25s var(--pw-spring-pop); }
@@ -455,17 +452,17 @@ onMounted(() => {
   justify-content: space-between;
   padding: 14px 28px 18px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+  color: var(--muted-foreground);
+  text-shadow: none;
   animation: pw-fade-in 0.8s ease 0.5s both;
 }
 .pw-footer-links { display: flex; gap: 20px; }
 .pw-footer-links a {
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--foreground);
   text-decoration: none;
   transition: color 0.2s;
 }
-.pw-footer-links a:hover { color: #fff; text-decoration: underline; }
+.pw-footer-links a:hover { color: var(--foreground); text-decoration: underline; }
 @keyframes pw-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* ── Bits ────────────────────────────────────────────────── */
@@ -511,7 +508,7 @@ onMounted(() => {
   .pw-top { padding: 14px 16px; }
   .pw-top-email { display: none; }
   .pw-main { padding: 8px 12px 12px; }
-  .pw-content { padding: 26px 20px 24px; border-radius: 18px; }
+  .pw-content { padding: 26px 20px 24px; border-radius: var(--radius); }
   .pw-footer { padding: 12px 16px 14px; }
   .pw-title { font-size: clamp(21px, 6vw, 24px); }
 }

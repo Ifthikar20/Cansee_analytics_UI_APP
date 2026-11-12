@@ -326,7 +326,7 @@ const gaps = computed(() =>
 }
 
 .ca-alert {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .ca-retry {
@@ -348,7 +348,7 @@ const gaps = computed(() =>
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -363,7 +363,7 @@ const gaps = computed(() =>
   position: relative;
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .ca-scroll:focus-visible {
@@ -443,7 +443,7 @@ const gaps = computed(() =>
   margin-left: 6px;
   padding: 1px 7px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--muted-foreground);
   font-size: 11.5px;
   font-weight: 500;

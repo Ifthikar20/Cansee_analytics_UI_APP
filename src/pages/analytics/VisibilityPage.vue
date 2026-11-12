@@ -280,7 +280,7 @@ function openPrompt(event) {
 }
 
 .an-alert {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 /* Sits under the share-of-voice row, as part of it. */

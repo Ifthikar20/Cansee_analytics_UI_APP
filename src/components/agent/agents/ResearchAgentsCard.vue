@@ -122,7 +122,7 @@ function use(template = '') {
   box-sizing: border-box;
   padding: 16px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .ag-research-main {
@@ -146,7 +146,7 @@ function use(template = '') {
   width: 30px;
   height: 30px;
   border: 1px solid var(--ag-iconbox-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .ag-research-name {
@@ -169,7 +169,7 @@ function use(template = '') {
 .ag-research-team {
   padding: 0 7px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
   font-size: 12px;
   line-height: 18px;
@@ -249,7 +249,7 @@ function use(template = '') {
   min-width: 0;
   padding: 8px 10px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-btn-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -268,7 +268,7 @@ function use(template = '') {
 }
 
 .ag-research-preset:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

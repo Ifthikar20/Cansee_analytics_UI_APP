@@ -56,7 +56,7 @@ const rows = computed(() => {
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 

@@ -48,7 +48,7 @@ defineProps({
   min-height: 26px;
   padding: 2px 10px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--muted-foreground);
   font: inherit;
@@ -71,7 +71,7 @@ button.ss-chip:hover {
 }
 
 button.ss-chip:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 /* Filled for a source that is on, hollow otherwise; the word says which. */
@@ -80,7 +80,7 @@ button.ss-chip:focus-visible {
   width: 7px;
   height: 7px;
   border: 1px solid var(--muted-foreground);
-  border-radius: 999px;
+  border-radius: 50%;
 }
 
 .ss-chip.is-on .ss-dot {

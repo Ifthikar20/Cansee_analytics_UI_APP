@@ -127,7 +127,7 @@ watch(
   gap: 6px;
   height: 30px;
   padding: 0 8px 0 6px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
   font-size: 13px;
   font-weight: 500;
@@ -142,7 +142,7 @@ watch(
 }
 
 .ag-artpage-back:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

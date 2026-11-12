@@ -39,7 +39,7 @@ const forwarded = useForwardPropsEmits(contentProps, emits)
       :data-side="side"
       :class="
         cn(
-          'sheet-content fixed top-0 bottom-0 z-[96] flex h-dvh flex-col border-border bg-card text-card-foreground shadow-2xl outline-none',
+          'sheet-content fixed top-0 bottom-0 z-[96] flex h-dvh flex-col border-foreground bg-background text-foreground outline-none',
           side === 'left' ? 'left-0 border-r' : 'right-0 border-l',
           props.class,
         )

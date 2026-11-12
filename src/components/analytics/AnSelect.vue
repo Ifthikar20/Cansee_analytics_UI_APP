@@ -64,7 +64,7 @@ const emit = defineEmits(['update:modelValue'])
   padding: 0 32px 0 12px;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -85,7 +85,7 @@ const emit = defineEmits(['update:modelValue'])
 
 .an-select-input:focus-visible {
   border-color: var(--ring);
-  border-radius: 10px;
+  border-radius: var(--radius);
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 22%, transparent);
 }

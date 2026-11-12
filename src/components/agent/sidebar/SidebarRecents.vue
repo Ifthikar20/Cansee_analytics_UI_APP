@@ -337,7 +337,7 @@ async function confirmDelete() {
   margin-left: -4px;
   padding: 0 4px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-2);
   font-size: 13px;
@@ -351,7 +351,7 @@ async function confirmDelete() {
 }
 
 .ag-recents-toggle:focus-visible {
-  border-radius: 6px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 0;
 }
@@ -400,7 +400,7 @@ async function confirmDelete() {
   height: 32px;
   padding: 0 30px 0 31px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -421,7 +421,7 @@ async function confirmDelete() {
 
 .ag-recents-search-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: none;
 }
 
@@ -433,7 +433,7 @@ async function confirmDelete() {
   width: 24px;
   height: 24px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-3);
   cursor: pointer;
@@ -485,7 +485,7 @@ async function confirmDelete() {
   margin-top: 2px;
   padding: 0 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-3);
   font: inherit;
@@ -505,7 +505,7 @@ async function confirmDelete() {
 }
 
 .ag-recents-more:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: -2px;
 }

@@ -37,6 +37,6 @@ const representation = ref('')
   margin: 0;
   padding: 14px 16px 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 </style>

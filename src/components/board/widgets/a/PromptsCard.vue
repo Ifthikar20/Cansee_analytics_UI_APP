@@ -123,7 +123,7 @@ function onAdded() {
   width: 100%;
   padding: 8px 6px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: inherit;
   font: inherit;

@@ -1,4 +1,7 @@
-// Which colour each series wears. Colour follows the entity, never its
+// Which colour each series wears. Charts are ink and warm grays with one
+// accent: the user's own series (brand:you) is the orange, nothing else
+// is. The slots are a weight ramp, so a chart always carries a legend or
+// direct labels as well. Colour follows the entity, never its
 // rank: ChatGPT is slot 1 on every chart, whether it is drawn first or
 // alone, and a filter that removes a series never repaints the others.
 //
@@ -6,7 +9,8 @@
 //   engine:<key>     chatgpt claude gemini grok perplexity -> slots 1-5
 //   assistant:<key>  the five engines, copilot 6, meta-ai 7; any other -> Other
 //   operator:<key>   openai anthropic google apple perplexity microsoft meta bytedance -> 1-8; any other -> Other
-//   brand:<key>      you b1..b5 -> 1-6; other (or any other) -> Other
+//   brand:<key>      you -> the accent (--viz-you), the only series that wears it;
+//                    b1..b5 -> 2-6; other (or any other) -> Other
 //   sentiment:<key>  positive / neutral / negative -> the diverging poles and gray
 //   muted            de-emphasis gray (a comparison period)
 //   status:<key>     good / warning / serious / critical (only when the series means a state)
@@ -32,7 +36,8 @@ export const OPERATOR_SLOT = Object.freeze({
   meta: 7,
   bytedance: 8,
 })
-export const BRAND_SLOT = Object.freeze({ you: 1, b1: 2, b2: 3, b3: 4, b4: 5, b5: 6 })
+export const YOU = '--viz-you'
+export const BRAND_SLOT = Object.freeze({ b1: 2, b2: 3, b3: 4, b4: 5, b5: 6 })
 
 const OTHER = '--viz-other'
 const ENGINE_ALIASES = { gpt4: 'chatgpt', openai: 'chatgpt', anthropic: 'claude', xai: 'grok' }
@@ -40,39 +45,41 @@ const SENTIMENT = { positive: '--viz-div-pos', neutral: '--viz-div-mid', negativ
 const STATUS = { good: '--viz-good', warning: '--viz-warning', serious: '--viz-serious', critical: '--viz-critical' }
 
 // Light values, used only where the stylesheet is absent (tests, SSR).
+// Keep in step with assets/css/viz.css and assets/tailwind.css.
 const FALLBACK = {
-  '--viz-surface': '#ffffff',
-  '--viz-ink-1': '#1a1a18',
-  '--viz-ink-2': '#6b6b66',
-  '--viz-grid': '#e1e0d9',
-  '--viz-axis': '#c3c2b7',
-  '--viz-cat-1': '#2a78d6',
-  '--viz-cat-2': '#eb6834',
-  '--viz-cat-3': '#1baf7a',
-  '--viz-cat-4': '#eda100',
-  '--viz-cat-5': '#e87ba4',
-  '--viz-cat-6': '#008300',
-  '--viz-cat-7': '#6250d6',
-  '--viz-cat-8': '#e34948',
-  '--viz-other': '#a5a5a0',
-  '--viz-seq-1': '#86b6ef',
-  '--viz-seq-2': '#5598e7',
-  '--viz-seq-3': '#2a78d6',
-  '--viz-seq-4': '#1c5cab',
-  '--viz-seq-5': '#104281',
+  '--viz-surface': '#e7e6e1',
+  '--viz-ink-1': '#0b0b0b',
+  '--viz-ink-2': '#5f5e58',
+  '--viz-grid': '#d6d5cf',
+  '--viz-axis': '#a09f98',
+  '--viz-you': '#ff4a00',
+  '--viz-cat-1': '#0b0b0b',
+  '--viz-cat-2': '#5f5e58',
+  '--viz-cat-3': '#a09f98',
+  '--viz-cat-4': '#3a3936',
+  '--viz-cat-5': '#84837c',
+  '--viz-cat-6': '#bab9b2',
+  '--viz-cat-7': '#4d4c47',
+  '--viz-cat-8': '#72716a',
+  '--viz-other': '#cbcac4',
+  '--viz-seq-1': '#cbcac4',
+  '--viz-seq-2': '#a09f98',
+  '--viz-seq-3': '#72716a',
+  '--viz-seq-4': '#3a3936',
+  '--viz-seq-5': '#0b0b0b',
   '--viz-seq-ink-1': '#0b0b0b',
-  '--viz-seq-ink-2': '#ffffff',
+  '--viz-seq-ink-2': '#0b0b0b',
   '--viz-seq-ink-3': '#ffffff',
   '--viz-seq-ink-4': '#ffffff',
   '--viz-seq-ink-5': '#ffffff',
-  '--viz-nodata': '#f0efec',
-  '--viz-div-pos': '#2a78d6',
-  '--viz-div-mid': '#a5a5a0',
-  '--viz-div-neg': '#e34948',
-  '--viz-good': '#0ca30c',
-  '--viz-warning': '#fab219',
-  '--viz-serious': '#ec835a',
-  '--viz-critical': '#d03b3b',
+  '--viz-nodata': '#dcdbd5',
+  '--viz-div-pos': '#0b0b0b',
+  '--viz-div-mid': '#cbcac4',
+  '--viz-div-neg': '#ff4a00',
+  '--viz-good': '#5f5e58',
+  '--viz-warning': '#0b0b0b',
+  '--viz-serious': '#b83600',
+  '--viz-critical': '#ff4a00',
 }
 
 /** '--viz-cat-N' for slot N (1-8); '--viz-other' past the last slot or for 'other'. */
@@ -85,7 +92,7 @@ function fromMap(map, key) {
   return map[key] ? slotToken(map[key]) : OTHER
 }
 
-/** The token a series wears: '--viz-cat-N' | '--viz-other' | '--viz-div-*' | '--viz-good'... */
+/** The token a series wears: '--viz-cat-N' | '--viz-you' | '--viz-other' | '--viz-div-*' | '--viz-good'... */
 export function entityToken(entity, index = 0) {
   const raw = String(entity ?? '').trim().toLowerCase()
   const bySlot = slotToken(Number(index) + 1)
@@ -102,7 +109,7 @@ export function entityToken(entity, index = 0) {
     case 'operator':
       return fromMap(OPERATOR_SLOT, key)
     case 'brand':
-      return fromMap(BRAND_SLOT, key)
+      return key === 'you' ? YOU : fromMap(BRAND_SLOT, key)
     case 'sentiment':
       return SENTIMENT[key] || OTHER
     case 'status':
@@ -116,7 +123,7 @@ export function entityToken(entity, index = 0) {
 
 /** A token's current value (theme-reactive through cssVar). */
 export function tokenColor(token) {
-  return cssVar(token, FALLBACK[token] || '#a5a5a0')
+  return cssVar(token, FALLBACK[token] || FALLBACK['--viz-other'])
 }
 
 /** The colour a series wears right now; recolours with the theme. */

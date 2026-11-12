@@ -654,12 +654,12 @@ const headerFacts = computed(() => {
                 <td class="py-3 pr-3">
                   <div class="flex items-center -space-x-1.5">
                     <span v-for="m in row.models" :key="m"
-                      class="flex size-5 items-center justify-center rounded-full text-[10px] font-bold text-white ring-2 ring-card"
+                      class="flex size-5 items-center justify-center text-[10px] font-bold text-white ring-2 ring-card"
                       :style="{ background: modelStyle(m).color }" :title="modelStyle(m).label">
                       {{ modelStyle(m).initial }}
                     </span>
                     <span v-if="row.extra"
-                      class="flex h-5 items-center justify-center rounded-full bg-secondary px-1.5 text-[10px] font-bold text-muted-foreground ring-2 ring-card">
+                      class="flex h-5 items-center justify-center bg-secondary px-1.5 text-[10px] font-bold text-muted-foreground ring-2 ring-card">
                       +{{ row.extra }}
                     </span>
                   </div>

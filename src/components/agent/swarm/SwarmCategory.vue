@@ -132,7 +132,7 @@ function waiting(taskId) {
   height: 34px;
   padding: 0 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: inherit;
   font: inherit;

@@ -109,7 +109,7 @@ onBeforeUnmount(() => clearTimeout(timer))
   max-width: 85%;
   margin: 0;
   padding: 8px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-bubble-bg);
   color: var(--ag-fg-1);
   font-size: 15px;
@@ -174,7 +174,7 @@ onBeforeUnmount(() => clearTimeout(timer))
   height: 24px;
   padding: 0 8px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-btn-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -195,6 +195,6 @@ onBeforeUnmount(() => clearTimeout(timer))
 .ag-user-retry:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 1px;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 </style>

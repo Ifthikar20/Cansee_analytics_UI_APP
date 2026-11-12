@@ -85,7 +85,7 @@ const interactive = computed(() => !props.plain && Boolean(props.websiteId && pr
   height: 26px;
   padding: 0 8px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--ag-pane-bg);
   color: var(--ag-fg-2);
   font: inherit;
@@ -106,7 +106,7 @@ button.ag-rchip[data-state='open'] {
 }
 
 button.ag-rchip:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

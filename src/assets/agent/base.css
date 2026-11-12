@@ -76,7 +76,7 @@
 
 :where(.ag-root, .ag-portal) ::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--ag-scroll-thumb);
   background-clip: padding-box;
 }
@@ -94,7 +94,7 @@
   height: 20px;
   padding: 0 5px;
   border: 1px solid var(--ag-divider);
-  border-radius: 5px;
+  border-radius: var(--radius);
   background: var(--ag-pane-bg);
   color: var(--ag-fg-2);
   font-family: var(--ag-font);

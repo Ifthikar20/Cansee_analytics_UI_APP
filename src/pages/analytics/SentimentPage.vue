@@ -6,7 +6,7 @@
       subtitle="How the AI engines describe you when they name you, and the themes they repeat."
     >
       <template #actions>
-        <Button class="rounded-full" @click="openAnalysis">
+        <Button @click="openAnalysis">
           <Sparkles class="size-4" aria-hidden="true" />
           Analyze answers
         </Button>
@@ -277,7 +277,7 @@ function openPrompt(event) {
 }
 
 .an-alert {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .an-retry {

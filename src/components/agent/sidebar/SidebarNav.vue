@@ -121,7 +121,7 @@ const items = computed(() =>
   box-sizing: border-box;
   height: 34px;
   padding: 0 8px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
   font-size: 14px;
   font-weight: 500;
@@ -148,7 +148,7 @@ a.ag-nav-row:hover {
 }
 
 .ag-nav-row:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: -2px;
 }
@@ -171,7 +171,7 @@ a.ag-nav-row:hover {
   min-width: 18px;
   margin-left: auto;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--ag-row-active);
   color: var(--ag-fg-1);
   font-size: 12px;

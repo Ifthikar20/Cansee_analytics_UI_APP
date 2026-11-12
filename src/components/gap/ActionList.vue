@@ -97,7 +97,7 @@ defineProps({
   max-width: 100%;
   padding: 4px 10px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--foreground);
   font-size: 12.5px;
   font-weight: 500;
@@ -118,7 +118,7 @@ defineProps({
   align-items: center;
   gap: 5px;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--muted);
   color: var(--muted-foreground);
   font-size: 12px;

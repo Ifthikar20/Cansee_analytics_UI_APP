@@ -114,8 +114,8 @@ async function confirm() {
           <span>{{ error }}</span>
         </p>
         <div class="tid-foot">
-          <Button variant="outline" class="rounded-full" @click="open = false">Cancel</Button>
-          <Button class="rounded-full" :disabled="submitting || !shown" @click="confirm">Track and check</Button>
+          <Button variant="outline" @click="open = false">Cancel</Button>
+          <Button :disabled="submitting || !shown" @click="confirm">Track and check</Button>
         </div>
       </DialogContent>
     </DialogPortal>
@@ -127,7 +127,7 @@ async function confirm() {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(10, 10, 12, 0.45);
+  background: var(--scrim);
 }
 
 .tid {
@@ -142,10 +142,10 @@ async function confirm() {
   padding: 22px 24px 20px;
   overflow-y: auto;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius);
   background: var(--popover);
   color: var(--popover-foreground);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
   transform: translate(-50%, -50%);
   outline: none;
 }
@@ -171,7 +171,7 @@ async function confirm() {
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;

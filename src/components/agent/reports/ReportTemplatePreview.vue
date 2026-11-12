@@ -137,7 +137,7 @@ onBeforeUnmount(() => observer?.disconnect())
   position: relative;
   overflow: hidden;
   border: 1px solid var(--ag-card-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--ag-pane-bg);
 }
 
@@ -234,13 +234,14 @@ onBeforeUnmount(() => observer?.disconnect())
   z-index: 1;
   padding: 2px 7px;
   border: 1px solid var(--ag-tab-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-tab-bg);
   color: var(--ag-fg-2);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.02em;
   line-height: 16px;
+  font-family: var(--font-mono);
   text-transform: uppercase;
 }
 </style>

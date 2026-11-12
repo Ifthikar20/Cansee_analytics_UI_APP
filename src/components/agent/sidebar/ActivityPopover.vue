@@ -221,7 +221,7 @@ const rows = computed(() =>
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--ag-fg-1);
   text-decoration: none;
 }
@@ -232,7 +232,7 @@ const rows = computed(() =>
 }
 
 .ag-act-item.is-link:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: -2px;
 }
@@ -244,7 +244,7 @@ const rows = computed(() =>
   width: 28px;
   height: 28px;
   border: 1px solid var(--ag-iconbox-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .ag-act-icon.is-accent {

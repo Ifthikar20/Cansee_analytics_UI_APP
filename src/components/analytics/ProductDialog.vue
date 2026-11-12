@@ -221,8 +221,8 @@ async function save() {
         </form>
 
         <div class="pd-foot">
-          <Button variant="outline" class="rounded-full" @click="open = false">Cancel</Button>
-          <Button class="rounded-full" :disabled="!canSave" @click="save">
+          <Button variant="outline" @click="open = false">Cancel</Button>
+          <Button :disabled="!canSave" @click="save">
             {{ editing ? 'Save' : 'Add product' }}
           </Button>
         </div>
@@ -236,7 +236,7 @@ async function save() {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(10, 10, 12, 0.45);
+  background: var(--scrim);
 }
 
 .pd {
@@ -249,10 +249,10 @@ async function save() {
   width: min(560px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius);
   background: var(--popover);
   color: var(--popover-foreground);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
   transform: translate(-50%, -50%);
   outline: none;
 }
@@ -280,7 +280,7 @@ async function save() {
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
@@ -318,7 +318,7 @@ async function save() {
   height: 38px;
   padding: 0 12px;
   border: 1px solid var(--input);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -360,7 +360,7 @@ async function save() {
   height: 30px;
   padding: 0 10px;
   border: 1px dashed var(--input);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--foreground);
   font: inherit;

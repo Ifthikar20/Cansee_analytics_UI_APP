@@ -178,17 +178,17 @@ watch(() => [props.src, props.domain, props.guess, props.guess ? props.name : ''
 
 <style scoped>
 .brand-logo-img {
-  border-radius: 5px;
+  border-radius: var(--radius);
   object-fit: contain;
-  background: var(--muted, #f1f5f9);
+  background: var(--muted);
   flex: 0 0 auto;
 }
 .brand-logo-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 5px;
-  color: #fff;
+  border-radius: var(--radius);
+  color: var(--white);
   font-weight: 700;
   flex: 0 0 auto;
   line-height: 1;

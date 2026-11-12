@@ -28,7 +28,7 @@ const fallback = computed(() => (tone.value === 'error' ? 'Something went wrong 
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .ag-notice-icon {

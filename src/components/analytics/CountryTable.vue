@@ -365,13 +365,13 @@ const detailPrompt = computed(() => {
             </p>
 
             <div v-if="detailLoading && !detail" class="ct-dialog-loading" aria-busy="true">
-              <Skeleton class="h-4 w-2/3 rounded" />
+              <Skeleton class="h-4 w-2/3 rounded-sm" />
               <Skeleton class="h-24 rounded-xl" />
             </div>
 
             <div v-else-if="detailError" class="ct-dialog-failed">
               <p class="ct-muted">{{ detailError }}</p>
-              <Button variant="outline" size="sm" class="rounded-full" @click="loadDetail">Try again</Button>
+              <Button variant="outline" size="sm" @click="loadDetail">Try again</Button>
             </div>
 
             <template v-else-if="detail && detail.engine === 'google'">
@@ -444,7 +444,7 @@ const detailPrompt = computed(() => {
   position: relative;
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -520,7 +520,7 @@ const detailPrompt = computed(() => {
 .ct-code {
   padding: 1px 6px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   color: var(--muted-foreground);
   font-size: 10.5px;
   font-weight: 600;
@@ -565,7 +565,7 @@ const detailPrompt = computed(() => {
   align-items: center;
   gap: 6px;
   padding: 2px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--tone) 13%, transparent);
   color: var(--foreground);
   font-size: 12px;
@@ -591,7 +591,7 @@ const detailPrompt = computed(() => {
   height: 28px;
   padding: 0 10px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--foreground);
   font: inherit;
@@ -675,7 +675,7 @@ const detailPrompt = computed(() => {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(10, 10, 12, 0.45);
+  background: var(--scrim);
 }
 
 .ct-dialog {
@@ -688,10 +688,10 @@ const detailPrompt = computed(() => {
   width: min(640px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius);
   background: var(--popover);
   color: var(--popover-foreground);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
   transform: translate(-50%, -50%);
   outline: none;
 }
@@ -727,7 +727,7 @@ const detailPrompt = computed(() => {
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
@@ -830,7 +830,7 @@ const detailPrompt = computed(() => {
   flex-shrink: 0;
   padding: 1px 8px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--muted-foreground);
   font-size: 11.5px;
   font-weight: 600;
@@ -846,7 +846,7 @@ const detailPrompt = computed(() => {
   padding: 12px 14px;
   overflow-y: auto;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--muted);
   color: var(--foreground);
   line-height: 1.6;

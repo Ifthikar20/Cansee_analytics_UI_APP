@@ -81,7 +81,7 @@ async function run(key) {
   height: 32px;
   padding: 0 9px 0 8px;
   border: 1px solid var(--ag-export-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-export-bg);
   color: var(--ag-fg-tab);
   font: inherit;
@@ -104,7 +104,7 @@ async function run(key) {
 }
 
 .ag-export:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

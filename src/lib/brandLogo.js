@@ -5,9 +5,10 @@
 // brand's domain and, when no logo resolves, shows a deterministic colored
 // initial badge built from brandInitial and brandColor.
 
+// Ink and dark warm grays only: the badge carries white text, and no brand
+// gets a hue of its own (the product has a single accent).
 const BADGE_COLORS = [
-  '#5b8def', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444',
-  '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#6366f1',
+  '#0b0b0b', '#2b2a28', '#3a3936', '#4d4c47', '#5f5e58', '#6b6a63',
 ]
 
 // Strip punctuation/spaces and append .com. Works for the many brands

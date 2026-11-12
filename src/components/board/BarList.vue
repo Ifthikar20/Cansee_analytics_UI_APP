@@ -98,7 +98,7 @@ const rows = computed(() =>
   margin: 0 -6px;
   width: calc(100% + 12px);
   padding: 6px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   cursor: pointer;
 }
 
@@ -107,7 +107,7 @@ const rows = computed(() =>
 }
 
 .bd-bars-row.is-action:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 0;
 }
@@ -161,14 +161,14 @@ const rows = computed(() =>
   display: block;
   height: 6px;
   overflow: hidden;
-  border-radius: 3px;
+  border-radius: var(--radius);
   background: var(--viz-nodata);
 }
 
 .bd-bars-fill {
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--radius);
   background: var(--viz-other);
 }
 

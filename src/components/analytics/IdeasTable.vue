@@ -203,7 +203,7 @@ function toggle(id) {
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -232,7 +232,7 @@ function toggle(id) {
   position: relative;
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .it-scroll:focus-visible {
@@ -315,7 +315,7 @@ function toggle(id) {
 .it-chip {
   padding: 2px 8px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--foreground);
   font-size: 12px;
   font-weight: 500;
@@ -342,7 +342,7 @@ function toggle(id) {
   height: 30px;
   padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;

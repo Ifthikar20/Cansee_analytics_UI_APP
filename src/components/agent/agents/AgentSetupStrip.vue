@@ -95,7 +95,7 @@ const visible = computed(() => Boolean(summary.value && (summary.value.google ||
   gap: 10px;
   padding: 12px 16px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .ag-setup-head {

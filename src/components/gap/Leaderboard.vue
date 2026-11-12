@@ -39,7 +39,7 @@ defineProps({
   align-items: center;
   gap: 10px;
   padding: 7px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13.5px;
 }
 
@@ -68,14 +68,14 @@ defineProps({
 .lb-bar {
   height: 6px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--viz-nodata);
 }
 
 .lb-bar span {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--viz-other);
 }
 

@@ -305,7 +305,7 @@ function openPrompt(event) {
 }
 
 .an-alert {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .an-retry {
@@ -328,7 +328,7 @@ function openPrompt(event) {
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -400,7 +400,7 @@ function openPrompt(event) {
   position: relative;
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .an-table-wrap:focus-visible {

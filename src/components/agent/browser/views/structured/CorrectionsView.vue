@@ -126,7 +126,7 @@ async function copyLetter(target) {
   flex-direction: column;
   gap: 4px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--ag-bubble-bg);
 }
 
@@ -177,7 +177,7 @@ async function copyLetter(target) {
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .ag-crv-head {
@@ -195,7 +195,7 @@ async function copyLetter(target) {
 
 .ag-crv-letter {
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-bubble-bg);
   font-size: 13.5px;
 }

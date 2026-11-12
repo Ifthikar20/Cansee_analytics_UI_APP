@@ -349,7 +349,8 @@ h1 {
 
 .legal-toc h3 {
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 500;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted-foreground);

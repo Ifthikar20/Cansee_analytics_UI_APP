@@ -86,7 +86,7 @@ const note = computed(() => {
   height: 34px;
   padding: 0 12px 0 10px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--ag-btn-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -108,7 +108,7 @@ const note = computed(() => {
 .ag-chip:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .ag-chip-icon {

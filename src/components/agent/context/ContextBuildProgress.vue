@@ -131,7 +131,7 @@ function confirmStop() {
   gap: 8px;
   padding: 12px 14px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-bubble-bg);
 }
 
@@ -169,14 +169,14 @@ function confirmStop() {
 .ag-cbp-bar {
   overflow: hidden;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--ag-row-active);
 }
 
 .ag-cbp-fill {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--ag-accent);
   transition: width 240ms ease;
 }

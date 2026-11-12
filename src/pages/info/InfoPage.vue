@@ -45,9 +45,9 @@ defineProps({
 <style scoped>
 .info-page {
   min-height: 100vh;
-  background: #fafafa;
-  color: #1a1a2e;
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
 }
 
 .info-header {
@@ -55,12 +55,11 @@ defineProps({
   align-items: center;
   justify-content: space-between;
   padding: 16px 40px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #ffffff;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
   position: sticky;
   top: 0;
   z-index: 100;
-  backdrop-filter: blur(12px);
 }
 .info-logo {
   display: flex;
@@ -68,24 +67,25 @@ defineProps({
   gap: 10px;
   font-weight: 700;
   font-size: 1.1rem;
-  color: #1a1a2e;
+  color: var(--foreground);
   text-decoration: none;
 }
 .info-nav { display: flex; align-items: center; gap: 20px; }
 .info-nav a {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--muted-foreground);
   text-decoration: none;
   font-weight: 500;
 }
-.info-nav a:hover { color: #1a1a2e; }
+.info-nav a:hover { color: var(--foreground); }
 .info-cta {
   padding: 8px 18px;
-  border-radius: 8px;
-  background: #1a1a2e;
-  color: #ffffff !important;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: var(--primary-foreground) !important;
+  border: 1px solid var(--primary);
 }
-.info-cta:hover { background: #2d2d44; color: #ffffff !important; }
+.info-cta:hover { background: transparent; color: var(--primary) !important; }
 
 .info-content {
   max-width: 780px;
@@ -97,15 +97,16 @@ defineProps({
 .info-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .info-badge {
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 500;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #ff6b35;
-  background: rgba(255, 107, 53, 0.08);
+  color: var(--signal-text);
+  background: var(--signal-soft);
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
-.info-date { font-size: 0.875rem; color: #9ca3af; }
+.info-date { font-size: 0.875rem; color: var(--subtle-foreground); }
 
 h1 {
   font-size: 2.2rem;
@@ -115,7 +116,7 @@ h1 {
 }
 .info-intro {
   font-size: 1.05rem;
-  color: #4b5563;
+  color: var(--muted-foreground);
   margin-bottom: 24px;
 }
 
@@ -124,20 +125,20 @@ h1 {
   font-weight: 700;
   margin: 36px 0 14px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #e5e7eb;
-  color: #1a1a2e;
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
 }
 :slotted(h3) {
   font-size: 1.05rem;
   font-weight: 600;
   margin: 20px 0 8px;
-  color: #1a1a2e;
+  color: var(--foreground);
 }
-:slotted(p) { margin-bottom: 12px; color: #4b5563; }
+:slotted(p) { margin-bottom: 12px; color: var(--muted-foreground); }
 :slotted(ul), :slotted(ol) { padding-left: 24px; margin-bottom: 16px; }
-:slotted(li) { margin-bottom: 6px; color: #4b5563; }
-:slotted(a) { color: #ff6b35; text-decoration: underline; text-underline-offset: 2px; }
-:slotted(strong) { color: #1a1a2e; }
+:slotted(li) { margin-bottom: 6px; color: var(--muted-foreground); }
+:slotted(a) { color: var(--signal-text); text-decoration: underline; text-underline-offset: 2px; }
+:slotted(strong) { color: var(--foreground); }
 :slotted(.info-grid) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -145,36 +146,36 @@ h1 {
   margin: 16px 0 24px;
 }
 :slotted(.info-grid > div) {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 16px 18px;
 }
 :slotted(.info-grid h4) {
   font-size: 0.95rem;
   font-weight: 700;
   margin-bottom: 4px;
-  color: #1a1a2e;
+  color: var(--foreground);
 }
 :slotted(.info-grid p) { font-size: 0.9rem; margin: 0; }
 :slotted(.info-grid p + p) { margin-top: 6px; }
 
 .info-footer {
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--border);
   padding: 24px 40px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-size: 0.875rem;
-  color: #9ca3af;
+  color: var(--subtle-foreground);
 }
 .info-footer-links { display: flex; gap: 20px; }
 .info-footer-links a {
-  color: #9ca3af;
+  color: var(--subtle-foreground);
   text-decoration: none;
   font-weight: 500;
 }
-.info-footer-links a:hover { color: #1a1a2e; }
+.info-footer-links a:hover { color: var(--foreground); }
 
 @media (max-width: 640px) {
   .info-header { padding: 12px 16px; }

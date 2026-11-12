@@ -97,7 +97,7 @@ function open(url) {
   max-width: 360px;
   padding: 10px 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-1);
   font: inherit;
@@ -111,7 +111,7 @@ function open(url) {
 }
 
 .ag-newtab-site:focus-visible {
-  border-radius: 12px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -123,7 +123,7 @@ function open(url) {
   width: 30px;
   height: 30px;
   border: 1px solid var(--ag-iconbox-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-logo-bg);
   color: var(--ag-logo-fg);
   font-size: 13px;

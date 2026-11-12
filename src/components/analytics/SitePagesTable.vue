@@ -98,7 +98,7 @@ function askValues(row) {
   min-width: 0;
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -107,7 +107,7 @@ function askValues(row) {
 }
 
 .spt-scroll:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .spt-table {
@@ -172,7 +172,7 @@ function askValues(row) {
   margin-top: 4px;
   padding: 1px 8px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--foreground);
   font-size: 11.5px;
   font-weight: 500;
@@ -190,7 +190,7 @@ function askValues(row) {
 .spt-chip {
   padding: 1px 8px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-size: 12px;
   white-space: nowrap;
 }

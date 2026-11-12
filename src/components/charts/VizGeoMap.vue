@@ -456,7 +456,7 @@ const alsoText = computed(() => {
 
 .viz-geo-loading {
   aspect-ratio: 1000 / 440;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--viz-nodata);
 }
 

@@ -18,7 +18,7 @@ const meta = computed(() => severityMeta(props.severity))
 
 <template>
   <span
-    class="inline-flex w-fit shrink-0 items-center gap-1 rounded border font-semibold uppercase tracking-wide"
+    class="inline-flex w-fit shrink-0 items-center gap-1 rounded-sm border font-medium font-mono uppercase tracking-wide"
     :class="[
       meta.badgeClass,
       size === 'sm' ? 'px-1.5 py-px text-[10px]' : 'px-2 py-0.5 text-xs',

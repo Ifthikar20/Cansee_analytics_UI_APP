@@ -40,7 +40,7 @@ function show() {
 .bd-setup-pointer-link {
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: none;
   color: var(--ag-fg-1);
   font: inherit;

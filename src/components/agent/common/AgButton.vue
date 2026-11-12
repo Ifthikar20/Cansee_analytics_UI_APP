@@ -56,7 +56,7 @@ const tagProps = computed(() => {
   height: 32px;
   padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-size: 14px;
   font-weight: 500;
   line-height: 20px;
@@ -76,7 +76,7 @@ const tagProps = computed(() => {
 .ag-button.is-xs {
   height: 26px;
   padding: 0 8px;
-  border-radius: 7px;
+  border-radius: var(--radius);
   font-size: 13px;
 }
 
@@ -118,8 +118,8 @@ const tagProps = computed(() => {
 
 .ag-button.is-danger {
   border-color: var(--ag-danger);
-  background: var(--ag-danger);
-  color: #ffffff;
+  background: var(--destructive);
+  color: var(--destructive-foreground);
 }
 
 .ag-button.is-danger:hover:not(:disabled):not([aria-disabled='true']) {
@@ -144,7 +144,7 @@ button.ag-button[aria-disabled='true']:not(:disabled) {
 }
 
 .ag-button:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

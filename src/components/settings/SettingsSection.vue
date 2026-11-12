@@ -47,8 +47,9 @@ defineProps({
 .sc-label {
   margin: 0 0 10px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.14em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   color: var(--muted-foreground);
   user-select: none;
@@ -56,10 +57,9 @@ defineProps({
 
 .sc {
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--card);
   color: var(--card-foreground);
-  box-shadow: var(--shadow-card, 0 1px 2px rgba(20, 20, 18, 0.04));
   padding: 22px 24px 24px;
 }
 .sc--danger { border-color: color-mix(in srgb, var(--destructive) 35%, transparent); }

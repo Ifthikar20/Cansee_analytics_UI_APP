@@ -141,7 +141,7 @@ async function copyProposed(change) {
 }
 
 .ag-prv-open:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -194,7 +194,7 @@ async function copyProposed(change) {
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .ag-prv-kind {
@@ -217,7 +217,7 @@ async function copyProposed(change) {
 
 .ag-prv-block {
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .ag-prv-block.is-now {
@@ -265,7 +265,7 @@ async function copyProposed(change) {
 .ag-prv-signal {
   padding: 2px 8px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 7px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
   font-size: 12px;
   line-height: 17px;

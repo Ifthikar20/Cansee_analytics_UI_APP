@@ -384,7 +384,7 @@ onMounted(() => {
 .om-btn {
   height: 32px;
   padding: 0 14px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13px;
 }
 
@@ -392,7 +392,7 @@ onMounted(() => {
   margin-bottom: 18px;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--muted);
 }
 .om-composer-row {
@@ -408,7 +408,7 @@ onMounted(() => {
   height: 36px;
   padding: 0 12px;
   border: 1px solid var(--input);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -423,7 +423,7 @@ onMounted(() => {
   height: 36px;
   padding: 0 10px;
   border: 1px solid var(--input);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -434,7 +434,7 @@ onMounted(() => {
 .om-select--sm {
   height: 30px;
   font-size: 12px;
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 .om-select:focus-visible {
   border-color: var(--ring);
@@ -472,8 +472,9 @@ onMounted(() => {
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.08em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   color: var(--muted-foreground);
 }

@@ -176,7 +176,7 @@ async function run() {
   gap: 0;
   margin: 0;
   border: 1px solid var(--ag-menu-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .rnd-row {

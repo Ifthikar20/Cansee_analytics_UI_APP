@@ -220,7 +220,7 @@ ol.ag-rd-list {
   overflow-x: auto;
   padding: 12px 14px;
   border: 1px solid var(--ag-code-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--ag-code-bg);
   font-family: var(--ag-font-mono);
   font-size: 13px;
@@ -231,7 +231,7 @@ ol.ag-rd-list {
 .ag-rd-table {
   overflow-x: auto;
   border: 1px solid var(--ag-card-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .ag-rd-table table {
@@ -310,7 +310,7 @@ ol.ag-rd-list {
 }
 
 .ag-rd-link:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

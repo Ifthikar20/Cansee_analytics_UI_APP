@@ -445,12 +445,12 @@ watch(websiteId, async (v) => {
             role="switch"
             :aria-checked="agentCrawl.enabled"
             :disabled="agentCrawlSaving || agentCrawlState !== 'ready'"
-            class="mt-0.5 relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-60"
+            class="mt-0.5 relative inline-flex h-5 w-9 shrink-0 items-center transition-colors disabled:opacity-60"
             :class="agentCrawl.enabled ? 'bg-[color:var(--chart-2)]' : 'bg-input'"
             @click="toggleAgentCrawl"
           >
             <span
-              class="inline-block size-4 transform rounded-full bg-background shadow-sm transition-transform"
+              class="inline-block size-4 transform bg-background shadow-sm transition-transform"
               :class="agentCrawl.enabled ? 'translate-x-4' : 'translate-x-0.5'"
             />
           </button>
@@ -499,7 +499,7 @@ watch(websiteId, async (v) => {
         <!-- URL tab -->
         <form v-if="inputTab === 'url'" class="flex flex-col gap-4" @submit.prevent="submitSource">
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">URL</label>
+            <label class="text-xs font-medium font-mono uppercase tracking-wider text-muted-foreground">URL</label>
             <div class="relative">
               <Link2 class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -514,7 +514,7 @@ watch(websiteId, async (v) => {
 
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_220px]">
             <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Title (optional)</label>
+              <label class="text-xs font-medium font-mono uppercase tracking-wider text-muted-foreground">Title (optional)</label>
               <input
                 v-model="form.title"
                 type="text"
@@ -523,7 +523,7 @@ watch(websiteId, async (v) => {
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Kind</label>
+              <label class="text-xs font-medium font-mono uppercase tracking-wider text-muted-foreground">Kind</label>
               <select
                 v-model="form.kind"
                 class="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -538,12 +538,12 @@ watch(websiteId, async (v) => {
               type="button"
               role="switch"
               :aria-checked="form.crawl"
-              class="mt-0.5 relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors"
+              class="mt-0.5 relative inline-flex h-5 w-9 shrink-0 items-center transition-colors"
               :class="form.crawl ? 'bg-[color:var(--chart-2)]' : 'bg-input'"
               @click="form.crawl = !form.crawl"
             >
               <span
-                class="inline-block size-4 transform rounded-full bg-background shadow-sm transition-transform"
+                class="inline-block size-4 transform bg-background shadow-sm transition-transform"
                 :class="form.crawl ? 'translate-x-4' : 'translate-x-0.5'"
               />
             </button>
@@ -554,7 +554,7 @@ watch(websiteId, async (v) => {
               </p>
               <div v-if="form.crawl" class="mt-3 grid grid-cols-2 gap-3">
                 <div class="flex flex-col gap-1">
-                  <label class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Page cap</label>
+                  <label class="text-[10px] font-medium font-mono uppercase tracking-wider text-muted-foreground">Page cap</label>
                   <input
                     v-model.number="form.page_cap"
                     type="number" min="1" max="50"
@@ -562,7 +562,7 @@ watch(websiteId, async (v) => {
                   />
                 </div>
                 <div class="flex flex-col gap-1">
-                  <label class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Depth</label>
+                  <label class="text-[10px] font-medium font-mono uppercase tracking-wider text-muted-foreground">Depth</label>
                   <input
                     v-model.number="form.depth"
                     type="number" min="0" max="2"
@@ -589,7 +589,7 @@ watch(websiteId, async (v) => {
           </p>
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-[1fr_220px]">
             <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Title</label>
+              <label class="text-xs font-medium font-mono uppercase tracking-wider text-muted-foreground">Title</label>
               <div class="relative">
                 <FileText class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <input
@@ -602,7 +602,7 @@ watch(websiteId, async (v) => {
               </div>
             </div>
             <div class="flex flex-col gap-1.5">
-              <label class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Kind</label>
+              <label class="text-xs font-medium font-mono uppercase tracking-wider text-muted-foreground">Kind</label>
               <select
                 v-model="pasteForm.kind"
                 class="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -613,7 +613,7 @@ watch(websiteId, async (v) => {
           </div>
 
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label class="text-xs font-medium font-mono uppercase tracking-wider text-muted-foreground">
               Text or markdown
               <span class="ml-1 font-normal text-muted-foreground/70">({{ pasteForm.text.length }} chars, min 20)</span>
             </label>
@@ -646,7 +646,7 @@ watch(websiteId, async (v) => {
             things your brand never claims, naming conventions.
           </p>
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Title</label>
+            <label class="text-xs font-medium font-mono uppercase tracking-wider text-muted-foreground">Title</label>
             <div class="relative">
               <StickyNote class="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -659,7 +659,7 @@ watch(websiteId, async (v) => {
             </div>
           </div>
           <div class="flex flex-col gap-1.5">
-            <label class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <label class="text-xs font-medium font-mono uppercase tracking-wider text-muted-foreground">
               Note
               <span class="ml-1 font-normal text-muted-foreground/70">({{ noteForm.text.length }} chars, min 20)</span>
             </label>

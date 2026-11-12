@@ -70,7 +70,7 @@ function open(url, event) {
   height: 24px;
   padding: 0 8px 0 4px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
   font-size: 12px;
   font-weight: 500;
@@ -87,7 +87,7 @@ function open(url, event) {
 .ag-source:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 .ag-source-n {
@@ -96,7 +96,7 @@ function open(url, event) {
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--ag-inline-code-bg);
   color: var(--ag-fg-3);
   font-size: 11px;

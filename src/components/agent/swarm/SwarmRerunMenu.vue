@@ -190,7 +190,7 @@ async function run(scope, category = null) {
   height: 26px;
   padding: 0 8px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-2);
   font: inherit;
@@ -213,7 +213,7 @@ async function run(scope, category = null) {
 }
 
 .ag-swarm-rerun-btn:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

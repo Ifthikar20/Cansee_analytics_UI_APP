@@ -458,7 +458,7 @@ async function saveProfile() {
   height: 40px;
   padding: 0 14px;
   border: 1px solid var(--input);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -481,7 +481,7 @@ async function saveProfile() {
 .sp-btn {
   height: 36px;
   padding: 0 16px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13px;
 }
 .sp-foot-note { font-size: 12px; color: var(--muted-foreground); }
@@ -533,7 +533,7 @@ async function saveProfile() {
   width: 100%;
   height: 84px;
   padding: 0 22px;
-  border-radius: 14px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   box-shadow: 0 0 0 0 transparent;
   transition: box-shadow 150ms ease, border-color 150ms ease;
@@ -555,18 +555,19 @@ async function saveProfile() {
   content: '';
   flex: 1;
   height: 5px;
-  border-radius: 3px;
+  border-radius: var(--radius);
   background: var(--_ink);
 }
 .sp-opt-preview i:nth-child(2)::after { flex: 0 0 60%; }
 .sp-opt-preview i:nth-child(3)::after { flex: 0 0 80%; }
 /* The previews are literal swatches of each theme, so their colours are
    fixed on purpose and do not follow the active theme. */
-.sp-opt-preview--light { background: #ffffff; --_ink: #cfcfcb; }
-.sp-opt-preview--dark { background: #000000; border-color: #2a2a2a; --_ink: #4a4a4a; }
+.sp-opt-preview--light { background: var(--paper); --_ink: var(--gray-300); }
+.sp-opt-preview--dark { background: var(--black); border-color: var(--gray-700); --_ink: var(--gray-700); }
 .sp-opt-preview--system {
-  background: linear-gradient(105deg, #ffffff 0 50%, #000000 50% 100%);
-  --_ink: #9a9a9a;
+  /* A hard split, half paper and half black: not a blend. */
+  background: linear-gradient(105deg, var(--paper) 0 50%, var(--black) 50% 100%);
+  --_ink: var(--gray-400);
 }
 .sp-opt:hover .sp-opt-preview { border-color: color-mix(in srgb, var(--foreground) 22%, transparent); }
 .sp-opt.is-active .sp-opt-preview {
@@ -582,7 +583,7 @@ async function saveProfile() {
   gap: 14px;
   margin-top: 20px;
   padding: 16px 18px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--accent);
   border: 1px solid color-mix(in srgb, var(--ring) 16%, transparent);
 }
@@ -607,7 +608,7 @@ async function saveProfile() {
   gap: 14px;
   padding: 16px 18px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 .sp-contact .sp-row-text { flex: 1; }
@@ -618,7 +619,7 @@ async function saveProfile() {
   flex: none;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--muted);
   color: var(--muted-foreground);
 }
@@ -626,7 +627,7 @@ async function saveProfile() {
   flex: none;
   padding: 9px 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13px;
   font-weight: 600;
   color: var(--foreground);
@@ -661,7 +662,7 @@ async function saveProfile() {
 .sp-allowance {
   margin-bottom: 16px;
   padding: 16px 18px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--muted);
 }
@@ -676,13 +677,13 @@ async function saveProfile() {
 .sp-allowance-title { font-size: 13px; font-weight: 600; color: var(--foreground); }
 .sp-allowance-amt { font-size: 13px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
 .sp-allowance-amt b { margin-left: 4px; font-weight: 600; color: var(--foreground); }
-.sp-bar { height: 8px; overflow: hidden; border-radius: 999px; background: var(--border); }
+.sp-bar { height: 8px; overflow: hidden; border-radius: var(--radius); background: var(--border); }
 .sp-bar-fill { height: 100%; border-radius: inherit; background: var(--chart-2); transition: width 200ms ease; }
 .is-warn .sp-bar-fill { background: var(--chart-5); }
 .is-exceeded .sp-bar-fill { background: var(--destructive); }
 .sp-allowance-note { margin: 10px 0 0; font-size: 12px; color: var(--muted-foreground); }
 .sp-allowance-flag { margin: 8px 0 0; font-size: 12px; font-weight: 600; }
-.sp-allowance-flag.is-warn { color: #b25e09; }
+.sp-allowance-flag.is-warn { color: var(--signal-text); }
 .sp-allowance-flag.is-exceeded { color: var(--destructive); }
 
 .sp-tiles {
@@ -695,7 +696,7 @@ async function saveProfile() {
 }
 .sp-tile {
   padding: 16px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--muted);
   text-align: center;
@@ -713,8 +714,9 @@ async function saveProfile() {
   display: block;
   margin-top: 7px;
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.08em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   color: var(--muted-foreground);
 }

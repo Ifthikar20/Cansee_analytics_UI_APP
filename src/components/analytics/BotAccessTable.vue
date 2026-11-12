@@ -67,7 +67,7 @@ const titleId = useId()
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -83,7 +83,7 @@ const titleId = useId()
 }
 
 .bat-scroll:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .bat-table {
@@ -151,6 +151,6 @@ const titleId = useId()
 }
 
 .bat-follows:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
 }
 </style>

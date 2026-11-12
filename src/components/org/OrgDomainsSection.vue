@@ -447,7 +447,7 @@ onMounted(loadDomainList)
   height: 36px;
   padding: 0 12px;
   border: 1px solid var(--input);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -461,7 +461,7 @@ onMounted(loadDomainList)
 .od-btn {
   height: 36px;
   padding: 0 14px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13px;
 }
 
@@ -496,7 +496,7 @@ onMounted(loadDomainList)
 .od-item {
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 .od-row {
@@ -533,7 +533,7 @@ onMounted(loadDomainList)
   height: 22px;
   margin: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--input);
   cursor: pointer;
   transition: background-color 160ms ease;
@@ -545,12 +545,12 @@ onMounted(loadDomainList)
   left: 3px;
   width: 16px;
   height: 16px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--background);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  box-shadow: none;
   transition: transform 160ms ease;
 }
-[data-theme='dark'] .od-switch:not(:checked) { background: rgba(255, 255, 255, 0.32); }
+[data-theme='dark'] .od-switch:not(:checked) { background: var(--bar); }
 .od-switch:checked { background: var(--primary); }
 .od-switch:checked::before { transform: translateX(16px); }
 .od-switch:disabled { opacity: 0.6; cursor: default; }
@@ -563,7 +563,7 @@ onMounted(loadDomainList)
   width: 28px;
   height: 28px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: none;
   color: var(--muted-foreground);
   cursor: pointer;
@@ -584,8 +584,9 @@ onMounted(loadDomainList)
   display: block;
   margin-bottom: 6px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.06em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
@@ -610,7 +611,7 @@ onMounted(loadDomainList)
   margin-top: 12px;
   padding: 12px 14px;
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--muted);
 }
 .od-dns-title {
@@ -627,8 +628,9 @@ onMounted(loadDomainList)
 }
 .od-dns-key {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.06em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
@@ -637,7 +639,7 @@ onMounted(loadDomainList)
   overflow-wrap: anywhere;
   padding: 4px 8px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--background);
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 12px;
@@ -646,7 +648,7 @@ onMounted(loadDomainList)
 .od-copy {
   background: none;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   padding: 3px 10px;
   font: inherit;
   font-size: 11.5px;

@@ -49,8 +49,9 @@ const inPanel = useInPanel()
 .an-eyebrow {
   color: var(--gap-ai);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.12em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
 }
 

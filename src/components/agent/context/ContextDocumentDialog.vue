@@ -169,7 +169,7 @@ async function submit() {
   min-height: 36px;
   padding: 7px 11px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -180,7 +180,7 @@ async function submit() {
 
 .ag-cdd-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: none;
 }
 

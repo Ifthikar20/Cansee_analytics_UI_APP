@@ -108,7 +108,7 @@ const showManage = computed(() => route?.name !== 'settings-connections')
       </table>
     </div>
     <div v-if="showManage" class="scap-foot">
-      <Button as-child variant="outline" size="sm" class="rounded-full">
+      <Button as-child variant="outline" size="sm">
         <router-link :to="{ name: 'settings-connections' }">Manage connections</router-link>
       </Button>
     </div>
@@ -124,7 +124,7 @@ const showManage = computed(() => route?.name !== 'settings-connections')
 .scap-scroll {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 

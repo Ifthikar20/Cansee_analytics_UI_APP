@@ -160,7 +160,7 @@ function onEmptyAction() {
 }
 
 .an-alert {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .an-retry {

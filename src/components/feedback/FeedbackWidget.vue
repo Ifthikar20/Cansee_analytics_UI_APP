@@ -14,7 +14,7 @@
     </Button>
     <span
       v-if="unreadCount"
-      class="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-white"
+      class="pointer-events-none absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center bg-destructive px-1 text-[10px] font-bold leading-none text-white"
       aria-hidden="true"
     >{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
   </span>
@@ -33,7 +33,7 @@
             <Headphones class="size-5 text-foreground" aria-hidden="true" />
             <DialogTitle class="text-lg font-semibold text-foreground">Help & feedback</DialogTitle>
             <DialogClose
-              class="ml-auto grid size-8 place-items-center rounded-full text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+              class="ml-auto grid size-8 place-items-center text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
               aria-label="Close"
             >
               <X class="size-4" aria-hidden="true" />
@@ -43,7 +43,7 @@
             Ask for help, report a problem, or share an idea.
           </DialogDescription>
 
-          <h3 id="fw-start-title" class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Start a request</h3>
+          <h3 id="fw-start-title" class="mb-2 text-xs font-medium font-mono uppercase tracking-wide text-muted-foreground">Start a request</h3>
           <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2" role="group" aria-labelledby="fw-start-title">
             <button
               v-for="cat in CATEGORIES"
@@ -52,7 +52,7 @@
               class="flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-secondary"
               @click="startCompose(cat.id)"
             >
-              <span class="flex size-9 flex-shrink-0 items-center justify-center rounded-full" :style="{ background: cat.bg, color: cat.fg }" aria-hidden="true">
+              <span class="flex size-9 flex-shrink-0 items-center justify-center bg-muted text-foreground" aria-hidden="true">
                 <component :is="cat.icon" class="size-4" />
               </span>
               <span class="text-sm font-semibold text-foreground">{{ cat.label }}</span>
@@ -60,7 +60,7 @@
           </div>
 
           <template v-if="tickets.length">
-            <h3 id="fw-requests-title" class="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Your requests</h3>
+            <h3 id="fw-requests-title" class="mb-2 text-xs font-medium font-mono uppercase tracking-wide text-muted-foreground">Your requests</h3>
             <ul class="mb-3 max-h-52 overflow-y-auto rounded-xl border border-border" aria-labelledby="fw-requests-title">
               <li v-for="t in tickets" :key="t.id" class="border-b border-border last:border-b-0">
                 <button
@@ -68,7 +68,7 @@
                   class="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-secondary"
                   @click="openThread(t)"
                 >
-                  <span class="flex size-7 flex-shrink-0 items-center justify-center rounded-full" :style="{ background: catFor(t.category).bg, color: catFor(t.category).fg }" aria-hidden="true">
+                  <span class="flex size-7 flex-shrink-0 items-center justify-center bg-muted text-foreground" aria-hidden="true">
                     <component :is="catFor(t.category).icon" class="size-3.5" />
                   </span>
                   <span class="min-w-0 flex-1">
@@ -96,13 +96,13 @@
           <div class="mb-3 flex items-center gap-2">
             <button
               type="button"
-              class="flex size-8 items-center justify-center rounded-full border border-border text-foreground hover:bg-secondary"
+              class="flex size-8 items-center justify-center border border-border text-foreground hover:bg-secondary"
               aria-label="Back to Help & feedback"
               @click="backToHome"
             >
               <ChevronLeft class="size-4" aria-hidden="true" />
             </button>
-            <span class="flex size-8 items-center justify-center rounded-full" :style="{ background: activeCat.bg, color: activeCat.fg }" aria-hidden="true">
+            <span class="flex size-8 items-center justify-center bg-muted text-foreground" aria-hidden="true">
               <component :is="activeCat.icon" class="size-4" />
             </span>
             <DialogTitle class="text-base font-semibold text-foreground">{{ activeCat.label }}</DialogTitle>
@@ -130,17 +130,17 @@
           <div class="mb-3 flex items-center gap-2">
             <button
               type="button"
-              class="flex size-8 items-center justify-center rounded-full border border-border text-foreground hover:bg-secondary"
+              class="flex size-8 items-center justify-center border border-border text-foreground hover:bg-secondary"
               aria-label="Back to Help & feedback"
               @click="backToHome"
             >
               <ChevronLeft class="size-4" aria-hidden="true" />
             </button>
-            <span class="flex size-8 items-center justify-center rounded-full" :style="{ background: catFor(thread.category).bg, color: catFor(thread.category).fg }" aria-hidden="true">
+            <span class="flex size-8 items-center justify-center bg-muted text-foreground" aria-hidden="true">
               <component :is="catFor(thread.category).icon" class="size-4" />
             </span>
             <DialogTitle class="text-base font-semibold text-foreground">{{ catFor(thread.category).label }}</DialogTitle>
-            <span v-if="thread.status === 'closed'" class="ml-auto rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">Closed</span>
+            <span v-if="thread.status === 'closed'" class="ml-auto bg-secondary px-2 py-0.5 text-xs text-muted-foreground">Closed</span>
           </div>
           <DialogDescription class="mb-2 text-sm text-muted-foreground">
             Replies show up here, on this browser, until you sign out.
@@ -207,25 +207,21 @@ import feedback, { loadSeen, loadTokens, rememberToken, saveSeen } from '@/api/f
 const CATEGORIES = [
   {
     id: 'bug', label: 'Bug report', icon: Bug,
-    fg: '#dc2626', bg: 'rgba(220, 38, 38, 0.12)',
     prompt: 'What went wrong?',
     placeholder: 'What happened, and what did you expect instead?',
   },
   {
     id: 'idea', label: 'Feature idea', icon: Lightbulb,
-    fg: '#7c3aed', bg: 'rgba(124, 58, 237, 0.12)',
     prompt: 'What should we build?',
     placeholder: 'Describe the idea and the problem it would solve for you…',
   },
   {
     id: 'help', label: 'Help request', icon: LifeBuoy,
-    fg: '#2563eb', bg: 'rgba(37, 99, 235, 0.12)',
     prompt: 'What are you trying to do?',
     placeholder: 'Tell us what you need help with…',
   },
   {
     id: 'billing', label: 'Billing & account', icon: CreditCard,
-    fg: '#059669', bg: 'rgba(5, 150, 105, 0.12)',
     prompt: 'What can we sort out?',
     placeholder: 'Plans, invoices, account access — ask away…',
   },

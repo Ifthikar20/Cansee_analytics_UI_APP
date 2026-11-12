@@ -244,7 +244,7 @@ const rerunDisabled = computed(() => {
   align-items: center;
   height: 26px;
   padding: 0 4px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   color: var(--ag-fg-3);
   font-size: 13px;
   line-height: 20px;

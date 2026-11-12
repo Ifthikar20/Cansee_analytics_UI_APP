@@ -281,7 +281,7 @@ function openInPane(event, url) {
   align-items: center;
   height: 44px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 22px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   box-shadow: var(--ag-composer-shadow);
 }
@@ -299,7 +299,7 @@ function openInPane(event, url) {
   height: 100%;
   padding: 0 18px 0 42px;
   border: 0;
-  border-radius: 22px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-1);
   font: inherit;
@@ -336,7 +336,7 @@ function openInPane(event, url) {
   height: 22px;
   padding: 0 8px;
   border: 1px solid var(--ag-tab-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-tab-bg);
   color: var(--ag-fg-2);
   font-size: 12px;
@@ -370,7 +370,7 @@ function openInPane(event, url) {
   margin-top: 18px;
   padding: 14px 16px 16px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .ag-serp-aio-title {
@@ -397,7 +397,7 @@ function openInPane(event, url) {
   height: 24px;
   padding: 0 9px;
   border: 1px solid var(--ag-tab-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-tab-bg);
   color: var(--ag-fg-2);
   font-size: 12px;
@@ -442,7 +442,7 @@ function openInPane(event, url) {
   height: 28px;
   padding: 0 10px 0 4px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   color: var(--ag-fg-1b);
   font-size: 12px;
   font-weight: 500;
@@ -456,7 +456,7 @@ function openInPane(event, url) {
 }
 
 .ag-serp-ref:focus-visible {
-  border-radius: 14px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 1px;
 }
@@ -489,12 +489,12 @@ function openInPane(event, url) {
   gap: 8px;
   padding: 12px 12px 12px 8px;
   border-left: 2px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .ag-serp-row.is-you {
   border-left-color: var(--ag-you);
-  border-radius: 2px 10px 10px 2px;
+  border-radius: 2px var(--radius) var(--radius) 2px;
   background: var(--ag-you-bg);
 }
 
@@ -580,7 +580,7 @@ function openInPane(event, url) {
   margin-left: auto;
   padding: 2px 7px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 500;
   line-height: 16px;
@@ -620,7 +620,7 @@ function openInPane(event, url) {
 }
 
 .ag-serp-title:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -649,7 +649,7 @@ function openInPane(event, url) {
   margin: 0;
   padding: 0;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   list-style: none;
 }
 
@@ -679,7 +679,7 @@ function openInPane(event, url) {
   margin-top: 20px;
   padding: 14px 16px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
 }
 
@@ -750,7 +750,7 @@ function openInPane(event, url) {
 .ag-skel {
   display: block;
   height: 10px;
-  border-radius: 5px;
+  border-radius: var(--radius);
   background: var(--ag-tab-bg);
   animation: ag-pulse 1.6s ease-in-out infinite;
 }

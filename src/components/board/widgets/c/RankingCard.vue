@@ -148,7 +148,7 @@ function openPrompt(promptId) {
 }
 
 .rk-link:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -161,7 +161,7 @@ function openPrompt(promptId) {
   gap: 6px 12px;
   padding: 8px 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .rk-notice-text {

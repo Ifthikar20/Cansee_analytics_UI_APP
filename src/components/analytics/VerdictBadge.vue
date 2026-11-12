@@ -44,7 +44,7 @@ const meta = computed(() => VERDICTS[key.value])
 }
 
 .vb.is-help {
-  border-radius: 6px;
+  border-radius: var(--radius);
   cursor: help;
 }
 

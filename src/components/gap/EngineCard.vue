@@ -83,7 +83,7 @@ function pathOf(url) {
   gap: 12px;
   padding: 18px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -148,7 +148,7 @@ function pathOf(url) {
   margin: 0;
   padding: 10px 12px;
   border-left: 2px solid var(--gap-ai);
-  border-radius: 0 10px 10px 0;
+  border-radius: 0 var(--radius) var(--radius) 0;
   background: var(--muted);
   color: var(--foreground);
   font-size: 13px;
@@ -163,8 +163,9 @@ function pathOf(url) {
 .ec-sub {
   color: var(--muted-foreground);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.06em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
 }
 
@@ -177,7 +178,7 @@ function pathOf(url) {
 .ec-brand {
   padding: 3px 9px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--foreground);
   font-size: 12px;
 }
@@ -214,7 +215,7 @@ function pathOf(url) {
 .ec-yours {
   flex-shrink: 0;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--gap-ai);
   color: var(--card);
   font-size: 10.5px;

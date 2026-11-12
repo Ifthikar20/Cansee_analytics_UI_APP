@@ -113,14 +113,14 @@ function runNow() {
         class="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5"
       >
         <span v-if="lastRun" class="text-[11px] text-muted-foreground">
-          <span class="font-semibold uppercase tracking-wide">Last run</span>
+          <span class="font-medium font-mono uppercase tracking-wide">Last run</span>
           <span class="ml-1.5 font-bold text-foreground">{{ lastRun }}</span>
         </span>
         <span v-if="nextRun" class="text-[11px] text-muted-foreground">
-          <span class="font-semibold uppercase tracking-wide">Next run</span>
+          <span class="font-medium font-mono uppercase tracking-wide">Next run</span>
           <span class="ml-1.5 font-bold text-foreground">{{ nextRun }}</span>
         </span>
-        <span v-if="schedule.is_paused" class="text-[11px] font-semibold text-[#C02926] dark:text-[#f87171]">
+        <span v-if="schedule.is_paused" class="text-[11px] font-semibold text-signal-text">
           Auto-paused after repeated failures — save to resume.
         </span>
       </div>

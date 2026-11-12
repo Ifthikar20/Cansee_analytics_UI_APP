@@ -338,7 +338,7 @@ function chars(n) {
 }
 
 .ag-apx-toggle:focus-visible {
-  border-radius: 6px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -431,7 +431,7 @@ function chars(n) {
 .ag-apx-table {
   overflow-x: auto;
   border: 1px solid var(--ag-card-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .ag-apx-table table {

@@ -86,7 +86,7 @@ function tryConfirm() {
   height: 38px;
   padding: 0 12px;
   border: 1px solid var(--input);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;

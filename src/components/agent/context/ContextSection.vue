@@ -134,7 +134,7 @@ const titleId = computed(() => `ctx-${props.section.key}-title`)
   margin-left: -8px;
   padding: 0 8px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-disabled);
   font: inherit;

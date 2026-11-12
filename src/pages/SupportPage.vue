@@ -1,6 +1,5 @@
 <template>
   <div class="sp">
-    <WatercolorBackdrop />
 
     <header class="sp-top">
       <div class="sp-brand">
@@ -83,7 +82,6 @@ import { useAuthStore } from '@/stores/auth'
 import { useHelpStore } from '@/stores/help'
 import { useHelpShortcut } from '@/composables/useHelpShortcut'
 import HelpDrawer from '@/components/help/HelpDrawer.vue'
-import WatercolorBackdrop from '@/components/onboarding/WatercolorBackdrop.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -117,16 +115,17 @@ function goBack() {
   --sp-muted: var(--muted-foreground);
   --sp-border: var(--border);
   --sp-surface: var(--muted);
-  --sp-accent: #ff6a2c;
-  --sp-accent-soft: rgba(255, 106, 44, 0.10);
+  --sp-accent: var(--signal-text);
+  --sp-accent-soft: var(--signal-soft);
   --sp-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --sp-spring-strong: cubic-bezier(0.16, 1, 0.3, 1);
   --sp-spring-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --sp-label-font: 'Geist', 'Inter', system-ui, sans-serif;
+  --sp-label-font: var(--font-mono);
 
   position: relative;
   min-height: 100vh;
   color: var(--sp-fg);
+  background: var(--background);
   font-feature-settings: 'cv11', 'ss01';
   display: flex;
   flex-direction: column;
@@ -142,8 +141,8 @@ function goBack() {
   justify-content: space-between;
   gap: 16px;
   padding: 20px 28px;
-  color: #fff;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+  color: var(--foreground);
+  text-shadow: none;
   animation: sp-drop 450ms var(--sp-spring) 80ms both;
 }
 .sp-brand {
@@ -159,7 +158,7 @@ function goBack() {
   height: 17px;
   object-fit: contain;
   flex-shrink: 0;
-  filter: brightness(0) invert(1);
+  filter: var(--logo-filter);
 }
 .sp-back {
   display: inline-flex;
@@ -168,15 +167,15 @@ function goBack() {
   background: transparent;
   border: none;
   font: inherit;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--foreground);
   font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   transition: color 0.15s;
 }
-.sp-back:hover { color: #fff; text-decoration: underline; }
+.sp-back:hover { color: var(--foreground); text-decoration: underline; }
 @keyframes sp-drop {
   from { opacity: 0; transform: translateY(-10px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -195,11 +194,8 @@ function goBack() {
   width: min(560px, 100%);
   background: var(--sp-bg);
   color: var(--sp-fg);
-  border: 1px solid var(--sp-border);
-  border-radius: 24px;
-  box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.35),
-    0 8px 24px rgba(0, 0, 0, 0.18);
+  border-radius: var(--radius);
+  box-shadow: none;
   padding: 40px 42px 34px;
   animation: sp-card-in 0.65s var(--sp-spring-pop) both;
 }
@@ -214,7 +210,7 @@ function goBack() {
   display: inline-block;
   font-family: var(--sp-label-font);
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--sp-muted);
@@ -250,7 +246,7 @@ function goBack() {
   align-items: center;
   gap: 9px;
   padding: 12px 20px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--sp-fg);
   color: var(--sp-bg);
   font-size: 14px;
@@ -262,7 +258,7 @@ function goBack() {
 .sp-cta:hover {
   transform: translateY(-2px);
   background: var(--sp-accent);
-  box-shadow: 0 10px 24px rgba(255, 106, 44, 0.35);
+  box-shadow: none;
 }
 
 .sp-actions {
@@ -277,7 +273,7 @@ function goBack() {
   align-items: center;
   padding: 11px 18px;
   border: 1px solid var(--sp-border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--sp-fg);
   font: inherit;
@@ -301,7 +297,7 @@ function goBack() {
   margin: 0 0 8px;
   font-family: var(--sp-label-font);
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--sp-muted);
@@ -343,17 +339,17 @@ function goBack() {
   justify-content: space-between;
   padding: 14px 28px 18px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+  color: var(--muted-foreground);
+  text-shadow: none;
   animation: sp-fade-in 0.8s ease 0.5s both;
 }
 .sp-footer-links { display: flex; gap: 20px; }
 .sp-footer-links a {
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--foreground);
   text-decoration: none;
   transition: color 0.2s;
 }
-.sp-footer-links a:hover { color: #fff; text-decoration: underline; }
+.sp-footer-links a:hover { color: var(--foreground); text-decoration: underline; }
 
 @keyframes sp-card-in {
   from { opacity: 0; transform: translateY(26px) scale(0.97); }
@@ -383,7 +379,7 @@ function goBack() {
 @media (max-width: 640px) {
   .sp-top { padding: 14px 16px; }
   .sp-main { padding: 8px 12px 12px; }
-  .sp-card { padding: 26px 20px 24px; border-radius: 18px; }
+  .sp-card { padding: 26px 20px 24px; border-radius: var(--radius); }
   .sp-footer { padding: 12px 16px 14px; }
 }
 </style>

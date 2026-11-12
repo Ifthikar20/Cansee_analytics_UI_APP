@@ -43,7 +43,7 @@ const lines = computed(() => {
   gap: 6px;
   padding: 14px 18px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 

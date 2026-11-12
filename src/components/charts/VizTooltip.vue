@@ -46,9 +46,9 @@ const transform = computed(() => {
   max-width: 260px;
   padding: 8px 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--popover);
-  box-shadow: 0 4px 16px rgba(20, 20, 18, 0.08);
+  box-shadow: none;
   color: var(--popover-foreground);
   font-size: 12px;
   line-height: 1.4;

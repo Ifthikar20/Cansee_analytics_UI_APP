@@ -293,7 +293,7 @@ function displayPath(ad) {
   margin-bottom: 24px;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--ag-warning) 32%, transparent);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--ag-warning) 8%, transparent);
 }
 
@@ -363,7 +363,7 @@ function displayPath(ad) {
 
 .ag-sheet-flag {
   padding: 0 6px;
-  border-radius: 5px;
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--ag-warning) 12%, transparent);
   color: var(--ag-warning);
   font-size: 12px;
@@ -373,7 +373,7 @@ function displayPath(ad) {
 .ag-sheet-table {
   overflow-x: auto;
   border: 1px solid var(--ag-card-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .ag-sheet-table + .ag-sheet-table {
@@ -455,7 +455,7 @@ function displayPath(ad) {
 .ag-sheet-chips li {
   padding: 2px 8px;
   border: 1px solid var(--ag-tab-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-tab-bg);
   color: var(--ag-fg-1b);
   font-size: 12px;

@@ -152,7 +152,7 @@ function addPrompts() {
 }
 
 .smp-retry:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

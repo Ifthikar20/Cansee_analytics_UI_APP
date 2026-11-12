@@ -43,7 +43,7 @@ const name = computed(() => findTemplate(props.template, props.templates)?.name 
   height: 26px;
   padding: 0 4px 0 8px;
   border: 1px solid var(--ag-tab-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-tab-bg);
   color: var(--ag-fg-1);
   font-size: 13px;
@@ -72,7 +72,7 @@ const name = computed(() => findTemplate(props.template, props.templates)?.name 
   flex-shrink: 0;
   padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-3);
   cursor: pointer;
@@ -86,7 +86,7 @@ const name = computed(() => findTemplate(props.template, props.templates)?.name 
 .ag-agent-chip-remove:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 0;
-  border-radius: 5px;
+  border-radius: var(--radius);
 }
 
 .ag-agent-chip-remove svg {

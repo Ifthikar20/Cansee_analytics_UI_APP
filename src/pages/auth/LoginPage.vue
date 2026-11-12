@@ -72,7 +72,7 @@
         {{ loading ? 'Signing in…' : 'Sign in' }}
       </Button>
 
-      <div class="flex items-center gap-4 text-xs uppercase tracking-[0.12em] text-muted-foreground before:h-px before:flex-1 before:bg-border before:content-[''] after:h-px after:flex-1 after:bg-border after:content-['']"><span>or</span></div>
+      <div class="flex items-center gap-4 text-xs font-mono uppercase tracking-[0.12em] text-muted-foreground before:h-px before:flex-1 before:bg-border before:content-[''] after:h-px after:flex-1 after:bg-border after:content-['']"><span>or</span></div>
 
       <Button type="button" variant="outline" class="login-btn h-12 w-full gap-3 bg-transparent text-[15px] font-semibold" @click="handleGoogleLogin()">
         <svg class="size-[18px]" viewBox="0 0 24 24" aria-hidden="true">
@@ -235,7 +235,7 @@ async function handleSsoContinue(method) {
   height: 48px;
   padding: 0 16px;
   border: 1px solid var(--input);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--card);
   color: var(--foreground);
   font-size: 15px;
@@ -252,22 +252,22 @@ async function handleSsoContinue(method) {
 }
 
 .login-input:hover {
-  border-color: rgba(255, 255, 255, 0.24);
+  border-color: var(--foreground);
 }
 
 .login-input:focus-visible {
   outline: none;
-  border-radius: 12px;
+  border-radius: var(--radius);
   border-color: var(--ring);
-  box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.18);
+  box-shadow: 0 0 0 1px var(--ring);
 }
 
 .login-btn {
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 .login-btn:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
   outline-offset: 3px;
 }
 </style>

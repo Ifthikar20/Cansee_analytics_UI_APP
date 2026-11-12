@@ -88,7 +88,7 @@ async function save() {
   gap: 6px;
   height: 26px;
   padding: 0 8px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   color: var(--ag-accent);
   font-size: 13px;
   font-weight: 500;
@@ -104,7 +104,7 @@ async function save() {
 .ag-saved:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 1px;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .ag-saved-icon {

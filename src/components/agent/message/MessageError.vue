@@ -64,7 +64,7 @@ const newChatTo = computed(() =>
   gap: 10px;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--ag-danger) 28%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-danger-bg);
 }
 
@@ -110,7 +110,7 @@ const newChatTo = computed(() =>
   height: 28px;
   padding: 0 10px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-btn-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -149,6 +149,6 @@ const newChatTo = computed(() =>
 .ag-msg-error-link:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 </style>

@@ -107,7 +107,7 @@ function goToBilling() {
   height: 40px;
   padding: 0 12px;
   border: 1px solid var(--input);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -116,7 +116,7 @@ function goToBilling() {
 
 .apj-input:focus-visible {
   border-color: var(--ring);
-  border-radius: 10px;
+  border-radius: var(--radius);
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 22%, transparent);
 }

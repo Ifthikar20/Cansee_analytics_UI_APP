@@ -96,7 +96,7 @@ function send() {
   min-height: 32px;
   padding: 5px 10px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -107,7 +107,7 @@ function send() {
 
 .ag-rsel-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: none;
 }
 

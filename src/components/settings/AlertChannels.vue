@@ -16,7 +16,7 @@
       <!-- Working integrations -->
       <div v-for="intg in integrations" :key="intg.id" class="intg-tile" :class="{ connected: intg.connected }">
         <div class="intg-tile-main">
-          <div class="intg-icon-wrap" :style="{ background: intg.bgColor }">
+          <div class="intg-icon-wrap">
             <span v-html="intg.icon"></span>
           </div>
           <div class="intg-tile-identity">
@@ -42,7 +42,7 @@
            so it renders as its own tile rather than joining the v-for. -->
       <div class="intg-tile" :class="{ connected: smsState === 'verified' }">
         <div class="intg-tile-main">
-          <div class="intg-icon-wrap" style="background: linear-gradient(135deg, #34C75915, #34C75908)">
+          <div class="intg-icon-wrap">
             <span v-html="smsIcon"></span>
           </div>
           <div class="intg-tile-identity">
@@ -334,7 +334,6 @@ const integrations = reactive([
     id: 'slack',
     name: 'Slack',
     description: 'Get the daily report in a Slack channel, and ask Cansee questions with @Cansee mentions and the /cansee command.',
-    bgColor: 'linear-gradient(135deg, #4A154B15, #E01E5A08)',
     connected: false,
     connectionId: null,
     webhookUrl: '',
@@ -348,7 +347,6 @@ const integrations = reactive([
     id: 'discord',
     name: 'Discord',
     description: 'Get the daily report in a Discord channel, and work with Cansee from your server through the /cansee command.',
-    bgColor: 'linear-gradient(135deg, #5865F215, #5865F208)',
     connected: false,
     connectionId: null,
     webhookUrl: '',
@@ -362,7 +360,6 @@ const integrations = reactive([
     id: 'teams',
     name: 'Microsoft Teams',
     description: 'Get the daily report in a Microsoft Teams channel through an incoming webhook.',
-    bgColor: 'linear-gradient(135deg, #6264A715, #6264A708)',
     connected: false,
     connectionId: null,
     webhookUrl: '',
@@ -743,7 +740,7 @@ function showToast(msg, kind = 'success') {
   gap: 12px;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 20px;
 }
 
@@ -759,7 +756,7 @@ function showToast(msg, kind = 'success') {
 
 .intg-icon-wrap {
   width: 48px; height: 48px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
   display: flex;
   align-items: center;
@@ -769,7 +766,10 @@ function showToast(msg, kind = 'success') {
 
 /* The brand SVGs are injected via v-html with width/height 24 attributes;
    scale them from CSS so the markup stays untouched. */
+/* Vendor marks are shown in gray: the product has one accent, and it is
+   not theirs. */
 .intg-icon-wrap :deep(svg) {
+  filter: grayscale(1);
   width: 28px;
   height: 28px;
 }
@@ -789,7 +789,7 @@ function showToast(msg, kind = 'success') {
   font-weight: 500;
   margin-top: 1px;
 }
-.text-success { color: var(--chart-2); }
+.text-success { color: var(--foreground); }
 .text-muted { color: var(--muted-foreground); }
 
 .intg-tile-desc {
@@ -1027,7 +1027,8 @@ function showToast(msg, kind = 'success') {
 
 .prefs-title {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted-foreground);
@@ -1066,8 +1067,8 @@ function showToast(msg, kind = 'success') {
 .btn-spinner {
   display: inline-block;
   width: 12px; height: 12px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
   margin-right: 6px;
@@ -1087,8 +1088,8 @@ function showToast(msg, kind = 'success') {
   padding: 12px 20px;
   background: var(--card);
   border: 1px solid color-mix(in srgb, var(--chart-2) 30%, transparent);
-  border-radius: 9999px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius);
+  box-shadow: none;
   font-size: 14px;
   font-weight: 600;
   color: var(--foreground);

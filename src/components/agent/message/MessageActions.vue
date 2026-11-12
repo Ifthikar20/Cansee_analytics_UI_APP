@@ -275,7 +275,7 @@ onBeforeUnmount(() => clearTimeout(copyTimer))
   height: 28px;
   padding: 0 10px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-2);
   font: inherit;
@@ -300,7 +300,7 @@ onBeforeUnmount(() => clearTimeout(copyTimer))
 .ag-feedback-comment:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 1px;
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 .ag-feedback-label {
@@ -315,7 +315,7 @@ onBeforeUnmount(() => clearTimeout(copyTimer))
   min-height: 64px;
   padding: 8px 10px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -329,7 +329,7 @@ onBeforeUnmount(() => clearTimeout(copyTimer))
 }
 
 .ag-feedback-comment:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .ag-feedback-actions {

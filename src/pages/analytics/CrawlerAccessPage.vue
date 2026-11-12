@@ -10,7 +10,7 @@
           <Tooltip :disabled="!runBlocker">
             <TooltipTrigger as-child>
               <Button
-                class="rounded-full"
+               
                 :aria-disabled="runBlocker ? 'true' : undefined"
                 :class="{ 'is-blocked': runBlocker }"
                 @click="openAudit"
@@ -256,7 +256,7 @@ function openAudit() {
 }
 
 .an-alert {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .an-retry {
@@ -297,7 +297,7 @@ function openAudit() {
   min-width: 0;
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 

@@ -271,7 +271,7 @@ function cellTitle(row, engine) {
   width: 100%;
   height: 32px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -339,7 +339,7 @@ function cellTitle(row, engine) {
   height: 32px;
   padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -354,7 +354,7 @@ function cellTitle(row, engine) {
 }
 
 .gt-chip:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 .gt-chip.is-active {
@@ -370,7 +370,7 @@ function cellTitle(row, engine) {
 .gt-scroll {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -428,7 +428,7 @@ function cellTitle(row, engine) {
   margin-left: 8px;
   padding: 1px 6px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   color: var(--muted-foreground);
   font-size: 10.5px;
   font-weight: 600;
@@ -501,7 +501,7 @@ function cellTitle(row, engine) {
   height: 30px;
   padding: 0 14px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--card);
   color: var(--foreground);
   font: inherit;
@@ -515,6 +515,6 @@ function cellTitle(row, engine) {
 }
 
 .gt-clear:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 </style>

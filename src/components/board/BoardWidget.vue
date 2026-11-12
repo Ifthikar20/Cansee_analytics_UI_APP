@@ -197,7 +197,7 @@ function remove() {
   z-index: 1;
   box-sizing: border-box;
   border: 1px dashed var(--ag-fg-4);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-ghost-hover);
   content: '';
 }
@@ -240,7 +240,7 @@ function remove() {
   min-width: 0;
   padding: 16px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-pane-bg);
   container: bd-card / inline-size;
   transition: border-color 120ms ease, box-shadow 120ms ease;
@@ -293,7 +293,7 @@ function remove() {
   max-width: 100%;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: none;
   color: inherit;
   font: inherit;
@@ -336,7 +336,7 @@ function remove() {
   margin: -4px -4px 0 0;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-4);
   line-height: 0;

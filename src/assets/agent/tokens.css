@@ -1,152 +1,98 @@
-/* Agent workspace tokens. Set on :root (light) and [data-theme="dark"] so
-   teleported menus, popovers and dialogs inherit them as well. Dark values
-   come from the reference measurements; light values are derived. */
+/* Agent workspace tokens.
+
+   Aliases only: every colour points at a semantic token from
+   ../tailwind.css, so the workspace wears the same paper, ink, warm grays
+   and single orange accent as the rest of the app, flips with the theme,
+   and inverts inside `.cs-contrast`. Do not add literal colours here.
+   Declared on :root so teleported menus, popovers and dialogs inherit. */
 
 :root {
   --ag-font: 'Inter Agent', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --ag-font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  --ag-font-mono: var(--font-mono);
   --ag-font-features: 'ss02';
   --ag-sidebar-w: 256px;
   --ag-col-max: 640px;
   --ag-min-chat: 380px;
   --ag-min-pane: 420px;
   --ag-ease: cubic-bezier(0.23, 1, 0.32, 1);
-
-  --ag-sidebar-bg: #f7f7f5;
-  --ag-pane-bg: #ffffff;
-  --ag-divider: #e6e6e1;
-  --ag-divider-subtle: #eeeeea;
-  --ag-composer-bg: #ffffff;
-  --ag-composer-border: #e2e2dd;
-  --ag-composer-shadow: 0 1px 2px rgba(20, 20, 18, 0.04), 0 6px 20px rgba(20, 20, 18, 0.04);
-  --ag-bubble-bg: #f2f2ef;
-  --ag-row-hover: #efefeb;
-  --ag-row-active: #e9e9e5;
-  --ag-ghost-hover: #f0f0ed;
-  --ag-seg-track: #efefec;
-  --ag-seg-border: #e4e4df;
-  --ag-seg-thumb: #ffffff;
-  --ag-seg-thumb-shadow: 0 1px 2px rgba(20, 20, 18, 0.1);
-  --ag-btn-bg: #ffffff;
-  --ag-btn-border: #e3e3de;
-  --ag-btn-hover: #f6f6f3;
-  --ag-plus-border: #dcdcd7;
-  --ag-export-bg: #ffffff;
-  --ag-export-border: #e3e3de;
-  --ag-tab-bg: #f4f4f2;
-  --ag-tab-border: #e4e4df;
-  --ag-card-border: #e8e8e4;
-  --ag-iconbox-border: #ecece8;
-  --ag-fg-1: #1a1a18;
-  --ag-fg-1b: #2a2a27;
-  --ag-fg-tab: #222220;
-  --ag-fg-2: #5c5c57;
-  --ag-fg-chevron: #6b6b66;
-  --ag-fg-3: #74746f;
-  --ag-fg-4: #8a8a85;
-  --ag-placeholder: #8f8f89;
-  --ag-fg-disabled: #c4c4bf;
-  --ag-send-bg: #1a1a18;
-  --ag-send-fg: #ffffff;
-  --ag-send-disabled-bg: #f0f0ed;
-  --ag-accent: #2f7d4f;
-  --ag-recent-icon: #b4691f;
-  --ag-logo-bg: #f6efd9;
-  --ag-logo-fg: #9a7a26;
-  --ag-kind-doc: #a8690f;
-  --ag-kind-sheet: #2563c9;
-  --ag-kind-report: #7232e0;
-  --ag-danger: #c2483d;
-  --ag-danger-bg: rgba(194, 72, 61, 0.08);
-  --ag-warning: #b07d28;
-  --ag-you: #2f7d4f;
-  --ag-you-bg: rgba(47, 125, 79, 0.08);
-  --ag-competitor: #b07d28;
-  --ag-serp-title: #1a0dab;
-  --ag-serp-url: #4d5156;
-  --ag-code-bg: #f7f7f5;
-  --ag-code-border: #ebebe7;
-  --ag-inline-code-bg: #f0f0ed;
-  --ag-menu-bg: #ffffff;
-  --ag-menu-border: #e3e3de;
-  --ag-shadow-pop: 0 10px 30px rgba(20, 20, 18, 0.12);
-  --ag-scrim: rgba(20, 20, 18, 0.32);
-  --ag-ring: #5c5c57;
-  --ag-scroll-thumb: #d6d6d1;
-
-  /* Shell additions: tooltips stay dark in both themes; menu-hover is the
-     highlighted row on a menu or popover surface. */
-  --ag-tooltip-bg: #1a1a18;
-  --ag-tooltip-fg: #fafafa;
-  --ag-tooltip-border: #1a1a18;
-  --ag-menu-hover: #f0f0ed;
 }
 
-[data-theme='dark'] {
-  --ag-sidebar-bg: #000000;
-  --ag-pane-bg: #0e0e10;
-  --ag-divider: #232323;
-  --ag-divider-subtle: #1a1a1c;
-  --ag-composer-bg: #141316;
-  --ag-composer-border: #242426;
+:root,
+.cs-contrast {
+  /* Surfaces: one paper plane, panels told apart by hairlines. */
+  --ag-sidebar-bg: var(--background);
+  --ag-pane-bg: var(--background);
+  --ag-divider: var(--rule);
+  --ag-divider-subtle: var(--rule);
+  --ag-composer-bg: var(--popover);
+  --ag-composer-border: var(--input);
   --ag-composer-shadow: none;
-  --ag-bubble-bg: #242426;
-  --ag-row-hover: #141416;
-  --ag-row-active: #262626;
-  --ag-ghost-hover: #1a1a1d;
-  --ag-seg-track: #131313;
-  --ag-seg-border: #242424;
-  --ag-seg-thumb: #242426;
+  --ag-bubble-bg: var(--card);
+  --ag-row-hover: var(--card);
+  --ag-row-active: var(--muted);
+  --ag-ghost-hover: var(--card);
+  --ag-seg-track: var(--card);
+  --ag-seg-border: var(--border);
+  --ag-seg-thumb: var(--popover);
   --ag-seg-thumb-shadow: none;
-  --ag-btn-bg: #1c1b1e;
-  --ag-btn-border: #232325;
-  --ag-btn-hover: #232226;
-  --ag-plus-border: #2a2a2c;
-  --ag-export-bg: #1b1b1d;
-  --ag-export-border: #252527;
-  --ag-tab-bg: #1d1d1f;
-  --ag-tab-border: #2a2a2c;
-  --ag-card-border: #1f1f21;
-  --ag-iconbox-border: #1a191c;
-  --ag-fg-1: #fafafa;
-  --ag-fg-1b: #ededef;
-  --ag-fg-tab: #f4f4f5;
-  --ag-fg-2: #a8a8aa;
-  --ag-fg-chevron: #a1a1a1;
-  --ag-fg-3: #88888a;
-  --ag-fg-4: #6e6e72;
-  --ag-placeholder: #636466;
-  --ag-fg-disabled: #464548;
-  --ag-send-bg: #fafafa;
-  --ag-send-fg: #0e0e10;
-  --ag-send-disabled-bg: #18181a;
-  --ag-accent: #62ab7f;
-  --ag-recent-icon: #d09349;
-  --ag-logo-bg: #151507;
-  --ag-logo-fg: #c5a14a;
-  --ag-kind-doc: #e0a43a;
-  --ag-kind-sheet: #6ea8fe;
-  --ag-kind-report: #a78bfa;
-  --ag-danger: #ff6b6b;
-  --ag-danger-bg: rgba(255, 107, 107, 0.1);
-  --ag-warning: #fbbf24;
-  --ag-you: #62ab7f;
-  --ag-you-bg: rgba(98, 171, 127, 0.1);
-  --ag-competitor: #e0a43a;
-  --ag-serp-title: #8ab4f8;
-  --ag-serp-url: #bdc1c6;
-  --ag-code-bg: #141316;
-  --ag-code-border: #1f1f21;
-  --ag-inline-code-bg: #1d1d1f;
-  --ag-menu-bg: #141316;
-  --ag-menu-border: #242426;
-  --ag-shadow-pop: 0 10px 30px rgba(0, 0, 0, 0.55);
-  --ag-scrim: rgba(0, 0, 0, 0.6);
-  --ag-ring: #a8a8aa;
-  --ag-scroll-thumb: #2a2a2c;
+  --ag-btn-bg: var(--popover);
+  --ag-btn-border: var(--input);
+  --ag-btn-hover: var(--card);
+  --ag-plus-border: var(--input);
+  --ag-export-bg: var(--popover);
+  --ag-export-border: var(--input);
+  --ag-tab-bg: var(--card);
+  --ag-tab-border: var(--border);
+  --ag-card-border: var(--border);
+  --ag-iconbox-border: var(--border);
 
-  --ag-tooltip-bg: #2a2a2c;
-  --ag-tooltip-fg: #fafafa;
-  --ag-tooltip-border: #343436;
-  --ag-menu-hover: #232226;
+  /* Ink */
+  --ag-fg-1: var(--foreground);
+  --ag-fg-1b: var(--foreground);
+  --ag-fg-tab: var(--foreground);
+  --ag-fg-2: var(--muted-foreground);
+  --ag-fg-chevron: var(--muted-foreground);
+  --ag-fg-3: var(--muted-foreground);
+  --ag-fg-4: var(--subtle-foreground);
+  --ag-placeholder: var(--subtle-foreground);
+  --ag-fg-disabled: var(--bar);
+  --ag-send-bg: var(--primary);
+  --ag-send-fg: var(--primary-foreground);
+  --ag-send-disabled-bg: var(--muted);
+
+  /* State without hue. "Done", "selected" and "saved" are ink; "you" and
+     anything that needs attention is the accent; the rest is gray. Every
+     use also carries a word or an icon. */
+  --ag-accent: var(--foreground);
+  --ag-recent-icon: var(--muted-foreground);
+  --ag-logo-bg: var(--muted);
+  --ag-logo-fg: var(--foreground);
+  --ag-kind-doc: var(--foreground);
+  --ag-kind-sheet: var(--foreground);
+  --ag-kind-report: var(--foreground);
+  --ag-danger: var(--signal-text);
+  --ag-danger-bg: var(--signal-soft);
+  --ag-warning: var(--signal-text);
+  --ag-you: var(--signal-text);
+  --ag-you-bg: var(--signal-soft);
+  --ag-competitor: var(--muted-foreground);
+  --ag-serp-title: var(--foreground);
+  --ag-serp-url: var(--muted-foreground);
+
+  /* Code, menus, overlays */
+  --ag-code-bg: var(--card);
+  --ag-code-border: var(--border);
+  --ag-inline-code-bg: var(--muted);
+  --ag-menu-bg: var(--popover);
+  --ag-menu-border: var(--foreground);
+  --ag-shadow-pop: none;
+  --ag-scrim: var(--scrim);
+  --ag-ring: var(--ring);
+  --ag-scroll-thumb: var(--bar);
+  --ag-menu-hover: var(--accent);
+
+  /* Tooltips invert the surface they float over. */
+  --ag-tooltip-bg: var(--foreground);
+  --ag-tooltip-fg: var(--background);
+  --ag-tooltip-border: var(--foreground);
 }

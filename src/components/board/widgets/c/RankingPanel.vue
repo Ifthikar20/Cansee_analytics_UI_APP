@@ -195,7 +195,7 @@ function openPrompt(promptId) {
   gap: 6px 12px;
   padding: 8px 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .rkp-notice-text {
@@ -239,7 +239,7 @@ function openPrompt(promptId) {
   height: 30px;
   padding: 0 12px;
   border: 1px solid var(--ag-seg-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-seg-track);
   color: var(--ag-fg-2);
   font-size: 13px;
@@ -335,7 +335,7 @@ function openPrompt(promptId) {
 }
 
 .rkp-open:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -362,7 +362,7 @@ function openPrompt(promptId) {
 }
 
 .rkp-link:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

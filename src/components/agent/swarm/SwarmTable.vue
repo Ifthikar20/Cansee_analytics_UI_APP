@@ -406,7 +406,7 @@ function download() {
   margin-top: 4px;
   overflow: hidden;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-pane-bg);
   color: var(--ag-fg-1);
 }
@@ -462,7 +462,7 @@ function download() {
   box-sizing: border-box;
   padding: 0 6px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-3);
   font: inherit;
@@ -491,7 +491,7 @@ function download() {
   height: 26px;
   padding: 1px;
   border: 1px solid var(--ag-seg-border);
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: var(--ag-seg-track);
 }
 
@@ -502,7 +502,7 @@ function download() {
   height: 22px;
   padding: 0 8px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-3);
   font: inherit;
@@ -675,7 +675,7 @@ function download() {
 }
 
 .ag-st-sort:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -768,7 +768,7 @@ function download() {
 
 .ag-st-link:focus-visible,
 .ag-st-ev:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

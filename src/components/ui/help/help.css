@@ -20,10 +20,10 @@
   box-sizing: border-box;
   max-width: min(280px, calc(100vw - 16px));
   padding: 6px 10px;
-  border: 1px solid var(--ag-tooltip-border, #1a1a18);
-  border-radius: 7px;
-  background: var(--ag-tooltip-bg, #1a1a18);
-  color: var(--ag-tooltip-fg, #fafafa);
+  border: 1px solid var(--ag-tooltip-border);
+  border-radius: var(--radius);
+  background: var(--ag-tooltip-bg);
+  color: var(--ag-tooltip-fg);
   font-size: 12px;
   font-weight: 500;
   line-height: 18px;
@@ -54,9 +54,9 @@
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
-  color: var(--cs-helptip-fg, var(--ag-fg-3, #74746f));
+  color: var(--cs-helptip-fg, var(--ag-fg-3));
   font: inherit;
   line-height: 1;
   vertical-align: middle;
@@ -72,7 +72,7 @@
 .cs-helptip:hover,
 .cs-helptip[data-state='delayed-open'],
 .cs-helptip[data-state='instant-open'] {
-  color: var(--cs-helptip-fg-hover, var(--ag-fg-1, #1a1a18));
+  color: var(--cs-helptip-fg-hover, var(--ag-fg-1));
 }
 
 .cs-helptip:focus-visible {
@@ -90,7 +90,7 @@
 .cs-helptip.has-text {
   width: auto;
   height: auto;
-  border-radius: var(--cs-helptip-radius, 4px);
+  border-radius: var(--cs-helptip-radius, var(--radius));
   color: inherit;
   text-align: inherit;
   vertical-align: baseline;
@@ -116,11 +116,11 @@
   width: 300px;
   max-width: calc(100vw - 16px);
   padding: 14px 16px 12px;
-  border: 1px solid var(--ag-menu-border, #e3e3de);
-  border-radius: 12px;
-  background: var(--ag-menu-bg, #ffffff);
-  box-shadow: var(--ag-shadow-pop, 0 10px 30px rgba(20, 20, 18, 0.12));
-  color: var(--ag-fg-1, #1a1a18);
+  border: 1px solid var(--ag-menu-border);
+  border-radius: var(--radius);
+  background: var(--ag-menu-bg);
+  box-shadow: none;
+  color: var(--ag-fg-1);
   font-size: 13px;
   line-height: 18px;
   outline: none;
@@ -133,7 +133,7 @@
 
 .cs-hint-title {
   margin: 0 0 4px;
-  color: var(--ag-fg-1, #1a1a18);
+  color: var(--ag-fg-1);
   font-size: 13px;
   font-weight: 600;
   line-height: 18px;
@@ -141,7 +141,7 @@
 
 .cs-hint-body {
   margin: 0;
-  color: var(--ag-fg-2, #5c5c57);
+  color: var(--ag-fg-2);
 }
 
 .cs-hint-actions {
@@ -159,9 +159,9 @@
   height: 28px;
   padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: transparent;
-  color: var(--ag-fg-2, #5c5c57);
+  color: var(--ag-fg-2);
   font: inherit;
   font-size: 13px;
   font-weight: 500;
@@ -169,13 +169,13 @@
 }
 
 .cs-hint-btn:hover {
-  background: var(--ag-menu-hover, #f0f0ed);
-  color: var(--ag-fg-1, #1a1a18);
+  background: var(--ag-menu-hover);
+  color: var(--ag-fg-1);
 }
 
 .cs-hint-btn.is-primary {
-  background: var(--ag-send-bg, #1a1a18);
-  color: var(--ag-send-fg, #ffffff);
+  background: var(--ag-send-bg);
+  color: var(--ag-send-fg);
 }
 
 .cs-hint-btn.is-primary:hover {

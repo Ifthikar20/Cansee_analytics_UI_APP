@@ -110,7 +110,7 @@ function isDisabled(plan) {
   min-width: 0;
   padding: 22px;
   border: 1px solid var(--pc-border, var(--border));
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--pc-card-bg, var(--card));
   color: var(--pc-fg, var(--foreground));
 }
@@ -173,7 +173,7 @@ function isDisabled(plan) {
   height: 40px;
   padding: 0 16px;
   border: 1px solid var(--pc-btn-bg, var(--primary));
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--pc-btn-bg, var(--primary));
   color: var(--pc-btn-fg, var(--primary-foreground));
   font: inherit;
@@ -204,7 +204,7 @@ function isDisabled(plan) {
 }
 
 .pc-btn:focus-visible {
-  border-radius: 10px;
+  border-radius: var(--radius);
   outline: 2px solid var(--pc-ring, var(--ring));
   outline-offset: 2px;
 }

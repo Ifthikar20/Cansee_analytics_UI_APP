@@ -97,7 +97,7 @@ const isFiltered = computed(
       <button
         v-for="opt in STATUS_OPTIONS"
         :key="opt.value || 'all'"
-        class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors"
+        class="inline-flex items-center gap-1.5 border px-2.5 py-1 text-xs font-medium transition-colors"
         :class="status === opt.value
           ? 'border-foreground bg-foreground text-background'
           : 'border-border bg-background text-muted-foreground hover:text-foreground'"
@@ -106,14 +106,14 @@ const isFiltered = computed(
         {{ opt.label }}
         <span
           v-if="opt.statKey"
-          class="rounded-full bg-secondary/50 px-1.5 text-[10px] font-semibold text-foreground"
+          class="bg-secondary/50 px-1.5 text-[10px] font-semibold text-foreground"
           :class="status === opt.value ? 'bg-background/25 text-background' : ''"
         >
           {{ stats[opt.statKey] || 0 }}
         </span>
         <span
           v-else
-          class="rounded-full bg-secondary/50 px-1.5 text-[10px] font-semibold text-foreground"
+          class="bg-secondary/50 px-1.5 text-[10px] font-semibold text-foreground"
           :class="status === opt.value ? 'bg-background/25 text-background' : ''"
         >
           {{ stats.total || 0 }}

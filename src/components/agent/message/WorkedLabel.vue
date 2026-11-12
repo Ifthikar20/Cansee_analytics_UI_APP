@@ -124,7 +124,7 @@ const note = computed(() => {
 
 .ag-worked-toggle {
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius);
   transition: color 0.15s ease;
 }
 
@@ -135,7 +135,7 @@ const note = computed(() => {
 .ag-worked-toggle:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .ag-worked-note {

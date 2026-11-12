@@ -57,14 +57,14 @@ const icon = computed(() => ICONS[props.kind] || Inbox)
   gap: 6px;
   padding: 36px 24px;
   border: 1px dashed var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--viz-surface);
   text-align: center;
 }
 
 .viz-state.is-compact {
   padding: 20px 16px;
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .viz-state-icon {
@@ -73,7 +73,7 @@ const icon = computed(() => ICONS[props.kind] || Inbox)
   width: 36px;
   height: 36px;
   margin-bottom: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--viz-nodata);
   color: var(--viz-ink-2);
 }
@@ -100,7 +100,7 @@ const icon = computed(() => ICONS[props.kind] || Inbox)
 
 .viz-state-btn {
   margin-top: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 /* A link styled as a button: the global `a` rule (base.css) is unlayered,

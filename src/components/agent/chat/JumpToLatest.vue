@@ -25,7 +25,7 @@ const emit = defineEmits(['jump'])
   height: 32px;
   padding: 0;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--ag-btn-bg);
   box-shadow: var(--ag-composer-shadow);
   color: var(--ag-fg-1);
@@ -40,7 +40,7 @@ const emit = defineEmits(['jump'])
 .ag-jump:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 .ag-jump svg {

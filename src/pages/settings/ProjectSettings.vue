@@ -244,7 +244,7 @@ watch(competitors, () => {
   height: 40px;
   padding: 0 14px;
   border: 1px solid var(--input);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -261,7 +261,7 @@ watch(competitors, () => {
 .ps-input:focus,
 .ps-input:focus-visible {
   border-color: var(--ring);
-  border-radius: 12px;
+  border-radius: var(--radius);
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 16%, transparent);
 }
@@ -286,7 +286,7 @@ watch(competitors, () => {
 .ps-btn {
   height: 36px;
   padding: 0 16px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13px;
 }
 

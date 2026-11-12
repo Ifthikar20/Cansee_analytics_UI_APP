@@ -411,7 +411,7 @@ function onEmptyAction() {
   margin: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--viz-chart-surface);
   color: var(--viz-ink-1);
 }
@@ -491,7 +491,7 @@ function onEmptyAction() {
   max-width: 220px;
   padding: 0 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--viz-chart-surface);
   color: var(--viz-ink-1);
   font: inherit;
@@ -504,7 +504,7 @@ function onEmptyAction() {
 }
 
 .viz-skeleton {
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--viz-nodata);
   animation: viz-pulse 1.6s ease-in-out infinite;
 }

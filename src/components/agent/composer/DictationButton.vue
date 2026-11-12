@@ -51,7 +51,7 @@ onBeforeUnmount(() => dictation.stop())
 <style scoped>
 .ag-mic {
   display: inline-flex;
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 .ag-mic.is-listening :deep(.ag-icon-btn) {

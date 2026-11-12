@@ -5,8 +5,6 @@
        it shows. Escape intentionally does nothing: the escape hatch is the
        always-visible Sign out. -->
   <div class="ob-root" role="region" aria-label="Set up your Cansee">
-    <WatercolorBackdrop />
-
     <header class="ob-topbar">
       <div class="ob-topbar-left">
         <img src="/images/cansee-logo.png" alt="Cansee" class="ob-brand-mark" />
@@ -76,7 +74,6 @@ import { useResizeObserver } from '@vueuse/core'
 
 import { useAuthStore } from '@/stores/auth'
 import { provideOnboardingFlow } from './useOnboardingFlow'
-import WatercolorBackdrop from './WatercolorBackdrop.vue'
 import WebsiteStep from './steps/WebsiteStep.vue'
 import BrandStep from './steps/BrandStep.vue'
 import CompetitorsStep from './steps/CompetitorsStep.vue'
@@ -154,21 +151,23 @@ onBeforeUnmount(() => {
      the custom properties are set on .ob-root, so nothing leaks. -->
 <style>
 .ob-root {
-  --ob-bg: #ffffff;
-  --ob-fg: #0a0a0a;
-  /* A step darker than the old #6b6b6b: secondary copy stays clearly
-     readable at a glance. */
-  --ob-muted: #5d5d5d;
-  --ob-border: rgba(10, 10, 10, 0.10);
-  --ob-surface: #fafafa;
-  --ob-accent: #ff6a2c;
-  --ob-accent-soft: rgba(255, 106, 44, 0.10);
+  /* The flow's palette is the app's: a flat card on the paper page, in
+     both themes. The accent is kept for the eyebrow mark, the spinner and
+     errors; selection and focus are ink. */
+  --ob-bg: var(--card);
+  --ob-fg: var(--foreground);
+  --ob-muted: var(--muted-foreground);
+  --ob-border: var(--border);
+  --ob-field-border: var(--input);
+  --ob-surface: var(--muted);
+  --ob-accent: var(--signal-text);
+  --ob-accent-soft: var(--signal-soft);
   --ob-spring: cubic-bezier(0.22, 1, 0.36, 1);
   --ob-spring-strong: cubic-bezier(0.16, 1, 0.3, 1);
   /* Framer-style back-out: transforms overshoot a touch, then settle.
      Use for entrances and pops, never for opacity alone. */
   --ob-spring-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ob-label-font: 'Geist', 'Inter', system-ui, sans-serif;
+  --ob-label-font: var(--font-mono);
 
   position: fixed;
   inset: 0;
@@ -176,19 +175,21 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: var(--background);
+  color: var(--foreground);
 }
-.ob-root :focus-visible { outline-color: var(--ob-accent); }
+.ob-root :focus-visible { outline-color: var(--ring); }
 /* Help icons (HelpTip) in the flow's own light palette; their tips are
    portalled above the flow (help.css). */
 .ob-root {
   --cs-helptip-fg: var(--ob-muted);
   --cs-helptip-fg-hover: var(--ob-fg);
-  --cs-helptip-ring: var(--ob-accent);
+  --cs-helptip-ring: var(--ring);
 }
 .ob-sub .cs-helptip,
 .ob-summary-row dt .cs-helptip { margin-left: 4px; }
 
-/* ── Topbar (white on video) ─────────────────────────────────────── */
+/* ── Topbar ── */
 .ob-topbar {
   position: relative;
   z-index: 2;
@@ -197,54 +198,53 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 16px;
   padding: 20px 28px;
-  color: #fff;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
+  color: var(--foreground);
   animation: ob-drop 450ms var(--ob-spring) 80ms both;
 }
 .ob-topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .ob-brand-mark {
   width: auto; height: 17px; object-fit: contain; flex-shrink: 0;
-  filter: brightness(0) invert(1);
+  filter: brightness(0);
 }
 .ob-brand-name { font-weight: 600; font-size: 15px; letter-spacing: -0.01em; }
 .ob-topbar-divider {
-  width: 1px; height: 16px; background: rgba(255, 255, 255, 0.3);
+  width: 1px; height: 16px; background: var(--border);
   margin: 0 4px; flex-shrink: 0;
 }
 .ob-topbar-email {
-  font-size: 12.5px; color: rgba(255, 255, 255, 0.65);
+  font-size: 12.5px; color: var(--muted-foreground);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .ob-signout {
   background: transparent; border: none;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--foreground);
   font-size: 12.5px; font-weight: 600;
-  cursor: pointer; padding: 4px 6px; border-radius: 6px;
+  cursor: pointer; padding: 4px 6px; border-radius: var(--radius);
   flex-shrink: 0;
   transition: color 0.2s;
 }
-.ob-signout:hover { color: #fff; text-decoration: underline; }
+.ob-signout:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 /* Segmented progress, Treasury-style. */
 .ob-progress { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .ob-progress-label {
   font-family: var(--ob-label-font);
-  font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
+  color: var(--muted-foreground);
 }
 .ob-progress-track { display: flex; gap: 6px; }
 .ob-seg {
-  display: block; width: 34px; height: 3px; border-radius: 999px;
-  overflow: hidden; background: rgba(255, 255, 255, 0.28);
+  display: block; width: 34px; height: 3px; border-radius: 0;
+  overflow: hidden; background: var(--bar);
 }
 .ob-seg-fill {
-  display: block; height: 100%; background: #fff;
+  display: block; height: 100%; background: var(--foreground);
   transform: scaleX(0); transform-origin: left;
   transition: transform 480ms var(--ob-spring-pop), box-shadow 480ms ease;
 }
 .ob-seg-fill.is-on {
   transform: scaleX(1);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.55);
+  box-shadow: none;
 }
 
 /* ── Stage + card shell ──────────────────────────────────────────── */
@@ -265,15 +265,13 @@ onBeforeUnmount(() => {
   overflow-x: hidden;
   background: var(--ob-bg);
   color: var(--ob-fg);
-  border-radius: 24px;
-  box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.35),
-    0 8px 24px rgba(0, 0, 0, 0.18);
+  border-radius: var(--radius);
+  box-shadow: none;
   font-feature-settings: 'cv11', 'ss01';
   animation: ob-card-in 650ms var(--ob-spring-pop) 140ms both;
 }
 
-/* ── Footer (legal links over the video) ─────────────────────────── */
+/* ── Footer ── */
 .ob-footer {
   position: relative;
   z-index: 2;
@@ -282,17 +280,16 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   padding: 14px 28px 18px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.6);
-  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
+  color: var(--muted-foreground);
   animation: ob-fade-in 0.8s ease 0.5s both;
 }
 .ob-footer-links { display: flex; gap: 20px; }
 .ob-footer-links a {
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--muted-foreground);
   text-decoration: none;
   transition: color 0.2s;
 }
-.ob-footer-links a:hover { color: #fff; text-decoration: underline; }
+.ob-footer-links a:hover { color: var(--foreground); text-decoration: underline; }
 @keyframes ob-fade-in { from { opacity: 0; } to { opacity: 1; } }
 
 /* Height morph wrapper (see OnboardingFlow.vue script for the rules). */
@@ -318,7 +315,7 @@ onBeforeUnmount(() => {
   display: inline-block;
   font-family: var(--ob-label-font);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ob-muted);
@@ -329,8 +326,7 @@ onBeforeUnmount(() => {
   display: inline-block;
   width: 20px;
   height: 2px;
-  border-radius: 1px;
-  background: var(--ob-accent);
+  border-radius: 0; background: var(--signal);
   margin-right: 10px;
   vertical-align: 3px;
 }
@@ -339,7 +335,7 @@ onBeforeUnmount(() => {
      headline voice used across the product. */
   font-size: clamp(28px, 4vw, 38px);
   line-height: 1.1;
-  font-weight: 600;
+  font-family: var(--font-display); font-weight: 500;
   letter-spacing: -0.025em;
   margin: 0 0 12px;
   outline: none;
@@ -370,23 +366,19 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   background: var(--ob-bg);
-  border: 1px solid var(--ob-border);
-  border-radius: 999px;
+  border: 1px solid var(--ob-field-border);
+  border-radius: var(--radius);
   padding: 6px 6px 6px 22px;
   transition: border-color 0.25s var(--ob-spring), box-shadow 0.25s var(--ob-spring), transform 0.25s var(--ob-spring);
 }
-.ob-input-wrap:focus-within {
-  border-color: var(--ob-accent);
-  box-shadow: 0 0 0 4px var(--ob-accent-soft);
-  transform: translateY(-1px);
-}
+.ob-input-wrap:focus-within { border-color: var(--ob-fg); box-shadow: 0 0 0 1px var(--ob-fg); }
 .ob-input-wrap.is-error {
   border-color: var(--ob-accent);
   animation: ob-shake 320ms ease;
 }
 .ob-input-prefix {
   color: var(--ob-muted);
-  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
 }
 .ob-input {
@@ -407,8 +399,8 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  border: none;
-  border-radius: 999px;
+  border: 1px solid var(--ob-fg);
+  border-radius: var(--radius);
   background: var(--ob-fg);
   color: var(--ob-bg);
   font-size: 14px;
@@ -418,13 +410,9 @@ onBeforeUnmount(() => {
   transition: transform 0.25s var(--ob-spring-pop), background 0.25s var(--ob-spring), box-shadow 0.25s ease, opacity 0.2s;
 }
 .ob-cta svg { transition: transform 0.25s var(--ob-spring-pop); }
-.ob-cta:hover:not(:disabled) {
-  transform: translateY(-2px);
-  background: var(--ob-accent);
-  box-shadow: 0 10px 24px rgba(255, 106, 44, 0.35);
-}
+.ob-cta:hover:not(:disabled) { background: transparent; color: var(--ob-fg); }
 .ob-cta:hover:not(:disabled) svg { transform: translateX(3px); }
-.ob-cta:active:not(:disabled) { transform: translateY(0) scale(0.97); box-shadow: 0 4px 12px rgba(255, 106, 44, 0.25); }
+.ob-cta:active:not(:disabled) { transform: scale(0.98); }
 .ob-cta:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .ob-link-btn {
@@ -438,7 +426,7 @@ onBeforeUnmount(() => {
   font-weight: 500;
   cursor: pointer;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   transition: color 0.2s, background 0.2s;
 }
 .ob-link-btn:hover:not(:disabled) { color: var(--ob-fg); background: var(--ob-surface); }
@@ -482,7 +470,7 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   border: 1.5px solid var(--ob-border);
 }
-.ob-scan-row.is-found .ob-scan-mark { color: var(--ob-accent); animation: ob-pop 320ms var(--ob-spring-pop) both; }
+.ob-scan-row.is-found .ob-scan-mark { color: var(--ob-fg); animation: ob-pop 320ms var(--ob-spring-pop) both; }
 .ob-scan-row.is-missing .ob-scan-mark { color: var(--ob-muted); }
 .ob-scan-label { font-weight: 500; }
 .ob-scan-result { color: var(--ob-muted); text-align: right; animation: ob-fade-in 240ms ease both; }
@@ -493,7 +481,7 @@ onBeforeUnmount(() => {
   margin-top: 6px;
   background: var(--ob-surface);
   border: 1px solid var(--ob-border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -505,7 +493,7 @@ onBeforeUnmount(() => {
 .ob-label {
   font-family: var(--ob-label-font);
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ob-muted);
@@ -516,7 +504,7 @@ onBeforeUnmount(() => {
   line-height: 16px;
   color: var(--ob-muted);
   border: 1px solid var(--ob-border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   padding: 0 7px;
 }
 .ob-label-hint {
@@ -539,14 +527,14 @@ onBeforeUnmount(() => {
   gap: 2px;
   padding: 10px 12px;
   border: 1px solid var(--ob-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--ob-surface);
 }
 .ob-note--muted { color: var(--ob-muted); font-size: 12.5px; }
 .ob-field-error { margin: 0; font-size: 12.5px; color: var(--ob-accent); }
 .ob-text-input {
-  border: 1px solid var(--ob-border);
-  border-radius: 10px;
+  border: 1px solid var(--ob-field-border);
+  border-radius: var(--radius);
   padding: 11px 14px;
   font-size: 15px;
   color: var(--ob-fg);
@@ -555,10 +543,7 @@ onBeforeUnmount(() => {
   font-family: inherit;
   transition: border-color 0.2s var(--ob-spring), box-shadow 0.2s var(--ob-spring);
 }
-.ob-text-input:focus {
-  border-color: var(--ob-accent);
-  box-shadow: 0 0 0 3px var(--ob-accent-soft);
-}
+.ob-text-input:focus { border-color: var(--ob-fg); box-shadow: 0 0 0 1px var(--ob-fg); }
 .ob-text-input[aria-invalid='true'] { border-color: var(--ob-accent); }
 .ob-text-input:disabled { opacity: 0.55; cursor: not-allowed; }
 .ob-textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
@@ -576,7 +561,7 @@ onBeforeUnmount(() => {
   gap: 12px;
   padding: 10px 14px;
   border: 1px dashed var(--ob-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 15px;
 }
 .ob-readonly-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -593,7 +578,7 @@ onBeforeUnmount(() => {
   width: 44px;
   height: 44px;
   border: 1px solid var(--ob-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--ob-bg);
   overflow: hidden;
 }
@@ -622,13 +607,13 @@ onBeforeUnmount(() => {
   gap: 6px;
   max-width: 100%;
   padding: 4px 4px 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--ob-bg);
   border: 1px solid var(--ob-border);
   font-size: 13px;
   transition: transform 0.2s var(--ob-spring), border-color 0.2s;
 }
-.ob-chip:hover { border-color: var(--ob-accent); }
+.ob-chip:hover { border-color: var(--ob-fg); }
 .ob-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ob-chip-x {
   background: transparent;
@@ -638,10 +623,10 @@ onBeforeUnmount(() => {
   padding: 0 6px;
   font-size: 14px;
   line-height: 1;
-  border-radius: 50%;
+  border-radius: var(--radius);
   transition: background 0.15s, color 0.15s;
 }
-.ob-chip-x:hover { background: var(--ob-accent-soft); color: var(--ob-accent); }
+.ob-chip-x:hover { background: var(--ob-surface); color: var(--ob-fg); }
 
 /* ── Checkable rows (competitors + prompts) ──────────────────────── */
 .ob-competitors,
@@ -657,19 +642,19 @@ onBeforeUnmount(() => {
   gap: 8px;
   padding: 10px 8px 10px 12px;
   border: 1px solid var(--ob-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--ob-bg);
   transition: border-color 160ms var(--ob-spring), background 160ms var(--ob-spring), opacity 160ms ease;
 }
 .ob-competitor:hover:not(.is-locked),
-.ob-prompt:hover:not(.is-locked) { border-color: var(--ob-accent); }
+.ob-prompt:hover:not(.is-locked) { border-color: var(--ob-fg); }
 .ob-competitor.is-selected,
-.ob-prompt.is-selected { background: var(--ob-accent-soft); border-color: var(--ob-accent); }
+.ob-prompt.is-selected { border-color: var(--ob-fg); box-shadow: inset 0 0 0 1px var(--ob-fg); }
 .ob-competitor.is-custom,
 .ob-prompt.is-custom { border-style: dashed; }
 .ob-competitor.is-locked,
 .ob-prompt.is-locked { opacity: 0.55; }
-.ob-check { width: 16px; height: 16px; margin: 0; accent-color: var(--ob-accent); flex-shrink: 0; cursor: pointer; }
+.ob-check { width: 16px; height: 16px; margin: 0; accent-color: var(--ob-fg); flex-shrink: 0; cursor: pointer; }
 .ob-check:disabled { cursor: not-allowed; }
 .ob-competitor-label,
 .ob-prompt-label {
@@ -690,7 +675,7 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   width: 26px;
   height: 26px;
-  border-radius: 50%;
+  border-radius: var(--radius);
   background: var(--ob-surface);
   border: 1px solid var(--ob-border);
   font-size: 12px;
@@ -719,16 +704,14 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   border: 1px solid var(--ob-border);
   background: var(--ob-bg);
-  font-size: 11px;
-  font-weight: 500;
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--ob-fg);
   white-space: nowrap;
 }
-.ob-badge.is-search,
-.ob-badge.is-both { border-color: rgba(255, 106, 44, 0.45); }
+.ob-badge.is-search, .ob-badge.is-both { border-color: var(--ob-fg); }
 .ob-row-remove {
   flex-shrink: 0;
   background: transparent;
@@ -738,10 +721,10 @@ onBeforeUnmount(() => {
   line-height: 1;
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   transition: background 0.15s, color 0.15s;
 }
-.ob-row-remove:hover { background: var(--ob-accent-soft); color: var(--ob-accent); }
+.ob-row-remove:hover { background: var(--ob-surface); color: var(--ob-fg); }
 
 /* "Add your own" rows */
 .ob-add-row {
@@ -757,8 +740,8 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   padding: 0 18px;
-  border-radius: 10px;
-  border: 1px solid var(--ob-border);
+  border-radius: var(--radius);
+  border: 1px solid var(--ob-field-border);
   background: var(--ob-bg);
   color: var(--ob-fg);
   font-size: 13px;
@@ -766,18 +749,14 @@ onBeforeUnmount(() => {
   cursor: pointer;
   transition: border-color 0.2s var(--ob-spring), background 0.2s var(--ob-spring), color 0.2s;
 }
-.ob-add-btn:hover:not(:disabled) {
-  border-color: var(--ob-accent);
-  background: var(--ob-accent);
-  color: var(--ob-bg);
-}
+.ob-add-btn:hover:not(:disabled) { border-color: var(--ob-fg); background: var(--ob-fg); color: var(--ob-bg); }
 .ob-add-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ── First research summary ──────────────────────────────────────── */
 .ob-summary {
   margin: 6px 0 0;
   border: 1px solid var(--ob-border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--ob-surface);
   padding: 4px 20px;
 }
@@ -794,7 +773,7 @@ onBeforeUnmount(() => {
 .ob-summary-row dt {
   font-family: var(--ob-label-font);
   font-size: 10.5px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ob-muted);
@@ -820,8 +799,8 @@ onBeforeUnmount(() => {
   gap: 4px 10px;
   margin: 16px 0 0;
   padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 106, 44, 0.35);
+  border-radius: var(--radius);
+  border: 1px solid var(--ob-accent);
   background: var(--ob-accent-soft);
   font-size: 14px;
   line-height: 1.5;
@@ -927,11 +906,11 @@ onBeforeUnmount(() => {
   .ob-stage { padding: 8px 12px 20px; }
   .ob-card-shell {
     width: calc(100vw - 24px);
-    border-radius: 18px;
+    border-radius: var(--radius);
     max-height: calc(100dvh - 96px);
   }
   .ob-step { padding: 28px 22px 30px; }
-  .ob-input-wrap { border-radius: 16px; flex-wrap: wrap; padding: 6px; }
+  .ob-input-wrap { border-radius: var(--radius); flex-wrap: wrap; padding: 6px; }
   .ob-input-prefix { padding-left: 12px; }
   .ob-input { padding: 12px 8px; }
   .ob-add-input--narrow { max-width: none; }

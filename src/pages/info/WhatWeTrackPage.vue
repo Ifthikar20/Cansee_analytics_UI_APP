@@ -293,7 +293,7 @@ const serverFields = [
 .wt-consent-btn {
   padding: 9px 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--muted);
   color: var(--foreground);
   font: inherit;
@@ -308,9 +308,9 @@ const serverFields = [
 .wt-callout {
   margin: 0 0 32px;
   padding: 16px 20px;
-  border-left: 3px solid var(--primary, #ff385c);
-  background: color-mix(in srgb, var(--primary, #ff385c) 6%, transparent);
-  border-radius: 0 12px 12px 0;
+  border-left: 3px solid var(--primary);
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+  border-radius: 0 var(--radius) var(--radius) 0;
   font-size: 15px;
   line-height: 1.6;
 }
@@ -320,13 +320,13 @@ const serverFields = [
   font-size: 13px;
   background: var(--muted);
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius);
 }
 
 .wt-table-wrap {
   overflow-x: auto;
   margin: 16px 0 28px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
 }
 .wt-table {
@@ -342,11 +342,12 @@ const serverFields = [
   border-bottom: 1px solid var(--border);
 }
 .wt-table th {
-  font-weight: 700;
+  font-weight: 500;
   color: var(--foreground);
   background: var(--muted);
   font-size: 12.5px;
   letter-spacing: 0.02em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
 }
 .wt-table tbody tr:last-child td { border-bottom: none; }
@@ -366,16 +367,17 @@ const serverFields = [
 .wt-tag {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.03em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   white-space: nowrap;
 }
-.wt-tag-none { background: color-mix(in srgb, #16a34a 14%, transparent); color: #15803d; }
-.wt-tag-weak { background: color-mix(in srgb, #ca8a04 16%, transparent); color: #a16207; }
-.wt-tag-pii  { background: color-mix(in srgb, #dc2626 14%, transparent); color: #b91c1c; }
+.wt-tag-none { background: var(--muted); color: var(--muted-foreground); }
+.wt-tag-weak { background: var(--muted); color: var(--foreground); }
+.wt-tag-pii  { background: var(--signal-soft); color: var(--signal-text); }
 
 .wt-footer {
   margin-top: 40px;

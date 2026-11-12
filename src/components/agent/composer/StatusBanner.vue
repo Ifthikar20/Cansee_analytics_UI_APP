@@ -154,7 +154,7 @@ const copy = computed(() => {
   margin-bottom: 8px;
   padding: 10px 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
 }
 
@@ -196,7 +196,7 @@ const copy = computed(() => {
   height: 28px;
   padding: 0 10px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-btn-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -220,6 +220,6 @@ const copy = computed(() => {
 .ag-banner-action:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 </style>

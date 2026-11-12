@@ -108,7 +108,7 @@ const rows = computed(() =>
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -136,7 +136,7 @@ const rows = computed(() =>
   position: relative;
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .tt-scroll:focus-visible {

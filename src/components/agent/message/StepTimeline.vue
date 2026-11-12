@@ -192,7 +192,7 @@ function open(line, event) {
 .ag-step-dot {
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--ag-fg-4);
 }
 
@@ -252,7 +252,7 @@ function open(line, event) {
 
 .ag-step-link {
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--radius);
   transition: color 0.15s ease;
 }
 
@@ -264,7 +264,7 @@ function open(line, event) {
 .ag-step-result:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .ag-step-go {
@@ -396,7 +396,7 @@ function open(line, event) {
   width: 6px;
   height: 6px;
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: 50%;
 }
 
 .ag-check-engine {

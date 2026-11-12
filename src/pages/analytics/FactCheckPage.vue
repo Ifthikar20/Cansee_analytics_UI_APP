@@ -6,7 +6,7 @@
       subtitle="What the AI engines state about you, checked against your brand facts and your own pages."
     >
       <template #actions>
-        <Button class="rounded-full" @click="openAnalysis">
+        <Button @click="openAnalysis">
           <Sparkles class="size-4" aria-hidden="true" />
           Analyze answers
         </Button>
@@ -341,7 +341,7 @@ function openAnswer(resultId) {
 }
 
 .an-alert {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .an-retry {

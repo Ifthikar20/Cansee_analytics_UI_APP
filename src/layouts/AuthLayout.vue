@@ -34,9 +34,9 @@
       </footer>
     </section>
 
-    <!-- Right: the same gradient panel as the landing hero. -->
+    <!-- Right: the same light card as the landing hero. -->
     <aside class="auth-aside">
-      <GradientCard class="auth-card">
+      <div class="auth-card cs-card cs-contrast">
         <div class="auth-card-inner">
           <span class="auth-card-pill">AI visibility analytics</span>
 
@@ -54,7 +54,7 @@
 
           <p class="auth-card-engines">ChatGPT · Claude · Gemini · Grok · Perplexity</p>
         </div>
-      </GradientCard>
+      </div>
     </aside>
   </div>
 </template>
@@ -63,7 +63,6 @@
 import { onMounted, ref } from 'vue'
 import { ArrowLeft, Check } from '@lucide/vue'
 import api from '@/api/client'
-import GradientCard from '@/components/GradientCard.vue'
 import { useForcedTheme } from '@/composables/useForcedTheme'
 
 defineProps({
@@ -108,22 +107,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* Token overrides: a slightly lifted near-black instead of the app's pure
-   black dark mode, and a lavender focus ring to match the landing page. */
 .auth {
-  --background: #0a0a0c;
-  --foreground: #f5f5f7;
-  --card: #111115;
-  --card-foreground: #f5f5f7;
-  --popover: #111115;
-  --muted: #16161b;
-  --muted-foreground: #a1a1aa;
-  --accent: #1c1c22;
-  --accent-foreground: #ffffff;
-  --border: rgba(255, 255, 255, 0.1);
-  --input: rgba(255, 255, 255, 0.14);
-  --ring: #a78bfa;
-
   display: flex;
   min-height: 100vh;
   min-height: 100svh;
@@ -161,8 +145,7 @@ onMounted(async () => {
   display: block;
   height: 22px;
   width: auto;
-  /* The wordmark ships dark slate; render it white on the dark page. */
-  filter: brightness(0) invert(1);
+  filter: var(--logo-filter);
 }
 
 .auth-back {
@@ -204,7 +187,8 @@ onMounted(async () => {
 .auth-title {
   color: var(--foreground);
   font-size: clamp(2rem, 3vw, 2.5rem);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 500;
   line-height: 1.1;
   letter-spacing: -0.035em;
   text-wrap: balance;
@@ -221,7 +205,7 @@ onMounted(async () => {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 18px;
-  color: rgba(245, 245, 247, 0.42);
+  color: var(--subtle-foreground);
   font-size: 13px;
 }
 
@@ -246,7 +230,7 @@ onMounted(async () => {
   user-select: none;
 }
 
-/* ── Gradient side ── */
+/* ── Card side ── */
 .auth-aside {
   flex: 1;
   display: flex;
@@ -268,22 +252,20 @@ onMounted(async () => {
 
 .auth-card-pill {
   align-self: flex-start;
-  padding: 7px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.05);
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 500;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
 }
 
 .auth-card-title {
   max-width: 14ch;
-  color: #ffffff;
+  color: var(--foreground);
   font-size: clamp(2.4rem, 4vw, 3.75rem);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 500;
   line-height: 1.04;
   letter-spacing: -0.04em;
   text-wrap: balance;
@@ -301,7 +283,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--foreground);
   font-size: 16px;
   font-weight: 500;
 }
@@ -309,25 +291,27 @@ onMounted(async () => {
 .auth-card-check {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 8px;
+  height: 8px;
   flex-shrink: 0;
-  border-radius: 50%;
-  background: #ffffff;
-  color: #4b3bb4;
+  border-radius: 0;
+  background: var(--signal);
+  color: transparent;
 }
 
 .auth-card-check svg {
+  display: none;
   width: 14px;
   height: 14px;
   stroke-width: 3;
 }
 
 .auth-card-engines {
-  color: rgba(255, 255, 255, 0.78);
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 /* ── Responsive ── */

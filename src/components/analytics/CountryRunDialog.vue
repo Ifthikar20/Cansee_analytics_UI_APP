@@ -430,8 +430,8 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="crd-foot">
-          <Button variant="outline" class="rounded-full" @click="open = false">Cancel</Button>
-          <Button class="rounded-full" :disabled="!canRun" @click="submit">
+          <Button variant="outline" @click="open = false">Cancel</Button>
+          <Button :disabled="!canRun" @click="submit">
             {{ submitting ? 'Starting...' : runLabel }}
           </Button>
         </div>
@@ -445,7 +445,7 @@ onBeforeUnmount(() => {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(10, 10, 12, 0.45);
+  background: var(--scrim);
 }
 
 .crd {
@@ -458,10 +458,10 @@ onBeforeUnmount(() => {
   width: min(640px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius);
   background: var(--popover);
   color: var(--popover-foreground);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
   transform: translate(-50%, -50%);
   outline: none;
 }
@@ -495,7 +495,7 @@ onBeforeUnmount(() => {
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
@@ -548,7 +548,7 @@ onBeforeUnmount(() => {
   gap: 4px;
   padding: 3px 4px 3px 10px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--accent);
   color: var(--foreground);
   font-size: 13px;
@@ -561,7 +561,7 @@ onBeforeUnmount(() => {
   width: 20px;
   height: 20px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
@@ -581,7 +581,7 @@ onBeforeUnmount(() => {
   align-items: center;
   height: 38px;
   border: 1px solid var(--input);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--background);
 }
 
@@ -621,7 +621,7 @@ onBeforeUnmount(() => {
 .crd-list {
   margin-top: 6px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--popover);
   overflow: hidden;
 }
@@ -644,7 +644,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 10px;
   padding: 7px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   cursor: pointer;
   outline: none;
 }
@@ -695,7 +695,7 @@ onBeforeUnmount(() => {
   height: 26px;
   padding: 0 10px;
   border: 1px dashed var(--input);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--foreground);
   font: inherit;
@@ -719,7 +719,7 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: 10px;
   padding: 6px 4px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--foreground);
   font-size: 13.5px;
   cursor: pointer;
@@ -757,7 +757,7 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   padding: 1px 6px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   color: var(--muted-foreground);
   font-size: 10.5px;
   font-weight: 600;
@@ -780,14 +780,14 @@ onBeforeUnmount(() => {
   display: inline-flex;
   padding: 2px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--muted);
 }
 
 .crd-seg-item {
   position: relative;
   padding: 4px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--muted-foreground);
   font-size: 13px;
   font-weight: 500;
@@ -804,7 +804,7 @@ onBeforeUnmount(() => {
 .crd-seg-item.is-on {
   background: var(--background);
   color: var(--foreground);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  box-shadow: none;
 }
 
 .crd-seg-item.is-off {
@@ -822,7 +822,7 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--muted);
   font-size: 13.5px;
   line-height: 1.5;

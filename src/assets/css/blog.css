@@ -7,7 +7,7 @@
    ══════════════════════════════════════ */
 
 .blog {
-  --blog-link: var(--brand-accent, #7232e0);
+  --blog-link: var(--foreground);
   --blog-measure: 720px;
   min-height: 100vh;
   display: flex;
@@ -29,7 +29,7 @@
   top: -48px;
   z-index: 100;
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--primary);
   color: var(--primary-foreground) !important;
   font-size: 14px;
@@ -78,7 +78,7 @@
 }
 .blog .blog-nav-link {
   padding: 6px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-size: 14px;
   font-weight: 500;
   color: var(--muted-foreground);
@@ -91,7 +91,7 @@
 .blog .blog-cta {
   margin-left: 8px;
   padding: 7px 16px;
-  border-radius: 9999px;
+  border-radius: var(--radius);
   font-size: 14px;
   font-weight: 600;
   background: var(--primary);
@@ -120,8 +120,9 @@
 .blog-eyebrow {
   margin: 0 0 10px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.12em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
@@ -165,7 +166,7 @@
 .blog-tag {
   padding: 2px 10px;
   border: 1px solid var(--border);
-  border-radius: 9999px;
+  border-radius: var(--radius);
   font-size: 12px;
   color: var(--muted-foreground);
 }
@@ -183,7 +184,7 @@
   position: relative;
   padding: 22px 22px 20px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--card);
   transition: border-color 150ms ease;
 }
@@ -205,7 +206,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 16px;
+  border-radius: var(--radius);
 }
 .blog-card-desc {
   margin: 0;
@@ -263,8 +264,9 @@
 .blog-toc-title {
   margin: 0 0 8px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.08em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
@@ -361,7 +363,7 @@
 }
 .blog-body code {
   padding: 1px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--muted);
   font-size: 0.9em;
 }
@@ -369,7 +371,7 @@
   margin: 0 0 1.2em;
   padding: 14px 16px;
   overflow-x: auto;
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--muted);
   font-size: 14px;
   line-height: 1.6;
@@ -422,7 +424,7 @@
   gap: 4px;
   padding: 16px 18px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   text-decoration: none;
 }
 .blog .blog-pager-link:hover {
@@ -494,7 +496,7 @@
     margin-bottom: 32px;
     padding: 16px 18px;
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius);
   }
   .blog-content {
     grid-row: 2;

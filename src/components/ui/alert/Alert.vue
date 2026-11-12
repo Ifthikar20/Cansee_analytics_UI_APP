@@ -9,8 +9,8 @@ const props = defineProps({
 
 const variantClasses = computed(() =>
   props.variant === 'destructive'
-    ? 'text-destructive bg-card [&>svg]:text-current'
-    : 'bg-card text-card-foreground'
+    ? 'border-destructive bg-card text-destructive [&>svg]:text-current'
+    : 'border-border bg-card text-card-foreground'
 )
 </script>
 
@@ -18,7 +18,7 @@ const variantClasses = computed(() =>
   <div
     role="alert"
     :class="cn(
-      'relative grid w-full grid-cols-[0_1fr] items-start gap-y-0.5 rounded-lg border border-border px-4 py-3 text-sm shadow-sm has-[>svg]:grid-cols-[1rem_1fr] has-[>svg]:gap-x-3 [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current',
+      'relative grid w-full grid-cols-[0_1fr] items-start gap-y-0.5 rounded-[var(--radius)] border px-4 py-3 text-sm has-[>svg]:grid-cols-[1rem_1fr] has-[>svg]:gap-x-3 [&>svg]:size-4 [&>svg]:translate-y-0.5 [&>svg]:text-current',
       variantClasses,
       props.class,
     )"

@@ -114,18 +114,18 @@ function errorOf(run) {
 .art-btn {
   height: 34px;
   padding: 0 14px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13px;
 }
 
 .art-scroll {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .art-scroll:focus-visible {
-  border-radius: 12px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
@@ -178,7 +178,7 @@ function errorOf(run) {
 .art-stop {
   height: 26px;
   padding: 0 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   font-size: 12px;
 }
 

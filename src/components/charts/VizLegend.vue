@@ -67,7 +67,7 @@ function hasValue(item) {
 .viz-legend-btn {
   padding: 3px 8px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   font: inherit;
   cursor: pointer;

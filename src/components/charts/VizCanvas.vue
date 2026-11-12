@@ -234,7 +234,7 @@ watch(
 .viz-canvas-plot {
   position: relative;
   width: 100%;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .viz-canvas-plot.is-selectable {

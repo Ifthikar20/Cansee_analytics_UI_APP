@@ -16,85 +16,173 @@
   }
 }
 
-/* shadcn-vue design tokens, mapped to the Cansee brand palette.
-   Design language: warm off-white surfaces, near-black ink, a single
-   purple accent used sparingly. Dark pill buttons, hairline borders,
-   almost no shadows. */
+/* ══════════════════════════════════════════════════════════════
+   Cansee design tokens: the single source of colour, type and shape.
+
+   Language: a warm paper page, flat square cards that are either light
+   warm gray or near-black, black ink, warm grays, and ONE accent, a vivid
+   orange, used sparingly (a dot, one highlighted bar, one small label).
+   No shadows, no gradients, no pills.
+
+   Layers:
+     1. Primitives   --paper --ink --white --gray-* --orange --orange-strong
+                     (fixed values, the same in both themes)
+     2. Semantic     --background --foreground --card ... --signal --rule
+                     (flip with the theme; components use these)
+     3. Aliases      legacy names (--bg-card, --ag-*, --viz-*, --ob-*) point
+                     at layer 2 in theme.css, agent/tokens.css and viz.css
+
+   The semantic block is declared twice: once for the page and once,
+   mirrored, for `.cs-contrast`, the opposite-tone surface (near-black in
+   the light theme, light gray in the dark theme). Children of a contrast
+   surface keep using the same semantic names.
+   ══════════════════════════════════════════════════════════════ */
 :root {
-  --background: #ffffff;
-  --foreground: #1a1a18;
-  --card: #ffffff;
-  --card-foreground: #1a1a18;
-  --popover: #ffffff;
-  --popover-foreground: #1a1a18;
-  --primary: #1e1e1e;
-  --primary-foreground: #ffffff;
-  --secondary: #f4f4f2;
-  --secondary-foreground: #1e1e1e;
-  --muted: #f4f4f2;
-  --muted-foreground: #6b6b66;
-  --accent: #f2edfc;
-  --accent-foreground: #3d1f8f;
-  --destructive: #c2483d;
-  --destructive-foreground: #ffffff;
-  --border: rgba(20, 20, 18, 0.08);
-  --input: rgba(20, 20, 18, 0.14);
-  --ring: #7232e0;
-  --chart-1: #7232e0;
-  --chart-2: #1e1e1e;
-  --chart-3: #a5a5a0;
-  --chart-4: #3f8f5f;
-  --chart-5: #b07d28;
-  --radius: 0.625rem;
-  /* Brand Security severity scale — the single source for every severity
-     badge, dot, tile and evidence mark. */
-  --severity-high: #c2483d;
-  --severity-medium: #b07d28;
-  --severity-low: #6b6b66;
-  /* Search vs AI gap classes (lib/gap.js): AI ahead, Google ahead,
-     strong in both, invisible in both. */
-  --gap-ai: #6d28d9;
-  --gap-google: #1d4ed8;
-  --gap-strong: #2f7d4f;
-  --gap-invisible: #a1a19c;
+  --paper: #f3f2ee;
+  --ink: #0b0b0b;
+  --white: #ffffff;
+  --black: #000000;
+  --gray-100: #e7e6e1; /* light card */
+  --gray-200: #dcdbd5; /* quiet fill on paper and on a light card */
+  --gray-300: #cbcac4; /* graphic bars, skeleton text */
+  --gray-400: #a09f98; /* secondary text on dark surfaces */
+  --gray-500: #65645e; /* tertiary text on light surfaces */
+  --gray-600: #5f5e58; /* secondary text on light surfaces */
+  --gray-700: #3a3936; /* graphic bars on dark surfaces */
+  --gray-800: #1f1f1d; /* quiet fill on dark surfaces */
+  --gray-900: #141414; /* dark-theme card */
+  --orange: #ff4a00; /* the accent: graphics, dots, large type */
+  --orange-strong: #b83600; /* the accent for text under 18px on light surfaces */
+
+  --radius: 2px;
 }
 
-[data-theme="dark"] {
-  /* Dark mode = black and white, ChatGPT-style. Pure black surfaces, white
-     ink, hairline white borders doing the separating; the only tints are
-     the single brand accent and semantic status colours. Text hierarchy
-     is white vs. 70% white — never a mid grey. */
-  --background: #000000;
-  --foreground: #ffffff;
-  --card: #000000;
-  --card-foreground: #ffffff;
-  --popover: #0f0f0f;
-  --popover-foreground: #ffffff;
-  --primary: #ffffff;
-  --primary-foreground: #000000;
-  --secondary: #1a1a1a;
-  --secondary-foreground: #ffffff;
-  --muted: #141414;
-  --muted-foreground: #b3b3b3;
-  --accent: #1f1f1f;
-  --accent-foreground: #ffffff;
-  --destructive: #ff5f5f;
-  --destructive-foreground: #000000;
-  --border: rgba(255, 255, 255, 0.14);
-  --input: rgba(255, 255, 255, 0.24);
-  --ring: #ffffff;
-  --chart-1: #a78bfa;
-  --chart-2: #ffffff;
-  --chart-3: #8a8a8a;
-  --chart-4: #4ade80;
-  --chart-5: #fbbf24;
-  --severity-high: #ff6b6b;
-  --severity-medium: #fbbf24;
-  --severity-low: #b3b3b3;
-  --gap-ai: #a78bfa;
-  --gap-google: #60a5fa;
-  --gap-strong: #4ade80;
-  --gap-invisible: #6f6f6f;
+/* Type. Inter for text, Geist for titles and big numerals, and the
+   system monospace for labels (no mono webfont is loaded, and none may be
+   added). `static` so the variables exist for scoped component styles
+   too, not only where a Tailwind utility uses them. */
+@theme static {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'SFMono-Regular', 'Cascadia Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+/* Light surfaces: the light theme, and a contrast surface in the dark theme. */
+/* (The doubled :root lifts the contrast selector above its dark twin, so a
+   contrast surface inside a nested [data-theme="dark"] wrapper, as on the
+   auth screens, still comes out light.) */
+:root,
+:root:root[data-theme="dark"] .cs-contrast,
+:root:root [data-theme="dark"] .cs-contrast {
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--gray-100);
+  --card-foreground: var(--ink);
+  --popover: var(--white);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: var(--paper);
+  --secondary: var(--gray-200);
+  --secondary-foreground: var(--ink);
+  --muted: var(--gray-200);
+  --muted-foreground: var(--gray-600);
+  --subtle-foreground: var(--gray-500);
+  /* shadcn's "accent" is the hover fill of rows and ghost buttons, not the
+     brand accent. The brand accent is --signal. */
+  --accent: var(--gray-200);
+  --accent-foreground: var(--ink);
+  --destructive: var(--orange-strong);
+  --destructive-foreground: var(--white);
+  --border: rgba(11, 11, 11, 0.12);
+  --input: rgba(11, 11, 11, 0.45);
+  --ring: var(--ink);
+  --rule: rgba(11, 11, 11, 0.12);
+  --rule-strong: var(--ink);
+  --bar: var(--gray-300);
+  --scrim: rgba(11, 11, 11, 0.55);
+  /* The wordmark PNG is dark slate; this renders it in the surface's ink. */
+  --logo-filter: brightness(0);
+  /* The single accent. --signal is for graphics, dots and type of 18px and
+     up; --signal-text is the same accent at a weight that passes contrast
+     for small text on this surface. */
+  --signal: var(--orange);
+  --signal-text: var(--orange-strong);
+  --signal-foreground: var(--ink);
+  --signal-soft: rgba(255, 74, 0, 0.12);
+  /* Charts: the user's own series is the accent, everything else is ink
+     and grays. */
+  --chart-1: var(--orange);
+  --chart-2: var(--ink);
+  --chart-3: var(--gray-600);
+  --chart-4: var(--gray-400);
+  --chart-5: var(--gray-300);
+  /* Brand Security severity scale: emphasis grows with severity (gray,
+     ink, accent). Every use also carries a word. */
+  --severity-high: var(--orange-strong);
+  --severity-medium: var(--ink);
+  --severity-low: var(--gray-600);
+  /* Search vs AI gap classes (lib/gap.js): AI ahead, Google ahead,
+     strong in both, invisible in both. Told apart by weight, with the
+     accent on the one class that asks for action. */
+  --gap-ai: var(--orange);
+  --gap-google: var(--ink);
+  --gap-strong: var(--gray-600);
+  --gap-invisible: var(--gray-300);
+  color-scheme: light;
+}
+
+/* Dark surfaces: the dark theme, and a contrast surface in the light theme. */
+[data-theme="dark"],
+:root:not([data-theme="dark"]) .cs-contrast {
+  --background: var(--black);
+  --foreground: var(--paper);
+  --card: var(--gray-900);
+  --card-foreground: var(--paper);
+  --popover: var(--gray-900);
+  --popover-foreground: var(--paper);
+  --primary: var(--paper);
+  --primary-foreground: var(--ink);
+  --secondary: var(--gray-800);
+  --secondary-foreground: var(--paper);
+  --muted: var(--gray-800);
+  --muted-foreground: var(--gray-400);
+  --subtle-foreground: #8f8e87;
+  --accent: var(--gray-800);
+  --accent-foreground: var(--paper);
+  --destructive: var(--orange);
+  --destructive-foreground: var(--ink);
+  --border: rgba(243, 242, 238, 0.16);
+  --input: rgba(243, 242, 238, 0.42);
+  --ring: var(--paper);
+  --rule: rgba(243, 242, 238, 0.16);
+  --rule-strong: var(--paper);
+  --bar: var(--gray-700);
+  --scrim: rgba(0, 0, 0, 0.7);
+  --logo-filter: brightness(0) invert(1);
+  --signal: var(--orange);
+  --signal-text: var(--orange);
+  --signal-foreground: var(--ink);
+  --signal-soft: rgba(255, 74, 0, 0.16);
+  --chart-1: var(--orange);
+  --chart-2: var(--paper);
+  --chart-3: var(--gray-400);
+  --chart-4: var(--gray-500);
+  --chart-5: var(--gray-700);
+  --severity-high: var(--orange);
+  --severity-medium: var(--paper);
+  --severity-low: var(--gray-400);
+  --gap-ai: var(--orange);
+  --gap-google: var(--paper);
+  --gap-strong: var(--gray-400);
+  --gap-invisible: var(--gray-700);
+  color-scheme: dark;
+}
+
+/* A contrast surface in the light theme is near-black, not pure black. */
+:root:not([data-theme="dark"]) .cs-contrast {
+  --background: var(--ink);
+  --card: var(--ink);
+  --popover: var(--ink);
 }
 
 @theme inline {
@@ -129,43 +217,252 @@
   --color-gap-google: var(--gap-google);
   --color-gap-strong: var(--gap-strong);
   --color-gap-invisible: var(--gap-invisible);
+  --color-signal: var(--signal);
+  --color-signal-text: var(--signal-text);
+  --color-signal-foreground: var(--signal-foreground);
+  --color-signal-soft: var(--signal-soft);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-bar: var(--bar);
+  --color-paper: var(--paper);
+  --color-ink: var(--ink);
 }
 
 /*
- * Cansee Design Tokens — Tailwind v4 @theme
- * These extend Tailwind's default theme with our brand tokens.
- * Runtime light/dark switching still uses CSS custom properties (in theme.css).
+ * Static theme values. Colours here are aliases of the semantic tokens so
+ * utilities such as `bg-brand-accent` and `text-success` follow the theme.
+ * Status has no hue of its own: success is ink, anything that needs
+ * attention is the accent, and both always carry a word or an icon.
  */
+@theme inline {
+  --color-brand-primary: var(--primary);
+  --color-brand-accent: var(--signal-text);
+  --color-brand-accent-hover: var(--foreground);
+  --color-brand-highlight: var(--signal);
+  --color-success: var(--foreground);
+  --color-warning: var(--signal-text);
+  --color-danger: var(--signal-text);
+  --color-info: var(--muted-foreground);
+}
+
 @theme {
-  /* Brand Colors */
-  --color-brand-primary: #1e1e1e;
-  --color-brand-accent: #7232e0;
-  --color-brand-accent-hover: #5f24c4;
-  --color-brand-highlight: #cdb8f5;
+  /* Radii: square, at most 2px. `rounded-full` stays a circle and is for
+     dots and avatars only. */
+  --radius-xs: 0px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 2px;
+  --radius-3xl: 2px;
+  --radius-4xl: 2px;
 
-  /* Status Colors */
-  --color-success: #3f8f5f;
-  --color-warning: #b07d28;
-  --color-danger: #c2483d;
-  --color-info: #7232e0;
-
-  /* Radii */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --radius-2xl: 28px;
-
-  /* Shadows — hairline borders do the work; shadows barely whisper */
-  --shadow-card: 0 1px 2px rgba(20, 20, 18, 0.04);
-  --shadow-card-hover: 0 2px 8px rgba(20, 20, 18, 0.06);
-  --shadow-elevated: 0 12px 32px rgba(20, 20, 18, 0.10);
-
-  /* Fonts */
-  --font-family-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-family-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* No shadows: surfaces are separated by tone and by hairline rules. */
+  --shadow-2xs: 0 0 #0000;
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow-md: 0 0 #0000;
+  --shadow-lg: 0 0 #0000;
+  --shadow-xl: 0 0 #0000;
+  --shadow-2xl: 0 0 #0000;
+  --shadow-card: 0 0 #0000;
+  --shadow-card-hover: 0 0 #0000;
+  --shadow-elevated: 0 0 #0000;
+  --drop-shadow-sm: 0 0 #0000;
+  --drop-shadow-md: 0 0 #0000;
+  --drop-shadow-lg: 0 0 #0000;
 
   /* Spacing scale extras */
   --spacing-18: 4.5rem;
   --spacing-88: 22rem;
+}
+
+/* ── Shared pieces ──────────────────────────────────────────────
+   In @layer components so a Tailwind utility on the same element wins
+   (`class="cs-label text-foreground"`). */
+@layer components {
+  /* Flat card. `.cs-card` wears the surface tone; add `.cs-contrast` for
+     the opposite tone. No border, no shadow. */
+  .cs-card {
+    position: relative;
+    background: var(--card);
+    color: var(--card-foreground);
+    border-radius: var(--radius);
+  }
+  .cs-contrast {
+    background: var(--card);
+    color: var(--card-foreground);
+  }
+
+  /* Small uppercase monospace label for metadata: "RANK IN AI ANSWERS". */
+  .cs-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 400;
+    line-height: 1.3;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .cs-label--ink {
+    color: var(--foreground);
+  }
+  .cs-label--signal {
+    color: var(--signal-text);
+  }
+
+  /* Hairline rule. On an <hr> or an empty block. */
+  .cs-rule {
+    display: block;
+    width: 100%;
+    height: 1px;
+    margin: 0;
+    border: 0;
+    background: var(--rule);
+  }
+  .cs-rule--strong {
+    background: var(--rule-strong);
+  }
+
+  /* Chip in the corner of a card: "LIVE". It inverts the surface it sits
+     on (black on a light card, light on a dark card). `.cs-chip--live`
+     adds the accent dot. */
+  .cs-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375rem;
+    height: 1.5rem;
+    padding: 0 0.5rem;
+    border-radius: 0;
+    background: var(--foreground);
+    color: var(--background);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .cs-chip--live::before {
+    content: '';
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--signal);
+  }
+  .cs-chip--quiet {
+    background: transparent;
+    color: var(--muted-foreground);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+
+  /* Caption under a card, outside it: a bold code and a gray description. */
+  .cs-caption {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.25rem 0.875rem;
+    margin-top: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .cs-caption__code {
+    color: var(--foreground);
+    font-weight: 700;
+  }
+
+  /* The one big number on a card: "74", with `.cs-numeral__unit` for
+     "/ 100". */
+  .cs-numeral {
+    font-family: var(--font-display);
+    font-size: clamp(4.5rem, 9vw, 9rem);
+    font-weight: 600;
+    line-height: 0.85;
+    letter-spacing: -0.06em;
+    font-variant-numeric: tabular-nums;
+    color: var(--foreground);
+  }
+  .cs-numeral--md {
+    font-size: clamp(2.5rem, 4.5vw, 4rem);
+    letter-spacing: -0.045em;
+    line-height: 0.9;
+  }
+  .cs-numeral__unit {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    color: var(--muted-foreground);
+  }
+
+  /* Accent marks: a round dot and the square "YOU" marker. */
+  .cs-dot {
+    display: inline-block;
+    flex: none;
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: 50%;
+    background: var(--signal);
+  }
+  .cs-mark {
+    display: inline-block;
+    flex: none;
+    width: 0.375rem;
+    height: 0.375rem;
+    background: var(--signal);
+  }
+
+  /* Display type for titles and questions. */
+  .cs-title {
+    font-family: var(--font-display);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.12;
+    color: var(--foreground);
+  }
+
+  /* Buttons outside the shared <Button>. Primary: ink on paper, inverting
+     on hover. Quiet: a hairline box. */
+  .cs-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 2.25rem;
+    padding: 0 1rem;
+    border: 1px solid var(--primary);
+    border-radius: var(--radius);
+    background: var(--primary);
+    color: var(--primary-foreground);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .cs-btn:hover:not(:disabled) {
+    background: transparent;
+    color: var(--primary);
+  }
+  .cs-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .cs-btn--quiet {
+    border-color: var(--input);
+    background: transparent;
+    color: var(--foreground);
+  }
+  .cs-btn--quiet:hover:not(:disabled) {
+    border-color: var(--foreground);
+    background: var(--accent);
+    color: var(--foreground);
+  }
 }

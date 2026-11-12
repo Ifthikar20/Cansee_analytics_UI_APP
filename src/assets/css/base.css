@@ -24,10 +24,11 @@
   outline: none;
 }
 
+/* One focus ring everywhere: 2px of ink (paper in the dark theme), offset
+   so it never touches the control. */
 *:focus-visible {
-  outline: 2px solid var(--brand-accent, #7232e0);
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
-  border-radius: var(--radius-sm, 8px);
 }
 
 /* ── Base ── */
@@ -50,6 +51,19 @@ body {
   line-height: 1.6;
   min-height: 100vh;
   transition: background var(--transition-base), color var(--transition-base);
+}
+
+/* Titles wear the display face. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+
+::selection {
+  background: var(--foreground);
+  color: var(--background);
 }
 
 #app {
@@ -78,8 +92,8 @@ a:hover {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
-  border-radius: var(--radius-full);
+  background: var(--bar);
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {

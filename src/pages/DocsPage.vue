@@ -467,23 +467,23 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
 }
 .dx-brand { display: flex; align-items: baseline; gap: 7px; flex-shrink: 0; }
 .dx-mark { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; color: var(--foreground); }
-.dx-tag { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted-foreground); }
+.dx-tag { font-size: 10px; letter-spacing: .16em; font-family: var(--font-mono);  text-transform: uppercase; color: var(--muted-foreground); }
 .dx-spacer { flex: 1; }
-.dx-link { font-size: 12.5px; color: var(--muted-foreground); padding: 6px 10px; border-radius: 7px; }
+.dx-link { font-size: 12.5px; color: var(--muted-foreground); padding: 6px 10px; border-radius: var(--radius); }
 .dx-link:hover { color: var(--foreground); background: var(--muted); }
 /* Two classes: `.docs a` outranks one, and painted the label in
    --foreground on the dark button. */
-.docs .dx-cta { font-size: 12.5px; font-weight: 600; color: var(--primary-foreground); background: var(--primary); padding: 6px 13px; border-radius: 8px; flex-shrink: 0; }
+.docs .dx-cta { font-size: 12.5px; font-weight: 600; color: var(--primary-foreground); background: var(--primary); padding: 6px 13px; border-radius: var(--radius); flex-shrink: 0; }
 .dx-cta:hover { opacity: .9; }
 
 .dx-search { position: relative; width: min(400px, 40vw); flex-shrink: 1; }
-.dx-search-input { width: 100%; height: 34px; padding: 0 12px 0 33px; background: var(--muted); border: 1px solid var(--border); border-radius: 9px; color: var(--foreground); font: inherit; font-size: 13px; outline: none; }
+.dx-search-input { width: 100%; height: 34px; padding: 0 12px 0 33px; background: var(--muted); border: 1px solid var(--border); border-radius: var(--radius); color: var(--foreground); font: inherit; font-size: 13px; outline: none; }
 .dx-search-input::placeholder { color: var(--muted-foreground); }
 .dx-search-input:focus { border-color: var(--muted-foreground); }
 .dx-search-ic { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--muted-foreground); pointer-events: none; }
-.dx-kbd { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-size: 10.5px; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; pointer-events: none; }
-.dx-results { position: absolute; top: 42px; left: 0; right: 0; z-index: 60; background: var(--background); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 34px rgba(0,0,0,.18); padding: 6px; max-height: 60vh; overflow-y: auto; }
-.dx-sr { display: flex; flex-direction: column; width: 100%; text-align: left; padding: 8px 11px; border-radius: 8px; background: none; border: 0; cursor: pointer; }
+.dx-kbd { position: absolute; right: 9px; top: 50%; transform: translateY(-50%); font-size: 10.5px; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: var(--radius); padding: 1px 6px; pointer-events: none; }
+.dx-results { position: absolute; top: 42px; left: 0; right: 0; z-index: 60; background: var(--background); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: none; padding: 6px; max-height: 60vh; overflow-y: auto; }
+.dx-sr { display: flex; flex-direction: column; width: 100%; text-align: left; padding: 8px 11px; border-radius: var(--radius); background: none; border: 0; cursor: pointer; }
 .dx-sr.sel { background: var(--muted); }
 .dx-sr-t { font-size: 13px; font-weight: 600; color: var(--foreground); }
 .dx-sr-s { font-size: 11.5px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -493,8 +493,8 @@ onBeforeUnmount(() => { if (observer) observer.disconnect() })
 .dx-shell { display: grid; grid-template-columns: 236px minmax(0,1fr) 272px; max-width: 1500px; margin: 0 auto; }
 .dx-side { position: sticky; top: 54px; align-self: start; height: calc(100vh - 54px); overflow-y: auto; padding: 22px 16px 60px; border-right: 1px solid var(--border); }
 .dx-grp { margin-bottom: 18px; }
-.dx-grp-t { font-size: 10px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 6px; padding-left: 9px; }
-.dx-navlink { display: block; font-size: 12.5px; color: var(--muted-foreground); padding: 4px 10px; border-radius: 7px; cursor: pointer; }
+.dx-grp-t { font-size: 10px; font-weight: 500; letter-spacing: .13em; font-family: var(--font-mono);  text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 6px; padding-left: 9px; }
+.dx-navlink { display: block; font-size: 12.5px; color: var(--muted-foreground); padding: 4px 10px; border-radius: var(--radius); cursor: pointer; }
 .dx-navlink:hover { color: var(--foreground); background: var(--muted); }
 .dx-navlink.active { color: var(--foreground); font-weight: 600; background: var(--muted); box-shadow: inset 2px 0 0 var(--primary); }
 
@@ -523,8 +523,8 @@ ol.steps > li::before { content: counter(s); position: absolute; left: 0; top: -
 ol.steps > li::after { content: ""; position: absolute; left: 12px; top: 25px; bottom: 1px; width: 1px; background: var(--border); }
 ol.steps > li:last-child::after { display: none; }
 
-.note { border: 1px solid var(--border); background: var(--card); border-radius: 10px; padding: 12px 15px; margin: 15px 0; font-size: 13px; }
-.note-label { display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 4px; }
+.note { border: 1px solid var(--border); background: var(--card); border-radius: var(--radius); padding: 12px 15px; margin: 15px 0; font-size: 13px; }
+.note-label { display: inline-block; font-size: 9.5px; font-weight: 500; letter-spacing: .1em; font-family: var(--font-mono);  text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 4px; }
 .note p:last-child { margin-bottom: 0; }
 
 .service { border-top: 1px solid var(--border); padding: 20px 0 4px; scroll-margin-top: 66px; }
@@ -533,23 +533,23 @@ ol.steps > li:last-child::after { display: none; }
 .svc-head h3 { margin: 0; font-size: 16px; }
 .svc-where { font-size: 11px; color: var(--muted-foreground); font-family: ui-monospace, monospace; }
 .service p { margin: 0 0 9px; max-width: 74ch; }
-.need { display: flex; gap: 9px; align-items: baseline; font-size: 12.5px; color: var(--muted-foreground); margin: 6px 0 12px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; max-width: 74ch; }
-.need-l { font-size: 9.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--foreground); flex-shrink: 0; padding-top: 1px; }
+.need { display: flex; gap: 9px; align-items: baseline; font-size: 12.5px; color: var(--muted-foreground); margin: 6px 0 12px; padding: 8px 12px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); max-width: 74ch; }
+.need-l { font-size: 9.5px; font-weight: 500; letter-spacing: .09em; font-family: var(--font-mono);  text-transform: uppercase; color: var(--foreground); flex-shrink: 0; padding-top: 1px; }
 
-.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--border); border-radius: 10px; }
+.table-wrap { overflow-x: auto; margin: 14px 0; border: 1px solid var(--border); border-radius: var(--radius); }
 .docs table { border-collapse: collapse; width: 100%; font-size: 13px; }
 .docs th, .docs td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
-.docs th { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted-foreground); font-weight: 700; background: var(--card); }
+.docs th { font-size: 10px; letter-spacing: .07em; font-family: var(--font-mono);  text-transform: uppercase; color: var(--muted-foreground); font-weight: 500; background: var(--card); }
 .docs tr:last-child td { border-bottom: 0; }
 .docs td:first-child, .docs th:first-child { font-weight: 600; color: var(--foreground); }
 
-.metrics { display: grid; margin: 16px 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.metrics { display: grid; margin: 16px 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
 .metric { display: grid; grid-template-columns: 148px 1fr; gap: 14px; padding: 12px 15px; }
 .metric + .metric { border-top: 1px solid var(--border); }
 .metric dt { font-weight: 600; color: var(--foreground); font-size: 13px; }
 .metric dd { margin: 0; color: var(--foreground); opacity: .88; font-size: 13px; }
 
-.contact-card { border: 1px solid var(--border); background: var(--card); border-radius: 12px; padding: 18px 20px; margin-top: 14px; }
+.contact-card { border: 1px solid var(--border); background: var(--card); border-radius: var(--radius); padding: 18px 20px; margin-top: 14px; }
 .contact-card .email { font-size: 16px; font-weight: 600; color: var(--foreground); }
 .contact-card .email:hover { text-decoration: underline; }
 .contact-sub { margin: 6px 0 0; color: var(--muted-foreground); font-size: 12.5px; }
@@ -557,7 +557,7 @@ ol.steps > li:last-child::after { display: none; }
 
 /* FAQ rail */
 .dx-rail { position: sticky; top: 54px; align-self: start; height: calc(100vh - 54px); overflow-y: auto; padding: 26px 22px 60px; border-left: 1px solid var(--border); }
-.docs .dx-rail-t { font-size: 10.5px; line-height: 1.4; letter-spacing: .12em; font-weight: 700; text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 12px; }
+.docs .dx-rail-t { font-size: 10.5px; line-height: 1.4; letter-spacing: .12em; font-weight: 500; font-family: var(--font-mono);  text-transform: uppercase; color: var(--muted-foreground); margin: 0 0 12px; }
 details.faq { border-bottom: 1px solid var(--border); padding: 9px 0; }
 details.faq > summary { list-style: none; cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--foreground); display: flex; gap: 8px; align-items: flex-start; }
 details.faq > summary::-webkit-details-marker { display: none; }
@@ -565,7 +565,7 @@ details.faq > summary .chev { margin-left: auto; flex-shrink: 0; color: var(--mu
 details.faq[open] > summary .chev { transform: rotate(90deg); }
 details.faq p { margin: 7px 0 2px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
 details.faq .faq-ul { margin: 4px 0 2px; padding-left: 16px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
-.dx-rail-all { margin-top: 14px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 8px; background: none; color: var(--foreground); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.dx-rail-all { margin-top: 14px; padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius); background: none; color: var(--foreground); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
 .dx-rail-all:hover { background: var(--muted); }
 .dx-rail-help { margin-top: 20px; font-size: 12px; color: var(--muted-foreground); }
 .dx-rail-help a { color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; }
@@ -582,10 +582,10 @@ details.faq .faq-ul { margin: 4px 0 2px; padding-left: 16px; font-size: 12px; co
   .dx-shell { grid-template-columns: 1fr; }
   .dx-search { width: auto; flex: 1; }
   .hide-sm { display: none; }
-  .dx-side { position: fixed; inset: 54px auto 0 0; width: 260px; z-index: 40; background: var(--background); transform: translateX(-100%); transition: transform .22s; box-shadow: 0 0 40px rgba(0,0,0,.25); }
+  .dx-side { position: fixed; inset: 54px auto 0 0; width: 260px; z-index: 40; background: var(--background); transform: translateX(-100%); transition: transform .22s; box-shadow: none; }
   .dx-side.open { transform: none; }
-  .dx-menu { display: inline-flex; align-items: center; width: 34px; height: 30px; justify-content: center; border: 1px solid var(--border); border-radius: 7px; background: none; color: var(--foreground); cursor: pointer; }
-  .dx-scrim { display: none; position: fixed; inset: 54px 0 0 0; background: rgba(0,0,0,.4); z-index: 39; }
+  .dx-menu { display: inline-flex; align-items: center; width: 34px; height: 30px; justify-content: center; border: 1px solid var(--border); border-radius: var(--radius); background: none; color: var(--foreground); cursor: pointer; }
+  .dx-scrim { display: none; position: fixed; inset: 54px 0 0 0; background: var(--scrim); z-index: 39; }
   .dx-scrim.open { display: block; }
 }
 @media (prefers-reduced-motion: reduce) { .dx-side { transition: none; } }

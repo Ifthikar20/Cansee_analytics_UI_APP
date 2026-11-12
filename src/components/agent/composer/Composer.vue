@@ -268,7 +268,7 @@ defineExpose({ focus })
   flex-direction: column;
   width: 100%;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   box-shadow: var(--ag-composer-shadow);
   cursor: text;

@@ -545,7 +545,7 @@ onBeforeUnmount(() => {
   margin: 0;
   padding: 8px 12px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--ag-pane-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -598,7 +598,7 @@ onBeforeUnmount(() => {
   height: 30px;
   padding: 0 8px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-btn-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -625,7 +625,7 @@ onBeforeUnmount(() => {
   height: 30px;
   padding: 0 10px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-3);
   font: inherit;
@@ -707,7 +707,7 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .pb-notice-title {

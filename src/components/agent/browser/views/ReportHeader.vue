@@ -96,7 +96,7 @@ const model = computed(() => headerModel(props.header, props.template))
   margin: 0 auto 24px;
   padding: 14px 16px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-1);
   font-size: 13px;
@@ -123,12 +123,13 @@ const model = computed(() => headerModel(props.header, props.template))
   height: 20px;
   padding: 0 7px;
   border: 1px solid var(--ag-tab-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-tab-bg);
   color: var(--ag-fg-2);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.02em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
 }
 

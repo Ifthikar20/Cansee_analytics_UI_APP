@@ -276,7 +276,7 @@ const ctaTo = computed(() =>
   height: 32px;
   padding: 0 30px 0 10px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-btn-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -288,7 +288,7 @@ const ctaTo = computed(() =>
 
 .ag-arts-filter-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: none;
 }
 
@@ -314,7 +314,7 @@ const ctaTo = computed(() =>
   margin: 0;
   padding: 0;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   list-style: none;
   overflow: hidden;
 }
@@ -353,7 +353,7 @@ const ctaTo = computed(() =>
 }
 
 .ag-art-main:focus-visible {
-  border-radius: 10px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: -3px;
 }
@@ -366,7 +366,7 @@ const ctaTo = computed(() =>
   width: 30px;
   height: 30px;
   border: 1px solid var(--ag-iconbox-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .ag-art-text {
@@ -417,7 +417,7 @@ const ctaTo = computed(() =>
 
 .ag-skel {
   display: block;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-row-hover);
   animation: ag-pulse 1.4s ease-in-out infinite;
 }

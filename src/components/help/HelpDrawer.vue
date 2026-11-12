@@ -274,7 +274,7 @@ watch(
 
 <style scoped>
 .help-drawer {
-  font-family: var(--font-family, inherit);
+  font-family: var(--font-family);
   font-feature-settings: normal;
   line-height: 1.5;
 }
@@ -300,7 +300,7 @@ watch(
   height: 38px;
   padding: 0 12px 0 34px;
   border: 1px solid var(--input);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -339,8 +339,9 @@ watch(
   margin: 0 0 2px;
   color: var(--muted-foreground);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 500;
   letter-spacing: 0.08em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
 }
 
@@ -381,7 +382,7 @@ watch(
   align-items: center;
   padding: 6px 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--muted-foreground);
   font: inherit;

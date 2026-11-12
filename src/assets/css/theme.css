@@ -1,97 +1,61 @@
 /* ══════════════════════════════════════
-   Cansee — Theme Variables
-   Light (default) + Dark mode
+   Cansee — legacy theme variables
 
-   Design language: warm off-white surfaces, near-black ink,
-   one purple accent (#7232e0) used sparingly. Dark pill
-   buttons, hairline borders, whisper-quiet shadows.
+   Aliases only. Every colour, radius and font here points at a token
+   defined in ../tailwind.css, so there is one palette and it flips with
+   the theme (and inside `.cs-contrast`) on its own. Do not add literal
+   colours to this file.
    ══════════════════════════════════════ */
 
-/* ════════════════════════════════════════
-   Light Mode (default)
-   ════════════════════════════════════════ */
-:root {
-  /* Surfaces — warm off-white bg, white cards separated by hairlines */
-  --bg-root: #f7f7f5;
-  --bg-surface: #f4f4f2;
-  --bg-card: #ffffff;
+:root,
+.cs-contrast {
+  /* Surfaces */
+  --bg-root: var(--background);
+  --bg-surface: var(--muted);
+  --bg-card: var(--card);
 
-  /* Brand — near-black primary + purple accent */
-  --brand-primary: #1e1e1e;
-  --brand-accent: #7232e0;
+  /* Brand: ink for primary actions, the accent for the few marks */
+  --brand-primary: var(--primary);
+  --brand-accent: var(--signal-text);
 
-  /* Status — muted, editorial tones */
-  --color-success: #3f8f5f;
-  --color-warning: #b07d28;
-  --color-danger: #c2483d;
-  --color-info: #7232e0;
+  /* Status has no hue of its own: success is ink, anything that needs
+     attention is the accent. Always pair with a word or an icon. */
+  --color-success: var(--foreground);
+  --color-warning: var(--signal-text);
+  --color-danger: var(--signal-text);
+  --color-info: var(--muted-foreground);
 
   /* Text */
-  --text-primary: #1a1a18;
-  --text-secondary: #6b6b66;
-  --text-muted: #9c9c96;
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-muted: var(--subtle-foreground);
 
   /* Borders */
-  --border-color: rgba(20, 20, 18, 0.08);
+  --border-color: var(--border);
+}
 
-  /* Shadows — hairline borders define surfaces, shadows only hint depth */
-  --shadow-sm: 0 1px 2px rgba(20, 20, 18, 0.03);
-  --shadow-md: 0 1px 3px rgba(20, 20, 18, 0.04);
-  --shadow-lg: 0 4px 16px rgba(20, 20, 18, 0.06);
-  --shadow-card: 0 1px 2px rgba(20, 20, 18, 0.03);
-  --shadow-card-hover: 0 2px 6px rgba(20, 20, 18, 0.05);
+:root {
+  /* No shadows anywhere: tone and hairlines separate surfaces. */
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-card: none;
+  --shadow-card-hover: none;
 
-  /* Radius — soft cards, pill buttons */
-  --radius-sm: 6px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  /* Radius: square. --radius-full is for dots and avatars only. */
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
   --radius-full: 9999px;
 
   /* Transitions */
   --transition-fast: 150ms ease;
   --transition-base: 250ms ease;
 
-  /* Typography — one neutral grotesque for everything */
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-display: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Typography */
+  --font-family: var(--font-sans);
   --font-xs: 0.6875rem;
   --font-sm: 0.75rem;
   --font-lg: 1.0625rem;
-
-  /* Color mode marker */
-  color-scheme: light;
-}
-
-/* ════════════════════════════════════════
-   Dark Mode — black and white
-   Pure black surfaces, white ink, hairline white borders. Mirrors the
-   shadcn tokens in tailwind.css so legacy components agree with new ones.
-   ════════════════════════════════════════ */
-[data-theme="dark"] {
-  --bg-root: #000000;
-  --bg-surface: #0f0f0f;
-  --bg-card: #000000;
-
-  --brand-primary: #ffffff;
-  --brand-accent: #a78bfa;
-
-  --color-success: #4ade80;
-  --color-warning: #fbbf24;
-  --color-danger: #ff6b6b;
-  --color-info: #a78bfa;
-
-  --text-primary: #ffffff;
-  --text-secondary: #b3b3b3;
-  --text-muted: #8a8a8a;
-
-  --border-color: rgba(255, 255, 255, 0.14);
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 6px 22px rgba(0, 0, 0, 0.6);
-  --shadow-card: none;
-  --shadow-card-hover: none;
-
-  color-scheme: dark;
 }

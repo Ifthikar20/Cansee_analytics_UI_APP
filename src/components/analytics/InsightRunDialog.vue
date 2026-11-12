@@ -483,8 +483,8 @@ function lastRead(p) {
         </div>
 
         <div class="ird-foot">
-          <Button variant="outline" class="rounded-full" @click="onOpenChange(false)">Cancel</Button>
-          <Button class="rounded-full" :disabled="!r.canStart.value" @click="submit">
+          <Button variant="outline" @click="onOpenChange(false)">Cancel</Button>
+          <Button :disabled="!r.canStart.value" @click="submit">
             {{ r.submitting.value ? 'Starting...' : runLabel }}
           </Button>
         </div>
@@ -498,7 +498,7 @@ function lastRead(p) {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(10, 10, 12, 0.45);
+  background: var(--scrim);
 }
 
 .ird {
@@ -511,10 +511,10 @@ function lastRead(p) {
   width: min(600px, calc(100vw - 32px));
   max-height: calc(100dvh - 32px);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius);
   background: var(--popover);
   color: var(--popover-foreground);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
   transform: translate(-50%, -50%);
   outline: none;
 }
@@ -548,7 +548,7 @@ function lastRead(p) {
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
@@ -592,7 +592,7 @@ function lastRead(p) {
   align-items: flex-start;
   gap: 10px;
   padding: 6px 4px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--foreground);
   font-size: 13.5px;
   cursor: pointer;
@@ -632,7 +632,7 @@ function lastRead(p) {
   gap: 6px;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--muted);
   font-size: 13.5px;
   line-height: 1.5;

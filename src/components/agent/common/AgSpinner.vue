@@ -25,7 +25,7 @@ defineProps({
   height: var(--ag-spinner-size);
   border: 1.5px solid color-mix(in srgb, currentColor 22%, transparent);
   border-top-color: currentColor;
-  border-radius: 999px;
+  border-radius: 50%;
   animation: ag-spin 0.8s linear infinite;
 }
 

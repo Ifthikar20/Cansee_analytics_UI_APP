@@ -229,7 +229,7 @@ function focusMain() {
   --app-gutter: 24px;
   --app-body-h: calc(var(--ag-vv-height, 100dvh) - var(--app-header-h) - 1px);
   position: fixed;
-  top: var(--ag-vv-top, 0px);
+  top: var(--ag-vv-top);
   right: 0;
   left: 0;
   z-index: 0;
@@ -334,7 +334,7 @@ function focusMain() {
   left: 8px;
   z-index: 120;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-send-bg);
   color: var(--ag-send-fg);
   font-size: 14px;
@@ -343,7 +343,7 @@ function focusMain() {
 }
 
 .app-skip:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
   transform: none;
@@ -372,6 +372,6 @@ function focusMain() {
 }
 
 :where(.app-main.is-settings) :focus-visible {
-  outline-color: var(--brand-accent, #7232e0);
+  outline-color: var(--ring);
 }
 </style>

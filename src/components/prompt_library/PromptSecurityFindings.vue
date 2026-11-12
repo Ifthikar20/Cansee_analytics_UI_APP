@@ -91,7 +91,7 @@ function label(issue) {
           <p class="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground">
             <span
               v-if="a.reference"
-              class="rounded bg-secondary px-1 py-px font-mono text-[10px] text-secondary-foreground"
+              class="rounded-sm bg-secondary px-1 py-px font-mono text-[10px] text-secondary-foreground"
             >{{ a.reference }}</span>
             <span
               v-if="a.detector_code"

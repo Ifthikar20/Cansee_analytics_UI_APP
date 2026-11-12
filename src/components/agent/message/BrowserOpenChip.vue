@@ -38,7 +38,7 @@ function open(event) {
   height: 32px;
   padding: 0 10px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-1);
   font: inherit;
@@ -55,7 +55,7 @@ function open(event) {
 .ag-open-chip:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .ag-open-chip-icon,

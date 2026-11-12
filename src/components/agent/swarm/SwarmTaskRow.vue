@@ -105,7 +105,7 @@ function close() {
   min-height: 30px;
   padding: 5px 8px 5px 68px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: inherit;
   font: inherit;

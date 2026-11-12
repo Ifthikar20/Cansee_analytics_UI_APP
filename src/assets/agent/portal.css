@@ -16,7 +16,7 @@
   overflow-y: auto;
   padding: 4px;
   border: 1px solid var(--ag-menu-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-menu-bg);
   box-shadow: var(--ag-shadow-pop);
   outline: none;
@@ -35,7 +35,7 @@
   box-sizing: border-box;
   min-height: 32px;
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   color: var(--ag-fg-1);
   font-size: 14px;
   font-weight: 400;
@@ -125,7 +125,7 @@
   max-height: min(var(--reka-popover-content-available-height, 70vh), 520px);
   overflow: hidden;
   border: 1px solid var(--ag-menu-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-menu-bg);
   box-shadow: var(--ag-shadow-pop);
   outline: none;
@@ -146,7 +146,7 @@
   max-width: 280px;
   padding: 5px 8px;
   border: 1px solid var(--ag-tooltip-border);
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: var(--ag-tooltip-bg);
   color: var(--ag-tooltip-fg);
   font-size: 12px;
@@ -193,7 +193,7 @@
   overflow-y: auto;
   padding: 20px;
   border: 1px solid var(--ag-menu-border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--ag-menu-bg);
   box-shadow: var(--ag-shadow-pop);
   transform: translate(-50%, -50%);
@@ -261,7 +261,7 @@
   height: 32px;
   padding: 0 12px;
   border: 1px solid var(--ag-btn-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-btn-bg);
   color: var(--ag-fg-1);
   font-size: 14px;
@@ -293,8 +293,8 @@
 
 .ag-portal .ag-btn.is-danger {
   border-color: var(--ag-danger);
-  background: var(--ag-danger);
-  color: #ffffff;
+  background: var(--destructive);
+  color: var(--destructive-foreground);
 }
 
 .ag-portal .ag-btn.is-danger:hover:not(:disabled) {
@@ -302,7 +302,7 @@
 }
 
 .ag-portal .ag-btn:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }

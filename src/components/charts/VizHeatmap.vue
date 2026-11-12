@@ -194,7 +194,7 @@ onBeforeUnmount(() => observer?.disconnect())
 <style scoped>
 .viz-heat-scroll {
   overflow-x: auto;
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .viz-heat-scroll:focus-visible {
@@ -247,7 +247,7 @@ onBeforeUnmount(() => observer?.disconnect())
   padding: 2px 4px;
   margin-left: -4px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -262,7 +262,7 @@ onBeforeUnmount(() => observer?.disconnect())
 
 .viz-heat tr.is-selected .viz-heat-row-btn,
 .viz-heat tr.is-selected .viz-heat-row-text {
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--viz-nodata);
 }
 
@@ -270,7 +270,7 @@ onBeforeUnmount(() => observer?.disconnect())
   min-width: 76px;
   height: 36px;
   padding: 0 8px;
-  border-radius: 4px;
+  border-radius: var(--radius);
   font-variant-numeric: tabular-nums;
   font-weight: 500;
   text-align: center;

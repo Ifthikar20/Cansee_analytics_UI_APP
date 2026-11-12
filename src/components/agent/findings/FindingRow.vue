@@ -267,7 +267,7 @@ function onCheck(event) {
 <style scoped>
 .ag-fr {
   position: relative;
-  border-radius: 10px;
+  border-radius: var(--radius);
   list-style: none;
   transition: background-color 120ms ease;
 }
@@ -308,7 +308,7 @@ function onCheck(event) {
 }
 
 .ag-fr-checkbox:focus-visible {
-  border-radius: 3px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -318,7 +318,7 @@ function onCheck(event) {
   height: 8px;
   margin-top: 6px;
   margin-left: 1px;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--ag-fg-disabled);
 }
 
@@ -353,7 +353,7 @@ function onCheck(event) {
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-1);
   font: inherit;
@@ -469,7 +469,7 @@ function onCheck(event) {
   align-items: center;
   gap: 4px;
   min-width: 0;
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--ag-fg-1);
   text-decoration: underline;
   text-decoration-color: var(--ag-divider);
@@ -508,7 +508,7 @@ function onCheck(event) {
 }
 
 .ag-fr-source-link {
-  border-radius: 4px;
+  border-radius: var(--radius);
   color: var(--ag-fg-1);
   font-weight: 500;
   text-decoration: underline;

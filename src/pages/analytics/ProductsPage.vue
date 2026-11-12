@@ -6,11 +6,11 @@
       subtitle="Where your products show up in Google Shopping and whether the AI engines name them for shopping questions."
     >
       <template #actions>
-        <Button variant="outline" class="rounded-full" :disabled="!data" @click="openAdd">
+        <Button variant="outline" :disabled="!data" @click="openAdd">
           <Plus class="size-4" aria-hidden="true" />
           Add product
         </Button>
-        <Button class="rounded-full" :disabled="!products.length" @click="openCheck()">
+        <Button :disabled="!products.length" @click="openCheck()">
           <ShoppingBag class="size-4" aria-hidden="true" />
           Run shopping check
         </Button>
@@ -161,9 +161,9 @@
           <p v-if="archiveError" class="pr-confirm-error" role="alert">{{ archiveError }}</p>
           <div class="pr-confirm-actions">
             <AlertDialogCancel as-child>
-              <Button variant="outline" class="rounded-full">Cancel</Button>
+              <Button variant="outline">Cancel</Button>
             </AlertDialogCancel>
-            <Button variant="destructive" class="rounded-full" :disabled="archiveBusy" @click="archive">Archive</Button>
+            <Button variant="destructive" :disabled="archiveBusy" @click="archive">Archive</Button>
           </div>
         </AlertDialogContent>
       </AlertDialogPortal>
@@ -351,7 +351,7 @@ async function archive() {
 }
 
 .an-alert {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .an-retry {
@@ -373,7 +373,7 @@ async function archive() {
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -388,7 +388,7 @@ async function archive() {
   position: relative;
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .an-table-wrap:focus-visible {
@@ -469,7 +469,7 @@ async function archive() {
   margin-left: 6px;
   padding: 0 7px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-size: 11.5px;
   font-weight: 600;
 }
@@ -504,7 +504,7 @@ async function archive() {
   height: 30px;
   padding: 0 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--foreground);
   font: inherit;
@@ -521,7 +521,7 @@ async function archive() {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(10, 10, 12, 0.45);
+  background: var(--scrim);
 }
 
 .pr-confirm {
@@ -534,10 +534,10 @@ async function archive() {
   width: min(440px, calc(100vw - 32px));
   padding: 22px 24px 20px;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius);
   background: var(--popover);
   color: var(--popover-foreground);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  box-shadow: none;
   transform: translate(-50%, -50%);
 }
 

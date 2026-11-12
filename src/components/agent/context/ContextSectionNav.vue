@@ -54,7 +54,7 @@ function jump(event, key) {
   height: 100%;
   padding: 10px 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   color: var(--ag-fg-1);
   text-decoration: none;
   transition: background-color 120ms ease;
@@ -66,7 +66,7 @@ function jump(event, key) {
 }
 
 .ag-csn-card:focus-visible {
-  border-radius: 10px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 1px;
 }
@@ -86,7 +86,7 @@ function jump(event, key) {
 .ag-csn-badge {
   margin-top: 4px;
   padding: 0 7px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--ag-accent) 12%, transparent);
   color: var(--ag-accent);
   font-size: 12px;

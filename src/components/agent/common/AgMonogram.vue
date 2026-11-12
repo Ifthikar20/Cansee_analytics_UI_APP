@@ -20,7 +20,7 @@ const initial = computed(() => {
     :style="{
       '--ag-mono-size': `${size}px`,
       '--ag-mono-font': `${Math.max(9, Math.round(size * 0.6))}px`,
-      '--ag-mono-radius': `${Math.max(4, Math.round(size * 0.24))}px`,
+      '--ag-mono-radius': 'var(--radius)',
     }"
     aria-hidden="true"
   >{{ initial }}</span>

@@ -37,7 +37,7 @@ const emit = defineEmits(['update:modelValue'])
   min-height: 28px;
   padding: 2px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--viz-nodata);
 }
 
@@ -45,7 +45,7 @@ const emit = defineEmits(['update:modelValue'])
   height: 22px;
   padding: 0 9px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--viz-ink-2);
   font: inherit;

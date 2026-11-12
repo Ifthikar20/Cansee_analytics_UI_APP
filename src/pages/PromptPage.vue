@@ -18,7 +18,7 @@
 
     <section v-else-if="loadFailed && !detail" class="pp-state">
       <p class="pp-state-title">We couldn't load this prompt.</p>
-      <Button variant="outline" class="rounded-full" @click="load">Try again</Button>
+      <Button variant="outline" @click="load">Try again</Button>
     </section>
 
     <template v-else-if="detail">
@@ -38,15 +38,15 @@
           </p>
         </div>
         <div class="pp-actions">
-          <Button class="rounded-full" :disabled="checking" @click="checkNow">
+          <Button :disabled="checking" @click="checkNow">
             <RefreshCw class="size-4" :class="{ 'animate-spin': checking }" />
             {{ checking ? 'Checking...' : 'Check now' }}
           </Button>
-          <Button variant="outline" class="rounded-full" @click="showSchedule = true">
+          <Button variant="outline" @click="showSchedule = true">
             <CalendarClock class="size-4" />
             Schedule
           </Button>
-          <Button variant="ghost" class="rounded-full" :disabled="archiving" @click="archive">
+          <Button variant="ghost" :disabled="archiving" @click="archive">
             <Archive class="size-4" />
             Archive
           </Button>
@@ -158,7 +158,7 @@
             <h2 id="pp-countries-title" class="pp-section-title">By country</h2>
             <p class="pp-section-sub">The latest check of this prompt in each country.</p>
           </div>
-          <Button v-if="countryRows.length" as-child variant="outline" class="rounded-full">
+          <Button v-if="countryRows.length" as-child variant="outline">
             <router-link :to="checkCountries">Check countries</router-link>
           </Button>
         </header>
@@ -595,7 +595,7 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
   gap: 12px;
   padding: 28px 30px;
   border: 1px dashed var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -626,7 +626,7 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
   align-self: start;
   padding: 18px;
   border: 1px dashed var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   color: var(--muted-foreground);
   font-size: 14px;
 }
@@ -675,7 +675,7 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
   gap: 6px;
   padding: 18px 20px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -726,7 +726,7 @@ onBeforeUnmount(() => clearTimeout(refreshTimer))
 .pp-ct-scroll {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 

@@ -6,7 +6,7 @@
       subtitle="Questions people and engines ask around your prompts, with where each one came from."
     >
       <template #actions>
-        <Button class="rounded-full" @click="openResearch">
+        <Button @click="openResearch">
           <Lightbulb class="size-4" aria-hidden="true" />
           Find prompt ideas
         </Button>
@@ -246,7 +246,7 @@ function openAnswer(resultId) {
 }
 
 .an-alert {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .an-retry {

@@ -54,10 +54,10 @@ const missLabel = computed(() => {
 const chartData = computed(() => ({
   datasets: [{
     data: plotted.value.map((p) => ({ x: p.google.position || NOT_RANKED_X, y: p.gap.ai_score, prompt: p })),
-    pointBackgroundColor: cssVar('--viz-other', '#a5a5a0'),
-    pointHoverBackgroundColor: cssVar('--viz-cat-1', '#2a78d6'),
-    pointBorderColor: cssVar('--viz-surface', cssVar('--card', '#ffffff')),
-    pointHoverBorderColor: cssVar('--viz-surface', cssVar('--card', '#ffffff')),
+    pointBackgroundColor: cssVar('--viz-other', '#cbcac4'),
+    pointHoverBackgroundColor: cssVar('--viz-cat-1', '#0b0b0b'),
+    pointBorderColor: cssVar('--viz-surface', cssVar('--card', '#e7e6e1')),
+    pointHoverBorderColor: cssVar('--viz-surface', cssVar('--card', '#e7e6e1')),
     pointBorderWidth: 2,
     pointRadius: 7,
     pointHoverRadius: 9,
@@ -80,7 +80,7 @@ const quadrants = {
     ctx.save()
     ctx.setLineDash([4, 5])
     ctx.lineWidth = 1
-    ctx.strokeStyle = cssVar('--input', 'rgba(0,0,0,0.15)')
+    ctx.strokeStyle = cssVar('--input', 'rgba(11,11,11,0.45)')
     ctx.beginPath()
     ctx.moveTo(xMid, area.top)
     ctx.lineTo(xMid, area.bottom)
@@ -102,7 +102,7 @@ const quadrants = {
       ['google_ahead', area.left + pad, yBottom - pad, 'left', 'bottom'],
       ['invisible_both', xRight - pad, yBottom - pad, 'right', 'bottom'],
     ]
-    ctx.fillStyle = cssVar('--viz-ink-2', cssVar('--muted-foreground', '#71717a'))
+    ctx.fillStyle = cssVar('--viz-ink-2', cssVar('--muted-foreground', '#5f5e58'))
     for (const [cls, lx, ly, align, baseline] of labels) {
       ctx.textAlign = align
       ctx.textBaseline = baseline
@@ -113,8 +113,8 @@ const quadrants = {
 }
 
 const chartOptions = computed(() => {
-  const muted = cssVar('--viz-ink-2', cssVar('--muted-foreground', '#71717a'))
-  const grid = cssVar('--viz-grid', cssVar('--border', 'rgba(0,0,0,0.08)'))
+  const muted = cssVar('--viz-ink-2', cssVar('--muted-foreground', '#5f5e58'))
+  const grid = cssVar('--viz-grid', cssVar('--border', 'rgba(11,11,11,0.12)'))
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -161,10 +161,10 @@ const chartOptions = computed(() => {
       tooltip: {
         backgroundColor: cssVar('--popover', '#ffffff'),
         titleColor: muted,
-        bodyColor: cssVar('--popover-foreground', '#222222'),
-        borderColor: cssVar('--border', '#e5e7eb'),
+        bodyColor: cssVar('--popover-foreground', '#0b0b0b'),
+        borderColor: cssVar('--foreground', '#0b0b0b'),
         borderWidth: 1,
-        cornerRadius: 10,
+        cornerRadius: 2,
         padding: 10,
         boxPadding: 5,
         titleFont: { weight: '600', size: 11 },

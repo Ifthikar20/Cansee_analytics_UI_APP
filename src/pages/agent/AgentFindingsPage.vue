@@ -558,7 +558,7 @@ async function confirmDelete() {
   height: 36px;
   padding: 1px;
   border: 1px solid var(--ag-seg-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-seg-track);
 }
 
@@ -569,7 +569,7 @@ async function confirmDelete() {
   height: 32px;
   padding: 0 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-2);
   font: inherit;
@@ -592,7 +592,7 @@ async function confirmDelete() {
 }
 
 .ag-fp-seg-item:focus-visible {
-  border-radius: 7px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: -1px;
 }
@@ -619,7 +619,7 @@ async function confirmDelete() {
   height: 36px;
   padding: 0 30px 0 11px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -635,7 +635,7 @@ async function confirmDelete() {
 
 .ag-fp-select-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: none;
 }
 
@@ -655,7 +655,7 @@ async function confirmDelete() {
 
 .ag-fp-search :deep(.ag-search-input) {
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .ag-fp-list {
@@ -690,7 +690,7 @@ async function confirmDelete() {
 
 .ag-fp-skel {
   display: block;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-row-hover);
   animation: ag-pulse 1.4s ease-in-out infinite;
 }
@@ -700,7 +700,7 @@ async function confirmDelete() {
   width: 8px;
   height: 8px;
   margin-top: 4px;
-  border-radius: 999px;
+  border-radius: 50%;
 }
 
 .ag-fp-skel-line {
@@ -726,7 +726,7 @@ async function confirmDelete() {
 .ag-fp-link {
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-1);
   font: inherit;

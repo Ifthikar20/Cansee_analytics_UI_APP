@@ -327,8 +327,9 @@ watch(() => route.fullPath, () => { open.value = false })
   margin: 0;
   padding: 22px 10px 8px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.14em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
   color: var(--muted-foreground);
   user-select: none;
@@ -340,7 +341,7 @@ watch(() => route.fullPath, () => { open.value = false })
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13px;
   font-weight: 500;
   line-height: 1.3;
@@ -382,7 +383,7 @@ watch(() => route.fullPath, () => { open.value = false })
   color: var(--foreground);
   text-align: left;
   cursor: pointer;
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 .ss-switch-icon { flex: none; color: var(--muted-foreground); }
 .ss-switch-label { flex: 1; min-width: 0; }

@@ -95,7 +95,7 @@ const originLine = computed(() => {
   gap: 8px;
   padding: 14px 16px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-pane-bg);
 }
 

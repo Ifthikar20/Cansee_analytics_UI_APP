@@ -112,7 +112,7 @@ function use() {
   min-height: 168px;
   padding: 16px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .ag-agent-head {
@@ -129,7 +129,7 @@ function use() {
   width: 30px;
   height: 30px;
   border: 1px solid var(--ag-iconbox-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .ag-agent-name {
@@ -152,7 +152,7 @@ function use() {
 .ag-agent-team {
   padding: 0 7px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
   font-size: 12px;
   line-height: 18px;
@@ -197,7 +197,7 @@ function use() {
 }
 
 .ag-agent-from-link:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 2px;
 }
@@ -207,7 +207,7 @@ function use() {
   gap: 8px;
   margin: 0;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-bubble-bg);
   color: var(--ag-fg-1b);
   font-size: 13px;

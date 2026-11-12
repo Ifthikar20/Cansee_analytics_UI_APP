@@ -111,14 +111,14 @@ function historyEngines(h) {
 
         <div class="pds-body">
           <div v-if="loading && !detail" class="pds-loading" aria-busy="true" aria-label="Loading this product">
-            <Skeleton class="h-5 w-2/3 rounded" />
+            <Skeleton class="h-5 w-2/3 rounded-sm" />
             <Skeleton class="h-40 rounded-xl" />
             <Skeleton class="h-32 rounded-xl" />
           </div>
 
           <div v-else-if="failed && !detail" class="pds-failed">
             <p class="pds-muted">We couldn't load this product.</p>
-            <Button variant="outline" size="sm" class="rounded-full" @click="load">Try again</Button>
+            <Button variant="outline" size="sm" @click="load">Try again</Button>
           </div>
 
           <template v-else-if="detail">
@@ -269,7 +269,7 @@ function historyEngines(h) {
   position: fixed;
   inset: 0;
   z-index: 60;
-  background: rgba(10, 10, 12, 0.45);
+  background: var(--scrim);
 }
 
 .pds {
@@ -284,7 +284,7 @@ function historyEngines(h) {
   border-left: 1px solid var(--border);
   background: var(--popover);
   color: var(--popover-foreground);
-  box-shadow: -24px 0 64px rgba(0, 0, 0, 0.16);
+  box-shadow: none;
   outline: none;
 }
 
@@ -322,7 +322,7 @@ function historyEngines(h) {
   width: 30px;
   height: 30px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--muted-foreground);
   cursor: pointer;
@@ -372,15 +372,16 @@ function historyEngines(h) {
   min-width: 0;
   padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
 .pds-block-title {
   color: var(--muted-foreground);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.04em;
+  font-family: var(--font-mono);
   text-transform: uppercase;
 }
 
@@ -471,7 +472,7 @@ function historyEngines(h) {
   margin-left: 6px;
   padding: 0 7px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--foreground);
   font-size: 11.5px;
   font-weight: 600;
@@ -525,7 +526,7 @@ function historyEngines(h) {
   max-height: 320px;
   padding: 10px 12px;
   overflow-y: auto;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--muted);
   color: var(--foreground);
   font-size: 13px;

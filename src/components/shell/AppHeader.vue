@@ -236,7 +236,7 @@ useEventListener(document, 'keydown', (event) => {
 .shell-home {
   display: inline-flex;
   flex-shrink: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .shell-logo {
@@ -282,7 +282,7 @@ useEventListener(document, 'keydown', (event) => {
   height: 34px;
   padding: 0 10px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--foreground);
   font: inherit;
@@ -298,7 +298,7 @@ useEventListener(document, 'keydown', (event) => {
 }
 
 .shell-bar :deep(.shell-chip:focus-visible) {
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .shell-bar :deep(.shell-chip-text) {
@@ -320,7 +320,7 @@ useEventListener(document, 'keydown', (event) => {
   place-items: center;
   width: 20px;
   height: 20px;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--foreground);
   color: var(--background);
   font-size: 11px;
@@ -331,7 +331,7 @@ useEventListener(document, 'keydown', (event) => {
   flex-shrink: 0;
   padding: 1px 7px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--muted-foreground);
   font-size: 11px;
   font-weight: 600;
@@ -346,7 +346,7 @@ useEventListener(document, 'keydown', (event) => {
 
 .shell-link {
   padding: 7px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--muted-foreground);
   font-size: 14px;
   font-weight: 500;
@@ -366,7 +366,7 @@ useEventListener(document, 'keydown', (event) => {
 }
 
 .shell-link:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 
 .shell-actions {
@@ -415,7 +415,7 @@ useEventListener(document, 'keydown', (event) => {
   margin-left: 4px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--foreground);
   color: var(--background);
   font: inherit;
@@ -425,14 +425,13 @@ useEventListener(document, 'keydown', (event) => {
 }
 
 .shell-bar :deep(.shell-avatar:focus-visible) {
-  border-radius: 999px;
+  border-radius: 50%;
 }
 
-/* Dashed hairline under the bar, as on the landing page. */
+/* Hairline under the bar, as on the landing page. */
 .shell-rule {
   height: 1px;
-  background-image: linear-gradient(90deg, var(--border) 0 12px, transparent 12px 32px);
-  background-size: 32px 1px;
+  background: var(--border);
 }
 
 .shell-sheet {
@@ -449,7 +448,7 @@ useEventListener(document, 'keydown', (event) => {
   padding: 8px;
   overflow-y: auto;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--popover);
   box-shadow: var(--ag-shadow-pop);
 }
@@ -461,7 +460,7 @@ useEventListener(document, 'keydown', (event) => {
   width: 100%;
   padding: 10px 12px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--foreground);
   font: inherit;

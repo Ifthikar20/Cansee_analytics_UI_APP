@@ -184,7 +184,7 @@ onBeforeUnmount(() => observer?.disconnect())
 .viz-table-wrap {
   overflow: auto;
   max-height: 360px;
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .viz-table-wrap.is-compact {
@@ -267,7 +267,7 @@ onBeforeUnmount(() => observer?.disconnect())
 }
 
 .viz-th-btn:focus-visible {
-  border-radius: 4px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }

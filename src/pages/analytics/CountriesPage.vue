@@ -9,14 +9,14 @@
         <!-- Blocked: still focusable, so the reason can be read. -->
         <Tooltip v-if="blockedReason">
           <TooltipTrigger as-child>
-            <Button class="rounded-full cp-blocked" aria-disabled="true" @click.prevent>
+            <Button class="cp-blocked" aria-disabled="true" @click.prevent>
               <Globe class="size-4" aria-hidden="true" />
               Check countries
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" class="max-w-72 whitespace-normal leading-relaxed">{{ blockedReason }}</TooltipContent>
         </Tooltip>
-        <Button v-else class="rounded-full" :disabled="!options" @click="openDialog">
+        <Button v-else :disabled="!options" @click="openDialog">
           <Globe class="size-4" aria-hidden="true" />
           Check countries
         </Button>
@@ -477,7 +477,7 @@ const visitorsSpec = computed(() => {
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -513,7 +513,7 @@ const visitorsSpec = computed(() => {
 }
 
 .an-alert {
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .an-retry {
@@ -536,7 +536,7 @@ const visitorsSpec = computed(() => {
 .an-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 

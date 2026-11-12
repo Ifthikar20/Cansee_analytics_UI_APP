@@ -214,7 +214,7 @@ function cancel() {
   gap: 14px;
   padding: 16px;
   border: 1px solid var(--ag-ring);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--ag-pane-bg);
 }
 
@@ -226,7 +226,7 @@ function cancel() {
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--ag-warning) 40%, transparent);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: color-mix(in srgb, var(--ag-warning) 8%, transparent);
   color: var(--ag-fg-1);
   font-size: 13px;
@@ -260,7 +260,7 @@ function cancel() {
   min-height: 36px;
   padding: 7px 11px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -271,7 +271,7 @@ function cancel() {
 
 .ag-cef-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: none;
 }
 
@@ -336,7 +336,7 @@ function cancel() {
   margin-left: -8px;
   padding: 0 8px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-disabled);
   font: inherit;

@@ -1,42 +1,55 @@
 /* ══════════════════════════════════════
    Cansee — Chart tokens
    One palette for every chart (src/lib/charts, src/components/charts).
-   Validated against the app's surfaces (light #ffffff, dark #000000,
-   agent dark #0e0e10): the categorical slots pass the colour-vision
-   checks in both modes; slots 3-5 are low-contrast on white, so every
-   chart keeps a legend with words and a table view.
 
-   Categorical = identity (fixed order, never cycled), sequential =
-   magnitude (one blue ramp; low -> high is light -> dark in light mode
-   and dark -> light in dark mode), diverging = polarity, status = state
-   (always with an icon and a word). Text never wears a series colour.
+   Charts are drawn in ink and warm grays with ONE accent: the user's own
+   series (`brand:you`, --viz-you) is the orange, and nothing else is.
+   Categorical slots are a weight ramp from ink to light gray (identity,
+   fixed order, never cycled); neighbours differ in lightness only, so
+   every chart keeps a legend with words, direct labels where it can, and
+   a table view. Sequential = magnitude (one gray ramp; low -> high is
+   light -> dark in light mode and dark -> light in dark mode). Diverging
+   = polarity (ink, gray, accent). Status = state: emphasis grows from
+   gray (good) through ink (warning) to the accent (serious, critical),
+   always with an icon and a word. Text never wears a series colour.
+
+   Colours alias the semantic tokens in ../tailwind.css; the only literals
+   are the gray steps of the ramps below.
    ══════════════════════════════════════ */
 
-:root {
+:root,
+.cs-contrast {
   --viz-surface: var(--card);
   --viz-ink-1: var(--foreground);
   --viz-ink-2: var(--muted-foreground);
-  --viz-grid: #e1e0d9;        /* hairline gridlines, solid */
-  --viz-axis: #c3c2b7;        /* baseline */
-  --viz-cat-1: #2a78d6; --viz-cat-2: #eb6834; --viz-cat-3: #1baf7a; --viz-cat-4: #eda100;
-  --viz-cat-5: #e87ba4; --viz-cat-6: #008300; --viz-cat-7: #6250d6; --viz-cat-8: #e34948;
-  --viz-other: #a5a5a0;       /* de-emphasis, "Other", comparison periods */
-  --viz-seq-1: #86b6ef; --viz-seq-2: #5598e7; --viz-seq-3: #2a78d6; --viz-seq-4: #1c5cab; --viz-seq-5: #104281;
-  --viz-seq-ink-1: #0b0b0b; --viz-seq-ink-2: #ffffff; --viz-seq-ink-3: #ffffff; --viz-seq-ink-4: #ffffff; --viz-seq-ink-5: #ffffff;
-  --viz-nodata: #f0efec; --viz-nodata-ring: rgba(11, 11, 11, 0.10);
-  --viz-div-pos: #2a78d6; --viz-div-mid: #a5a5a0; --viz-div-neg: #e34948;
-  --viz-good: #0ca30c; --viz-warning: #fab219; --viz-serious: #ec835a; --viz-critical: #d03b3b;
+  --viz-you: var(--signal);    /* the user's own series, the only accent */
+  --viz-cat-1: var(--viz-step-1); --viz-cat-2: var(--viz-step-2); --viz-cat-3: var(--viz-step-3); --viz-cat-4: var(--viz-step-4);
+  --viz-cat-5: var(--viz-step-5); --viz-cat-6: var(--viz-step-6); --viz-cat-7: var(--viz-step-7); --viz-cat-8: var(--viz-step-8);
+  --viz-other: var(--bar);     /* de-emphasis, "Other", comparison periods */
+  --viz-nodata: var(--muted); --viz-nodata-ring: var(--border);
+  --viz-div-pos: var(--foreground); --viz-div-mid: var(--bar); --viz-div-neg: var(--signal);
+  --viz-good: var(--muted-foreground); --viz-warning: var(--foreground); --viz-serious: var(--signal-text); --viz-critical: var(--signal);
 }
 
-[data-theme='dark'] {
-  --viz-grid: #2c2c2a; --viz-axis: #383835;
-  --viz-cat-1: #3987e5; --viz-cat-2: #d95926; --viz-cat-3: #199e70; --viz-cat-4: #c98500;
-  --viz-cat-5: #d55181; --viz-cat-6: #008300; --viz-cat-7: #9085e9; --viz-cat-8: #e66767;
-  --viz-other: #7a7a75;
-  --viz-seq-1: #184f95; --viz-seq-2: #256abf; --viz-seq-3: #3987e5; --viz-seq-4: #6da7ec; --viz-seq-5: #9ec5f4;
-  --viz-seq-ink-1: #ffffff; --viz-seq-ink-2: #ffffff; --viz-seq-ink-3: #ffffff; --viz-seq-ink-4: #0b0b0b; --viz-seq-ink-5: #0b0b0b;
-  --viz-nodata: #1c1c1b; --viz-nodata-ring: rgba(255, 255, 255, 0.10);
-  --viz-div-pos: #3987e5; --viz-div-mid: #7a7a75; --viz-div-neg: #e66767;
+/* The weight ramps, on a light surface... */
+:root,
+:root:root[data-theme='dark'] .cs-contrast,
+:root:root [data-theme='dark'] .cs-contrast {
+  --viz-grid: #d6d5cf; --viz-axis: #a09f98; /* hairline gridlines (solid, so crossings do not darken) and the baseline */
+  --viz-step-1: #0b0b0b; --viz-step-2: #5f5e58; --viz-step-3: #a09f98; --viz-step-4: #3a3936;
+  --viz-step-5: #84837c; --viz-step-6: #bab9b2; --viz-step-7: #4d4c47; --viz-step-8: #72716a;
+  --viz-seq-1: #cbcac4; --viz-seq-2: #a09f98; --viz-seq-3: #72716a; --viz-seq-4: #3a3936; --viz-seq-5: #0b0b0b;
+  --viz-seq-ink-1: #0b0b0b; --viz-seq-ink-2: #0b0b0b; --viz-seq-ink-3: #ffffff; --viz-seq-ink-4: #ffffff; --viz-seq-ink-5: #ffffff;
+}
+
+/* ...and on a dark one. */
+[data-theme='dark'],
+:root:not([data-theme='dark']) .cs-contrast {
+  --viz-grid: #2a2a28; --viz-axis: #4d4c47;
+  --viz-step-1: #f3f2ee; --viz-step-2: #a09f98; --viz-step-3: #5f5e58; --viz-step-4: #cbcac4;
+  --viz-step-5: #84837c; --viz-step-6: #4d4c47; --viz-step-7: #bab9b2; --viz-step-8: #72716a;
+  --viz-seq-1: #3a3936; --viz-seq-2: #5f5e58; --viz-seq-3: #84837c; --viz-seq-4: #bab9b2; --viz-seq-5: #f3f2ee;
+  --viz-seq-ink-1: #ffffff; --viz-seq-ink-2: #ffffff; --viz-seq-ink-3: #0b0b0b; --viz-seq-ink-4: #0b0b0b; --viz-seq-ink-5: #0b0b0b;
 }
 
 /* Screen-reader-only copy of a chart (the hidden table, live regions). */

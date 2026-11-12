@@ -274,7 +274,7 @@ function exportTranscript() {
   width: 6px;
   height: 6px;
   border: 1.5px solid var(--ag-pane-bg);
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--ag-accent);
   box-sizing: content-box;
   pointer-events: none;
@@ -299,7 +299,7 @@ function exportTranscript() {
   margin-left: -6px;
   padding: 0 6px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -315,7 +315,7 @@ function exportTranscript() {
 .ag-chat-title-btn:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 1px;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .ag-chat-title-text {
@@ -344,7 +344,7 @@ function exportTranscript() {
   margin-left: -6px;
   padding: 0 6px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -355,7 +355,7 @@ function exportTranscript() {
 .ag-chat-rename-input:focus-visible {
   outline: 2px solid var(--ag-ring);
   outline-offset: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
 
 .ag-chat-kbd {

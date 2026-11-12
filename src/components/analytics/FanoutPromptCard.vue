@@ -127,7 +127,7 @@ function check() {
 
     <footer v-if="selected.length" class="fpc-foot">
       <span v-if="checkBlocked" class="fpc-blocked">{{ checkBlocked }}</span>
-      <Button class="rounded-full" :disabled="Boolean(checkBlocked)" @click="check">
+      <Button :disabled="Boolean(checkBlocked)" @click="check">
         Check {{ selected.length }} on Google
       </Button>
     </footer>
@@ -142,7 +142,7 @@ function check() {
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -185,7 +185,7 @@ function check() {
   position: relative;
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
 }
 
 .fpc-scroll:focus-visible {

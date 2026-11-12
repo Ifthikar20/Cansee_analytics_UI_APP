@@ -396,7 +396,7 @@ watch(
   gap: 12px;
   padding: 16px 18px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -464,7 +464,7 @@ watch(
 }
 
 .ts-btn {
-  border-radius: 10px;
+  border-radius: var(--radius);
 }
 
 .ts-form {
@@ -490,7 +490,7 @@ watch(
   height: 32px;
   padding: 0 12px;
   border: 1px solid var(--input);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;

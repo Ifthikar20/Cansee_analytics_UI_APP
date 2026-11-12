@@ -16,7 +16,7 @@ defineProps({
   flex: 1 1 auto;
   box-sizing: border-box;
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--viz-nodata);
   animation: bd-skel-pulse 1.6s ease-in-out infinite;
 }

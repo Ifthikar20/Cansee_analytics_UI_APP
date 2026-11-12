@@ -338,7 +338,7 @@ async function suggest() {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid var(--input);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -349,7 +349,7 @@ async function suggest() {
 
 .apd-text:focus-visible {
   border-color: var(--ring);
-  border-radius: 12px;
+  border-radius: var(--radius);
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 22%, transparent);
 }
@@ -369,7 +369,7 @@ async function suggest() {
   height: 34px;
   padding: 0 10px;
   border: 1px solid var(--input);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--background);
   color: var(--foreground);
   font: inherit;
@@ -393,7 +393,7 @@ async function suggest() {
   gap: 6px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--muted);
   font-size: 13px;
   line-height: 1.5;

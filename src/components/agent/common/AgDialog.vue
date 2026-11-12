@@ -71,7 +71,7 @@ defineProps({
   margin: -2px -6px 0 0;
   padding: 0;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-3);
   cursor: pointer;
@@ -83,7 +83,7 @@ defineProps({
 }
 
 .ag-dlg-close:focus-visible {
-  border-radius: 6px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 1px;
 }

@@ -35,7 +35,7 @@ const note = computed(() => methodNote(props.method))
   min-height: 20px;
   padding: 1px 8px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--muted-foreground);
   font: inherit;
@@ -56,6 +56,6 @@ button.mchip:hover {
 }
 
 button.mchip:focus-visible {
-  border-radius: 999px;
+  border-radius: var(--radius);
 }
 </style>

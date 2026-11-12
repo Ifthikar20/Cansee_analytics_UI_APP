@@ -46,7 +46,8 @@ const keyshortcuts = computed(() => (props.shortcut ? ariaShortcut(props.shortcu
 const style = computed(() => ({
   '--ag-ib-size': `${px.value}px`,
   '--ag-ib-icon': `${Number(props.iconSize) || 16}px`,
-  '--ag-ib-radius': props.shape === 'circle' ? '999px' : px.value <= 28 ? '6px' : '8px',
+  // Square in every shape: the design has no round or pill controls.
+  '--ag-ib-radius': 'var(--radius)',
 }))
 </script>
 

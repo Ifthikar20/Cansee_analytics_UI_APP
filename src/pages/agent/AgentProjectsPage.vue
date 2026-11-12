@@ -167,7 +167,7 @@ onMounted(load)
   min-height: 72px;
   padding: 12px 16px 12px 12px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .ag-project.is-current {
@@ -200,7 +200,7 @@ onMounted(load)
 .ag-project-badge {
   flex-shrink: 0;
   padding: 0 6px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--ag-you-bg);
   color: var(--ag-accent);
   font-size: 11px;

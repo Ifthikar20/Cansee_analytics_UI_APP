@@ -82,7 +82,7 @@ const rows = computed(() => pageAuditRows(props.audit, { checks: props.checks, b
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 
@@ -98,7 +98,7 @@ const rows = computed(() => pageAuditRows(props.audit, { checks: props.checks, b
 }
 
 .pat-scroll:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 .pat-table {
@@ -169,7 +169,7 @@ const rows = computed(() => pageAuditRows(props.audit, { checks: props.checks, b
 .pat-chip {
   padding: 1px 8px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius);
   color: var(--foreground);
   font-size: 12px;
   white-space: nowrap;

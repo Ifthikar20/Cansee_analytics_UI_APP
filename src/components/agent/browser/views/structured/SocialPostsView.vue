@@ -98,7 +98,7 @@ async function copyPost(post) {
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .ag-spv-parts {

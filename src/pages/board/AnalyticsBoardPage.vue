@@ -464,7 +464,7 @@ watch(
 }
 
 .bd-top.is-stuck {
-  box-shadow: 0 1px 0 var(--ag-divider-subtle);
+  box-shadow: none;
 }
 
 .bd-bar {

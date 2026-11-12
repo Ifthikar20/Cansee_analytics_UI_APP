@@ -243,7 +243,7 @@ onMounted(() => {
   height: 30px;
   padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-2);
   font: inherit;
@@ -266,13 +266,13 @@ onMounted(() => {
 }
 
 .ag-agents-tab:focus-visible {
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 1px;
 }
 
 .ag-agents-panel:focus-visible {
-  border-radius: 12px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: 4px;
 }
@@ -294,12 +294,12 @@ onMounted(() => {
   min-height: 168px;
   padding: 16px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .ag-skel {
   display: block;
-  border-radius: 6px;
+  border-radius: var(--radius);
   background: var(--ag-row-hover);
   animation: ag-pulse 1.4s ease-in-out infinite;
 }

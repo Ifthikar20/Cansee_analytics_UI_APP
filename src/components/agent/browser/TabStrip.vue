@@ -299,7 +299,7 @@ watch(
   box-sizing: border-box;
   height: 34px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--radius);
   color: var(--ag-fg-2);
   transition: background-color 120ms ease, color 120ms ease;
 }
@@ -324,7 +324,7 @@ watch(
   height: 100%;
   padding: 0 12px 0 10px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius);
   background: transparent;
   color: inherit;
   font: inherit;
@@ -333,7 +333,7 @@ watch(
 }
 
 .ag-tab-main:focus-visible {
-  border-radius: 9px;
+  border-radius: var(--radius);
   outline: 2px solid var(--ag-ring);
   outline-offset: -2px;
 }
@@ -352,7 +352,7 @@ watch(
 .ag-tab-page {
   flex-shrink: 0;
   padding: 0 4px;
-  border-radius: 4px;
+  border-radius: var(--radius);
   background: var(--ag-ghost-hover);
   color: var(--ag-fg-2);
   font-size: 11px;
@@ -373,7 +373,7 @@ watch(
   margin-right: 10px;
   padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius);
   background: transparent;
   color: var(--ag-fg-4);
   cursor: pointer;
@@ -411,7 +411,7 @@ watch(
   flex-shrink: 0;
   align-items: center;
   background: var(--ag-pane-bg);
-  box-shadow: -6px 0 6px var(--ag-pane-bg);
+  box-shadow: none;
 }
 
 .ag-strip-end {

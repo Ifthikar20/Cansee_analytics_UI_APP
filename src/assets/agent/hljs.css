@@ -1,33 +1,20 @@
-/* highlight.js token colours for agent code blocks, light and dark.
+/* highlight.js token colours for agent code blocks: ink, grays and the one
+   accent (strings and numbers), following the theme through the tokens.
    Scoped to .ag-code so nothing else in the app picks them up. */
 
 .ag-code {
   --ag-hl-text: var(--ag-fg-1);
-  --ag-hl-comment: #6e7781;
-  --ag-hl-keyword: #cf222e;
-  --ag-hl-string: #0a3069;
-  --ag-hl-number: #0550ae;
-  --ag-hl-title: #8250df;
-  --ag-hl-name: #116329;
-  --ag-hl-meta: #953800;
-  --ag-hl-del-fg: #82071e;
-  --ag-hl-del-bg: #ffebe9;
-  --ag-hl-add-fg: #116329;
-  --ag-hl-add-bg: #dafbe1;
-}
-
-[data-theme='dark'] .ag-code {
-  --ag-hl-comment: #8b949e;
-  --ag-hl-keyword: #ff7b72;
-  --ag-hl-string: #a5d6ff;
-  --ag-hl-number: #79c0ff;
-  --ag-hl-title: #d2a8ff;
-  --ag-hl-name: #7ee787;
-  --ag-hl-meta: #ffa657;
-  --ag-hl-del-fg: #ffdcd7;
-  --ag-hl-del-bg: rgba(248, 81, 73, 0.15);
-  --ag-hl-add-fg: #aff5b4;
-  --ag-hl-add-bg: rgba(46, 160, 67, 0.15);
+  --ag-hl-comment: var(--subtle-foreground);
+  --ag-hl-keyword: var(--foreground);
+  --ag-hl-string: var(--signal-text);
+  --ag-hl-number: var(--signal-text);
+  --ag-hl-title: var(--foreground);
+  --ag-hl-name: var(--muted-foreground);
+  --ag-hl-meta: var(--muted-foreground);
+  --ag-hl-del-fg: var(--signal-text);
+  --ag-hl-del-bg: var(--signal-soft);
+  --ag-hl-add-fg: var(--foreground);
+  --ag-hl-add-bg: var(--muted);
 }
 
 .ag-code .hljs {

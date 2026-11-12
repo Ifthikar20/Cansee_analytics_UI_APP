@@ -318,7 +318,7 @@ function submit() {
   min-height: 34px;
   padding: 6px 10px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -329,7 +329,7 @@ function submit() {
 
 .ag-cbd-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: none;
 }
 
@@ -343,7 +343,7 @@ function submit() {
   flex-direction: column;
   gap: 6px;
   padding: 12px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--ag-bubble-bg);
   transition: opacity 120ms ease;
 }

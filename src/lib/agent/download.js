@@ -73,22 +73,22 @@ export function escapeHtml(value) {
 
 const DOC_CSS = `
 :root{color-scheme:light}
-body{margin:0;background:#fff;color:#1a1a18;font:16px/1.625 Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif}
+body{margin:0;background:#fff;color:#0b0b0b;font:16px/1.625 Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif}
 main{max-width:720px;margin:0 auto;padding:48px 24px 64px}
 h1,h2,h3,h4{line-height:1.3;margin:1.6em 0 .6em}
 h1{font-size:28px;margin-top:0}h2{font-size:22px}h3{font-size:18px}h4{font-size:16px}
 p,ul,ol,blockquote,pre,table{margin:0 0 16px}
-a{color:#1a0dab}
+a{color:#0b0b0b;text-decoration:underline;text-underline-offset:2px}
 blockquote{border-left:3px solid #e2e2dd;margin-left:0;padding-left:16px;color:#5c5c57}
-code{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:.9em;background:#f2f2ef;border-radius:4px;padding:.1em .3em}
-pre{background:#f7f7f5;border:1px solid #ebebe7;border-radius:8px;padding:12px 14px;overflow:auto}
+code{font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;font-size:.9em;background:#f2f2ef;border-radius:2px;padding:.1em .3em}
+pre{background:#f7f7f5;border:1px solid #ebebe7;border-radius:2px;padding:12px 14px;overflow:auto}
 pre code{background:none;padding:0}
 table{border-collapse:collapse;width:100%;font-size:14px}
 th,td{border:1px solid #e6e6e1;padding:6px 10px;text-align:left;vertical-align:top}
 th{background:#f7f7f5;font-weight:600}
 hr{border:0;border-top:1px solid #e6e6e1;margin:24px 0}
 button{display:none}
-.ag-rh{border:1px solid #e6e6e1;border-radius:8px;padding:12px 16px;margin:0 0 24px;font-size:14px;line-height:1.5}
+.ag-rh{border:1px solid #e6e6e1;border-radius:2px;padding:12px 16px;margin:0 0 24px;font-size:14px;line-height:1.5}
 .ag-rh-top{margin:0 0 8px;font-weight:600}.ag-rh-sample{margin-left:8px;font-size:12px;text-transform:uppercase}
 .ag-rh-list{margin:0}.ag-rh-row{display:flex;gap:12px}.ag-rh-row dt{flex:0 0 96px;color:#5c5c57}.ag-rh-row dd{margin:0}
 .ag-rh-items,.ag-rh-engines{margin:0;padding:0;list-style:none}.ag-rh-engines li{display:inline;margin-right:14px}.ag-rh-muted{color:#5c5c57}

@@ -97,7 +97,7 @@ function citedLine(doc) {
   padding: 0;
   overflow: hidden;
   border: 1px solid var(--ag-card-border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   list-style: none;
 }
 

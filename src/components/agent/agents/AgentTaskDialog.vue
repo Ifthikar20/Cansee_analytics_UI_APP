@@ -675,7 +675,7 @@ const blankChat = computed(() =>
   min-height: 36px;
   padding: 7px 11px;
   border: 1px solid var(--ag-composer-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-composer-bg);
   color: var(--ag-fg-1);
   font: inherit;
@@ -686,7 +686,7 @@ const blankChat = computed(() =>
 
 .ag-atd-input:focus-visible {
   border-color: var(--ag-ring);
-  border-radius: 8px;
+  border-radius: var(--radius);
   outline: none;
 }
 
@@ -776,7 +776,7 @@ const blankChat = computed(() =>
   gap: 8px;
   padding: 8px 10px;
   border: 1px solid var(--ag-card-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   cursor: pointer;
 }
 
@@ -819,7 +819,7 @@ const blankChat = computed(() =>
 .ag-atd-preview-text {
   margin: 0;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--ag-bubble-bg);
   color: var(--ag-fg-1b);
   font-size: 13px;
