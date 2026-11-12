@@ -18,7 +18,7 @@ import { useRoute } from 'vue-router'
 import { GripVertical } from '@lucide/vue'
 import { useBoardDragItem } from '@/composables/board/useBoardDrag'
 import { CARD_RETRY, CARD_STATUS, useBoard } from '@/lib/board/context'
-import { CARD_STATUSES, statusChip } from '@/lib/board/frame'
+import { statusChip } from '@/lib/board/frame'
 import { SIZE_WORDS, blockCode, widgetMeta } from '@/lib/board/widgets'
 import { useAgentUiStore } from '@/stores/agentUi'
 import { useBoardStore } from '@/stores/board'
@@ -74,7 +74,7 @@ const card = computed(() => {
 // What the card says its body shows; null until it says so.
 const reported = ref(null)
 provide(CARD_STATUS, (status) => {
-  reported.value = CARD_STATUSES.includes(status) ? status : null
+  reported.value = status || null
 })
 
 function retry() {
@@ -93,7 +93,8 @@ onErrorCaptured(() => {
 
 // The chip never claims more than the frame knows: a layout still loading
 // is loading, a card that could not load is an error, and otherwise it is
-// what the card reports (no chip until it does).
+// what the card reports (no chip until it does, nor for a status the frame
+// does not know).
 const status = computed(() => {
   if (props.pending) return 'loading'
   if (failed.value || !card.value) return 'error'

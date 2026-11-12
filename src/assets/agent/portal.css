@@ -208,9 +208,12 @@
   width: min(560px, calc(100vw - 32px));
 }
 
+/* A gallery sits on the page's own surface, so the cards it shows read as
+   they do on the page (a card is the popover's tone in the dark theme). */
 .ag-portal.ag-dialog.is-gallery {
   width: min(1120px, calc(100vw - 32px));
   padding: 24px;
+  background: var(--background);
 }
 
 .ag-dialog .ag-dialog-title {

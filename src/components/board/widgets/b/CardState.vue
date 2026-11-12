@@ -49,8 +49,8 @@ function run() {
   flex: 1 1 auto;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
-  gap: 6px;
+  justify-content: flex-end;
+  gap: 8px;
   min-height: 96px;
 }
 
@@ -59,17 +59,33 @@ function run() {
   min-height: 0;
 }
 
+/* In place of the numbers: one sentence in the card's display type, set
+   at the foot of the card. Under a card's numbers it stays small. */
 .wb-state-title {
+  max-width: 28ch;
   margin: 0;
+  color: var(--ag-fg-1);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+}
+
+.wb-state.is-inline .wb-state-title {
+  max-width: none;
   color: var(--ag-fg-2);
+  font-family: inherit;
   font-size: 13px;
+  font-weight: 400;
   line-height: 18px;
+  letter-spacing: 0;
 }
 
 .wb-state-body {
-  margin: 0 0 2px;
+  margin: 0 0 4px;
   color: var(--ag-fg-3);
-  font-size: 12px;
-  line-height: 16px;
+  font-size: 13px;
+  line-height: 18px;
 }
 </style>

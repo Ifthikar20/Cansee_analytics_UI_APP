@@ -142,6 +142,16 @@ function openPrompt(promptId) {
   line-height: 18px;
 }
 
+/* The card could not load: one sentence in the card's display type. */
+.rk-state:not(.is-inline) .rk-state-title {
+  color: var(--ag-fg-1);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+}
+
 .rk-lead {
   margin: 0;
   color: var(--ag-fg-1);

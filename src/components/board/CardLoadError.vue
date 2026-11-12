@@ -32,15 +32,18 @@ function retry() {
   flex: 1 1 auto;
   flex-direction: column;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-end;
   gap: 8px;
   min-height: 96px;
 }
 
 .bd-load-error-text {
   margin: 0;
-  color: var(--ag-fg-2);
-  font-size: 13px;
-  line-height: 18px;
+  color: var(--ag-fg-1);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 24px;
+  letter-spacing: -0.01em;
 }
 </style>

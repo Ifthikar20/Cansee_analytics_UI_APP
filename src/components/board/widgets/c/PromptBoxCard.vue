@@ -524,6 +524,16 @@ onBeforeUnmount(() => {
   line-height: 18px;
 }
 
+/* The card could not load: one sentence in the card's display type. */
+.pb-state-title {
+  color: var(--ag-fg-1);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 24px;
+  letter-spacing: -0.01em;
+}
+
 .pb-layout {
   display: flex;
   flex-direction: column;

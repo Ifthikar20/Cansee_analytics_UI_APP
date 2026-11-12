@@ -16,7 +16,7 @@ import { Maximize2, Minimize2, Plus, X } from '@lucide/vue'
 import AgButton from '@/components/agent/common/AgButton.vue'
 import AgIconButton from '@/components/agent/common/AgIconButton.vue'
 import { CARD_RETRY, IN_PANEL, useBoard } from '@/lib/board/context'
-import { panelTitle, widgetMeta } from '@/lib/board/widgets'
+import { blockCode, panelTitle, widgetMeta } from '@/lib/board/widgets'
 import { useAgentUiStore } from '@/stores/agentUi'
 import { useBoardStore } from '@/stores/board'
 import { WIDGET_COMPONENTS } from './widgetComponents'
@@ -42,6 +42,8 @@ const titleEl = ref(null)
 const bodyEl = ref(null)
 
 const title = computed(() => panelTitle(props.widgetKey, route.query))
+// The block's code, as under its card on the board.
+const code = computed(() => blockCode(props.widgetKey))
 const entry = computed(() => WIDGET_COMPONENTS[props.widgetKey] || null)
 const panelProps = computed(() => entry.value?.panelProps || {})
 
@@ -158,6 +160,7 @@ useEventListener(window, 'keydown', onKeydown)
       aria-labelledby="bd-panel-title"
     >
       <header class="bd-panel-head">
+        <span v-if="code" class="bd-panel-code" aria-hidden="true">{{ code }}</span>
         <h2 id="bd-panel-title" ref="titleEl" class="bd-panel-title" tabindex="-1">{{ title }}</h2>
         <div class="bd-panel-actions">
           <AgButton v-if="canAdd" size="sm" :icon="Plus" @click="addToBoard">Add to board</AgButton>
@@ -225,10 +228,9 @@ useEventListener(window, 'keydown', onKeydown)
   width: min(var(--bd-sheet-w, 760px), 100%);
   min-width: 0;
   height: var(--bd-view-h, 100dvh);
-  border-left: 1px solid var(--ag-divider);
+  border-left: 1px solid var(--foreground);
   background: var(--ag-pane-bg);
   color: var(--ag-fg-1);
-  box-shadow: var(--ag-shadow-pop);
   outline: none;
   animation: bd-panel-in 220ms var(--ag-ease);
 }
@@ -240,7 +242,6 @@ useEventListener(window, 'keydown', onKeydown)
 .bd-panel.is-full {
   width: 100%;
   border-left: 0;
-  box-shadow: none;
 }
 
 @keyframes bd-panel-in {
@@ -267,11 +268,22 @@ useEventListener(window, 'keydown', onKeydown)
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   box-sizing: border-box;
-  height: 48px;
+  height: 56px;
   padding: 0 12px 0 20px;
   border-bottom: 1px solid var(--ag-divider-subtle);
+}
+
+/* The block's code, as in the line under its card. */
+.bd-panel-code {
+  flex: 0 0 auto;
+  color: var(--foreground);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: 0.05em;
 }
 
 .bd-panel-title {
@@ -280,9 +292,11 @@ useEventListener(window, 'keydown', onKeydown)
   margin: 0;
   overflow: hidden;
   color: var(--ag-fg-1);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 20px;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 24px;
+  letter-spacing: -0.01em;
   text-overflow: ellipsis;
   white-space: nowrap;
   /* Focus lands here only from script (tabindex -1), so a screen reader
@@ -313,6 +327,11 @@ useEventListener(window, 'keydown', onKeydown)
 @media (max-width: 767px) {
   .bd-panel-head {
     padding: 0 8px 0 16px;
+  }
+
+  /* A phone's sheet keeps the room for the title. */
+  .bd-panel-code {
+    display: none;
   }
 
   .bd-panel-body {
