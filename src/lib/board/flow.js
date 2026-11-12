@@ -16,8 +16,10 @@ export function cleanDensity(value) {
     return DENSITIES.includes(n) ? n : DEFAULT_DENSITY
 }
 
-// The widths under which a board drops a column, whatever its density (a
-// card under about 300px is no card).
+// The widths under which a board shows fewer columns than its density asks
+// for (a card under about 300px is no card). Four columns fold in half, to
+// two: three would leave the fourth card of a row of four alone on the
+// next row.
 export const DENSE_MIN_PX = 1240 // @container board (max-width: 1239px) in BoardGrid.vue
 export const WIDE_MIN_PX = 920 // @container board (max-width: 919px)
 export const SPLIT_MIN_PX = 640 // @container board (max-width: 639px)
@@ -31,17 +33,20 @@ const SPANS = {
 /**
  * The column mode of a board `width` px wide (the content width of
  * .bd-body) at a density of `columns`: 'dense' (four thirds to a row),
- * 'wide' (three), 'medium' (two) or 'single'. The board shows as many
- * columns as its density asks for and its width allows; 0 (not measured)
- * allows them all. As in the container queries, a width just over 1239px,
- * 919px or 639px is the wider mode.
+ * 'wide' (three), 'medium' (two) or 'single'. A board wide enough shows
+ * its density; a narrower one shows two columns (four fold in half, so a
+ * row of four becomes two rows of two, never three and one), and a phone
+ * one. 0 (not measured) is wide enough. As in the container queries, a
+ * width just over 1239px, 919px or 639px is the wider mode.
  */
 export function boardMode(width, columns = DEFAULT_DENSITY) {
     const w = Number(width) || 0
     if (w > 0 && w <= SPLIT_MIN_PX - 1) return 'single'
-    const room = w <= 0 || w > DENSE_MIN_PX - 1 ? 4 : w > WIDE_MIN_PX - 1 ? 3 : 2
-    const shown = Math.min(cleanDensity(columns), room)
-    return shown === 4 ? 'dense' : shown === 3 ? 'wide' : 'medium'
+    const density = cleanDensity(columns)
+    const fits = (min) => w <= 0 || w > min - 1
+    if (density === 4 && fits(DENSE_MIN_PX)) return 'dense'
+    if (density === 3 && fits(WIDE_MIN_PX)) return 'wide'
+    return 'medium'
 }
 
 /** The columns a widget of `size` spans in `mode`. */

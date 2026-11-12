@@ -2,7 +2,7 @@
 // The board's cards on a 12-column grid (board_frontend.md 3): thirds,
 // halves and full rows in the user's order. `columns` is the board's
 // density: how many one-third cards make a row (2, 3 or 4). A board too
-// narrow for that many shows fewer, and a phone always shows one column.
+// narrow for that many shows two, and a phone always shows one column.
 // Cards move by drag and drop (a card's header or grip, or the grip's keys)
 // as well as by their menu (frame_board.md B3 and B4): while one moves the
 // grid shows the draft order and the other cards glide out of its way. The
@@ -91,15 +91,16 @@ const { shown } = provideBoardDrag({
   --bd-span-third: 3;
 }
 
-/* A card under about 300px is no card: a narrower board drops a column. */
+/* A card under about 300px is no card: a board too narrow for its density
+   shows two columns. Four fold in half rather than drop to three, so a row
+   of four becomes two rows of two and no card is left alone on a row. */
 @container board (max-width: 1239px) {
   .bd-grid.is-cols-4 {
-    --bd-span-third: 4;
+    --bd-span-third: 6;
   }
 }
 
 @container board (max-width: 919px) {
-  .bd-grid.is-cols-4,
   .bd-grid.is-cols-3 {
     --bd-span-third: 6;
   }
