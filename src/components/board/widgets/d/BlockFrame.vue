@@ -11,6 +11,7 @@ import { useCardStatus } from '@/lib/board/context'
 import { cardStatus } from '@/lib/board/frame'
 import { widgetMeta } from '@/lib/board/widgets'
 import CardFoot from '@/components/board/CardFoot.vue'
+import CardReading from '@/components/board/CardReading.vue'
 import CardSkeleton from '@/components/board/CardSkeleton.vue'
 import CardState from '../b/CardState.vue'
 import { loadFailure } from '../b/specs'
@@ -32,6 +33,8 @@ const props = defineProps({
   foot: { type: String, default: '' },
   // The skeleton's height in px.
   skeleton: { type: Number, default: 240 },
+  // What the numbers mean and the step that follows (lib/board/reading.js).
+  reading: { type: Object, default: null },
 })
 const emit = defineEmits(['retry'])
 
@@ -55,6 +58,7 @@ const footText = computed(() => [props.foot, props.stale ? "Couldn't refresh." :
     <CardState v-else-if="!data" v-bind="failed" :widget="widget" @retry="emit('retry')" />
     <CardState v-else-if="empty" v-bind="empty" :widget="widget" @retry="emit('retry')" />
     <template v-else>
+      <CardReading :reading="reading" />
       <slot />
       <CardFoot v-if="footText || $slots.aside">
         <template v-if="footText">{{ footText }}</template>

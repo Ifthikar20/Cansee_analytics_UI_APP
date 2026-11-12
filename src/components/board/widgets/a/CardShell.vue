@@ -8,6 +8,7 @@ import { computed } from 'vue'
 import { useCardStatus } from '@/lib/board/context'
 import { cardStatus } from '@/lib/board/frame'
 import CardFoot from '@/components/board/CardFoot.vue'
+import CardReading from '@/components/board/CardReading.vue'
 import CardSkeleton from '@/components/board/CardSkeleton.vue'
 import CardState from './CardState.vue'
 import { failureState, STALE_NOTE } from './specs'
@@ -25,6 +26,8 @@ const props = defineProps({
   // Foot lines (source, window, notes) shown with the numbers.
   notes: { type: Array, default: () => [] },
   skeleton: { type: Number, default: 132 },
+  // What the numbers mean and the step that follows (lib/board/reading.js).
+  reading: { type: Object, default: null },
 })
 const emit = defineEmits(['retry', 'action'])
 
@@ -47,7 +50,10 @@ const footText = computed(() => [...props.notes, props.stale ? STALE_NOTE : ''].
     <CardState v-else-if="phase === 'failed'" v-bind="failed" @action="emit('retry')" />
     <template v-else>
       <CardState v-if="empty" v-bind="empty" @action="emit('action')" />
-      <slot v-else />
+      <template v-else>
+        <CardReading :reading="reading" />
+        <slot />
+      </template>
       <CardFoot v-if="footText || $slots.link">
         <template v-if="footText">{{ footText }}</template>
         <template v-if="$slots.link" #link><slot name="link" /></template>

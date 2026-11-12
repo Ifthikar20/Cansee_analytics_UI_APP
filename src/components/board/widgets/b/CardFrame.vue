@@ -10,6 +10,7 @@ import { useCardStatus } from '@/lib/board/context'
 import { cardStatus } from '@/lib/board/frame'
 import { widgetMeta } from '@/lib/board/widgets'
 import CardFoot from '@/components/board/CardFoot.vue'
+import CardReading from '@/components/board/CardReading.vue'
 import CardSkeleton from '@/components/board/CardSkeleton.vue'
 import CardState from './CardState.vue'
 import { loadFailure } from './specs'
@@ -28,6 +29,8 @@ const props = defineProps({
   foot: { type: String, default: '' },
   // The skeleton's height in px.
   skeleton: { type: Number, default: 132 },
+  // What the numbers mean and the step that follows (lib/board/reading.js).
+  reading: { type: Object, default: null },
 })
 const emit = defineEmits(['retry'])
 
@@ -53,10 +56,13 @@ const footText = computed(() =>
     <CardState v-else-if="!data" v-bind="failed" :widget="widget" @retry="emit('retry')" />
     <template v-else>
       <CardState v-if="empty" v-bind="empty" :widget="widget" @retry="emit('retry')" />
-      <div v-else class="wb-body" :class="{ 'has-lead': $slots.lead }">
-        <div v-if="$slots.lead" class="wb-lead"><slot name="lead" /></div>
-        <div class="wb-main"><slot /></div>
-      </div>
+      <template v-else>
+        <CardReading :reading="reading" />
+        <div class="wb-body" :class="{ 'has-lead': $slots.lead }">
+          <div v-if="$slots.lead" class="wb-lead"><slot name="lead" /></div>
+          <div class="wb-main"><slot /></div>
+        </div>
+      </template>
       <CardFoot v-if="footText">{{ footText }}</CardFoot>
     </template>
   </div>
