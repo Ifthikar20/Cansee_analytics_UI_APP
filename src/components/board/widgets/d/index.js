@@ -6,7 +6,8 @@
 //
 // A block may add `preview: () => import('./XPreview.vue')` to draw its own
 // catalog tile; without one the tile draws the catalog's `preview` kind
-// (BlockPreview.vue).
+// (BlockPreview.vue). The watch's tile is the card's own eye, and the
+// visibility score's shows the block's real unit, a percent.
 const watchCard = () => import('./WatchCard.vue')
 
 export default {
@@ -14,6 +15,7 @@ export default {
         card: watchCard,
         panel: watchCard,
         panelProps: { size: 'full' },
+        preview: () => import('./WatchPreview.vue'),
     },
     'asked-answered': {
         card: () => import('./AskedAnsweredCard.vue'),
@@ -27,5 +29,6 @@ export default {
         card: () => import('./VisibilityScoreCard.vue'),
         panel: () => import('@/pages/analytics/VisibilityPage.vue'),
         panelProps: { focus: 'over-time' },
+        preview: () => import('./VisibilityScorePreview.vue'),
     },
 }
